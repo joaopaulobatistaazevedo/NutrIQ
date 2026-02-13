@@ -12,8 +12,7 @@ export default function Register() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Por agora só navega para dashboard (sem validação)
-    navigate('/dashboard');
+    navigate('/welcome-bot', { state: { name: name.trim() } });
   };
 
   return (
@@ -22,7 +21,7 @@ export default function Register() {
       <div className="auth-form-side">
         <div className="auth-form">
           <div className="logo">
-            <span className="logo-text">MealPlanner</span>
+            <span className="logo-text">NutrIQ</span>
           </div>
 
           <h1>Cria a tua conta</h1>

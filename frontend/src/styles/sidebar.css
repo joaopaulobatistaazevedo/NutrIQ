@@ -53,6 +53,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-height: 44px;
   padding: 12px 16px;
   margin-bottom: 4px;
   border: 1px solid transparent;
@@ -113,6 +114,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-height: 44px;
   padding: 12px 16px;
   border: 1px solid #FECACA;
   border-radius: 8px;
@@ -146,6 +148,26 @@
   }
 
   .sidebar-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 12px;
+    scrollbar-width: thin;
+  }
+
+  .sidebar-item {
+    width: auto;
+    min-width: fit-content;
+    padding: 10px 12px;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .sidebar-item-label {
+    white-space: nowrap;
+  }
+
+  .sidebar-item-arrow {
     display: none;
   }
 
@@ -154,7 +176,14 @@
   }
 
   .sidebar-footer {
-    display: none;
+    display: block;
+    padding: 12px;
+    border-top: none;
+  }
+
+  .sidebar-logout {
+    width: auto;
+    padding: 10px 12px;
   }
 }
 

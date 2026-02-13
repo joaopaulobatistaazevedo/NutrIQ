@@ -19,7 +19,7 @@ export default function Login() {
       <div className="auth-form-side">
         <div className="auth-form">
           <div className="logo">
-            <span className="logo-text">MealPlanner</span>
+            <span className="logo-text">NutrIQ</span>
           </div>
 
           <h1>Bem-vindo de volta</h1>

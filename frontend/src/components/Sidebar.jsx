@@ -36,7 +36,7 @@ export default function Sidebar() {
     <div className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <span className="sidebar-logo-text">MealPlanner</span>
+        <span className="sidebar-logo-text">NutrIQ</span>
       </div>
 
       {/* Menu */}
