@@ -9,15 +9,16 @@
 .layout-content {
   flex: 1;
   margin-left: 280px;
-  padding: 32px;
+  padding: clamp(16px, 2vw, 32px);
   overflow-y: auto;
+  min-width: 0;
 }
 
 /* Mobile */
 @media (max-width: 768px) {
   .layout-content {
     margin-left: 0;
-    padding: 20px;
+    padding: 16px;
   }
 }
 
@@ -25,6 +26,12 @@
 @media (max-width: 1024px) {
   .layout-content {
     margin-left: 240px;
-    padding: 24px;
+    padding: 20px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .layout-content {
+    padding: 40px 56px;
   }
 }

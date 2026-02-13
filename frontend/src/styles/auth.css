@@ -19,6 +19,7 @@
 .auth-form {
   width: 100%;
   max-width: 440px;
+  min-width: 0;
 }
 
 /* Logo */
@@ -41,14 +42,14 @@
 
 /* Títulos */
 .auth-form h1 {
-  font-size: 32px;
+  font-size: clamp(28px, 4vw, 32px);
   font-weight: 700;
   color: #1F2937;
   margin-bottom: 8px;
 }
 
 .subtitle {
-  font-size: 16px;
+  font-size: clamp(14px, 2vw, 16px);
   color: #6B7280;
   margin-bottom: 32px;
 }
@@ -68,6 +69,7 @@
 
 .form-group input {
   width: 100%;
+  min-height: 44px;
   padding: 12px 16px;
   font-size: 16px;
   border: 1px solid #E5E7EB;
@@ -102,6 +104,7 @@
 /* Botão */
 .btn-primary {
   width: 100%;
+  min-height: 44px;
   padding: 14px;
   font-size: 16px;
   font-weight: 600;
@@ -247,7 +250,7 @@
   }
 
   .auth-form-side {
-    padding: 32px 20px;
+    padding: 24px 16px;
   }
 
   .auth-form h1 {
@@ -256,5 +259,33 @@
 
   .logo {
     margin-bottom: 32px;
+  }
+}
+
+@media (max-width: 380px) {
+  .auth-form-side {
+    padding: 20px 12px;
+  }
+
+  .auth-form h1 {
+    font-size: 24px;
+  }
+
+  .subtitle {
+    margin-bottom: 24px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .auth-form-side {
+    padding: 56px 24px;
+  }
+
+  .auth-visual-side {
+    padding: 72px;
   }
 }
