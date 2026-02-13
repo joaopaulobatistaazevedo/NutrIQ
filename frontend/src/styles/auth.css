@@ -1,0 +1,260 @@
+/* src/styles/auth.css - Design minimalista inspirado no Nutrium */
+
+.auth-container {
+  display: flex;
+  min-height: 100vh;
+  background: #FAFAFA;
+}
+
+/* ==== LADO ESQUERDO - FORMULÁRIO ==== */
+.auth-form-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: white;
+}
+
+.auth-form {
+  width: 100%;
+  max-width: 440px;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+
+.logo-icon {
+  font-size: 32px;
+}
+
+.logo-text {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1F2937;
+}
+
+/* Títulos */
+.auth-form h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1F2937;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #6B7280;
+  margin-bottom: 32px;
+}
+
+/* Form */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.form-group input::placeholder {
+  color: #9CA3AF;
+}
+
+/* Links */
+.forgot-password {
+  display: block;
+  text-align: right;
+  font-size: 14px;
+  color: #10B981;
+  text-decoration: none;
+  margin-bottom: 24px;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+/* Botão */
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  background: #10B981;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: #059669;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Footer */
+.auth-footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.auth-footer a {
+  color: #10B981;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ==== LADO DIREITO - VISUAL ==== */
+.auth-visual-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: white;
+}
+
+.visual-content {
+  max-width: 500px;
+}
+
+.visual-content h2 {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 16px;
+}
+
+.visual-content > p {
+  font-size: 18px;
+  opacity: 0.9;
+  margin-bottom: 48px;
+}
+
+/* Features */
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+}
+
+.feature-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+/* Stats (para Register) */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin-top: 48px;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat h3 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.stat p {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* ==== RESPONSIVO ==== */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .auth-visual-side {
+    padding: 40px;
+  }
+
+  .visual-content h2 {
+    font-size: 32px;
+  }
+
+  .stats {
+    gap: 20px;
+  }
+
+  .stat h3 {
+    font-size: 24px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .auth-container {
+    flex-direction: column;
+  }
+
+  .auth-visual-side {
+    display: none; /* Esconde lado visual no mobile */
+  }
+
+  .auth-form-side {
+    padding: 32px 20px;
+  }
+
+  .auth-form h1 {
+    font-size: 28px;
+  }
+
+  .logo {
+    margin-bottom: 32px;
+  }
+}
