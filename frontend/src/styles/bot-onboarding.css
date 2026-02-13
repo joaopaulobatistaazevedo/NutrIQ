@@ -121,6 +121,28 @@
   padding: 18px;
 }
 
+.bot-intro-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 22px;
+  text-align: center;
+  animation: bot-step-in 220ms ease-out;
+}
+
+.bot-intro-card h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  color: #065F46;
+}
+
+.bot-intro-card p {
+  margin: 0 0 16px;
+  color: #4B5563;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 .bot-step-field {
   margin-bottom: 14px;
   animation: bot-step-in 220ms ease-out;
@@ -206,6 +228,28 @@
 .bot-submit-btn:hover {
   filter: brightness(1.03);
   transform: translateY(-1px);
+}
+
+.bot-welcome-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%);
+  border: 1px solid #D1FAE5;
+  border-radius: 14px;
+  padding: 22px;
+  text-align: center;
+  animation: bot-step-in 240ms ease-out;
+}
+
+.bot-welcome-card h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  color: #065F46;
+}
+
+.bot-welcome-card p {
+  margin: 0 0 16px;
+  color: #4B5563;
+  line-height: 1.55;
+  font-size: 14px;
 }
 
 @media (max-width: 768px) {
