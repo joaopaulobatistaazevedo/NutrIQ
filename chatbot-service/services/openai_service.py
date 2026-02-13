@@ -24,7 +24,9 @@ class OpenAIService:
         onboarding_complete = self._is_onboarding_complete(extracted_preferences)
 
         if onboarding_complete:
-            bot_response = "Perfeito! Já tenho o necessário para preparar o teu meal planning 🎯"
+            bot_response = (
+                "Perfeito! Já tenho o necessário para preparar o teu plano semanal de refeições 🎯"
+            )
 
         return ChatResponse(
             response=bot_response,
@@ -125,6 +127,7 @@ class OpenAIService:
         lower = text.lower()
         keywords = [
             "meal plan",
+            "plano de refeições",
             "plano",
             "planear",
             "planeamento",
