@@ -26,8 +26,8 @@ public class UserController {
 
     public List<UserMeResponse> listUsers() {
         return userService.listUsers().stream()
-            .map(UserMeResponse::from)
-            .toList();
+                .map(UserMeResponse::from)
+                .toList();
     }
 
     public UserMeResponse getById(Long userId) {

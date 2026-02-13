@@ -23,9 +23,8 @@ public class Main {
 
         Javalin app = Javalin.create(config -> config.plugins.enableCors(cors -> cors.add(it -> it.anyHost())));
 
-        app.exception(IllegalArgumentException.class, (e, ctx) ->
-            ctx.status(400).json(Map.of("error", e.getMessage()))
-        );
+        app.exception(IllegalArgumentException.class,
+                (e, ctx) -> ctx.status(400).json(Map.of("error", e.getMessage())));
 
         app.post("/api/auth/register", ctx -> {
             RegisterRequest request = ctx.bodyAsClass(RegisterRequest.class);
