@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from groq import Groq
+from openai import OpenAI
 
 from config.settings import get_settings
 from models.schemas import ChatResponse, Message
@@ -10,7 +10,7 @@ from utils.helpers import load_prompt, safe_json_loads
 class OpenAIService:
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.client = Groq(api_key=self.settings.groq_api_key)
+        self.client = OpenAI(api_key=self.settings.openai_api_key)
 
     async def onboarding_chat(self, user_message: str, history: List[Message]) -> ChatResponse:
         system_prompt = load_prompt("prompts/onboarding.txt")
