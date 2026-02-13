@@ -1,4 +1,4 @@
-# Chatbot Service (Groq)
+# Chatbot Service (OpenAI)
 
 Serviço independente do frontend/backend para onboarding e assistência de meal planning.
 
@@ -29,11 +29,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Configurar `.env` com a tua chave Groq:
+3. Configurar `.env` com a tua chave OpenAI:
 
 ```env
-GROQ_API_KEY=...
-MODEL_NAME=llama-3.1-8b-instant
+OPENAI_API_KEY=...
+MODEL_NAME=gpt-4o-mini
 ```
 
 4. Executar API:

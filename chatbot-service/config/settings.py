@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,8 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
-    groq_api_key: str 
-    model_name: str = "llama-3.1-8b-instant"
+    openai_api_key: str = Field(
+        validation_alias=AliasChoices("OPENAI_API_KEY", "GROQ_API_KEY")
+    )
+    model_name: str = "gpt-4o-mini"
     max_tokens: int = 600
     temperature: float = 0.7
     allowed_origins: str = "*"

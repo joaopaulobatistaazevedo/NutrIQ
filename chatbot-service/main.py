@@ -7,7 +7,7 @@ from services.conversation import ConversationManager
 from services.openai_service import OpenAIService
 
 settings = get_settings()
-app = FastAPI(title="Meal Planner Chatbot (Groq)")
+app = FastAPI(title="Meal Planner Chatbot (OpenAI)")
 
 origins = ["*"] if settings.allowed_origins == "*" else [x.strip() for x in settings.allowed_origins.split(",")]
 app.add_middleware(
@@ -24,7 +24,7 @@ conversation_manager = ConversationManager()
 
 @app.get("/")
 def root():
-    return {"status": "Chatbot API running", "provider": "groq"}
+    return {"status": "Chatbot API running", "provider": "openai"}
 
 
 @app.get("/health")
@@ -39,7 +39,7 @@ async def onboarding_chat(request: ChatRequest):
     try:
         response = await chat_service.onboarding_chat(request.message, history)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Groq provider error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
     conversation_manager.append(request.user_id, Message(role="user", content=request.message))
     conversation_manager.append(request.user_id, Message(role="assistant", content=response.response))
@@ -54,7 +54,7 @@ async def assistant_chat(request: ChatRequest):
     try:
         response = await chat_service.assistant_chat(request.message, request.user_context, history)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Groq provider error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
     conversation_manager.append(request.user_id, Message(role="user", content=request.message))
     conversation_manager.append(request.user_id, Message(role="assistant", content=response.response))
