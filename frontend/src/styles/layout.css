@@ -1,0 +1,30 @@
+/* src/styles/layout.css */
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #F0FDF4 0%, #F8FAFC 100%);
+}
+
+.layout-content {
+  flex: 1;
+  margin-left: 280px;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .layout-content {
+    margin-left: 0;
+    padding: 20px;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .layout-content {
+    margin-left: 240px;
+    padding: 24px;
+  }
+}
