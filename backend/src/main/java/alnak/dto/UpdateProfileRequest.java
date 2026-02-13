@@ -1,8 +1,8 @@
 package alnak.dto;
 
-import alnak.models.Goal;
-import alnak.models.Restriction;
-import alnak.models.Sex;
+import alnak.business_logic.entities.Goal;
+import alnak.business_logic.entities.Restriction;
+import alnak.business_logic.entities.Sex;
 
 import java.util.Set;
 

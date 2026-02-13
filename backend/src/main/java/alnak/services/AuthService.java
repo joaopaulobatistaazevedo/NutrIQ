@@ -3,7 +3,7 @@ package alnak.services;
 import alnak.dto.AuthResponse;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
-import alnak.models.User;
+import alnak.business_logic.entities.User;
 
 import java.util.HashMap;
 import java.util.Map;

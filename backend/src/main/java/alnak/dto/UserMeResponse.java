@@ -1,7 +1,7 @@
 package alnak.dto;
 
-import alnak.models.User;
-import alnak.models.UserProfile;
+import alnak.business_logic.entities.User;
+import alnak.business_logic.entities.UserProfile;
 
 public class UserMeResponse {
     private Long id;

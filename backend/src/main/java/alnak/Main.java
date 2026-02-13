@@ -5,7 +5,7 @@ import alnak.controllers.UserController;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
 import alnak.dto.UpdateProfileRequest;
-import alnak.models.User;
+import alnak.business_logic.entities.User;
 import alnak.services.AuthService;
 import alnak.services.UserService;
 import alnak.utils.JWTUtil;

@@ -1,4 +1,4 @@
-package alnak.models;
+package alnak.business_logic.entities;
 
 public class User {
     private Long id;

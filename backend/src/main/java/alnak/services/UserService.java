@@ -1,8 +1,8 @@
 package alnak.services;
 
+import alnak.business_logic.entities.UserProfile;
 import alnak.dto.UpdateProfileRequest;
-import alnak.models.User;
-import alnak.models.UserProfile;
+import alnak.business_logic.entities.User;
 
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -2,7 +2,7 @@ package alnak.controllers;
 
 import alnak.dto.UpdateProfileRequest;
 import alnak.dto.UserMeResponse;
-import alnak.models.User;
+import alnak.business_logic.entities.User;
 import alnak.services.UserService;
 
 import java.util.List;
