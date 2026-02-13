@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { X, Send, Sparkles, HeartHandshake } from 'lucide-react';
+import { X, Send, HeartHandshake } from 'lucide-react';
 import '../styles/chatbot.css';
 
 const PROFILE_KEY = 'nutribot_profile';
@@ -55,67 +55,64 @@ export default function ChatWidget() {
     setInput('');
   };
 
-  if (location.pathname === '/welcome-bot') {
+  if (location.pathname === '/welcome-bot' || location.pathname === '/login') {
     return null;
   }
 
   return (
-    <div className="chat-widget">
-      {isOpen && (
-        <section className="chat-panel" aria-label="Chat bot">
-          <header className="chat-header">
-            <div>
-              <h3>NutriBot</h3>
-              <p>Companheiro nutricional</p>
-            </div>
-            <button
-              type="button"
-              className="chat-close"
-              onClick={() => setIsOpen(false)}
-              aria-label="Fechar chat"
-            >
-              <X size={16} />
-            </button>
-          </header>
-
-          <div className="chat-messages">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`chat-message ${message.role === 'user' ? 'user' : 'bot'}`}
-              >
-                {message.text}
+    <>
+      <div className="chat-widget">
+        {isOpen && (
+          <section className="chat-panel" aria-label="Chat bot">
+            <header className="chat-header">
+              <div>
+                <h3>NutriBot</h3>
+                <p>Companheiro nutricional</p>
               </div>
-            ))}
-          </div>
+              <button
+                type="button"
+                className="chat-close"
+                onClick={() => setIsOpen(false)}
+                aria-label="Fechar chat"
+              >
+                <X size={16} />
+              </button>
+            </header>
 
-          <form className="chat-input-area" onSubmit={handleSubmit}>
-            <input
-              type="text"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="Escreve a tua mensagem..."
-            />
-            <button type="submit" disabled={!canSend} aria-label="Enviar mensagem">
-              <Send size={16} />
-            </button>
-          </form>
-        </section>
-      )}
+            <div className="chat-messages">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`chat-message ${message.role === 'user' ? 'user' : 'bot'}`}
+                >
+                  {message.text}
+                </div>
+              ))}
+            </div>
 
-      <div className="chat-priority-badge" role="status" aria-live="polite">
-        <Sparkles size={14} />
-        <span>NutriBot é o teu companheiro</span>
+            <form className="chat-input-area" onSubmit={handleSubmit}>
+              <input
+                type="text"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="Escreve a tua mensagem..."
+              />
+              <button type="submit" disabled={!canSend} aria-label="Enviar mensagem">
+                <Send size={16} />
+              </button>
+            </form>
+          </section>
+        )}
+
+        <button
+          type="button"
+          className="chat-toggle"
+          onClick={() => setIsOpen((previous) => !previous)}
+          aria-label={isOpen ? 'Fechar chat' : 'Abrir chat'}
+        >
+          {isOpen ? <X size={20} /> : <HeartHandshake size={20} />}
+        </button>
       </div>
-
-      <button
-        type="button"
-        className="chat-toggle"
-        onClick={() => setIsOpen((previous) => !previous)}
-        aria-label={isOpen ? 'Fechar chat' : 'Abrir chat'}
-      >
-        {isOpen ? <X size={20} /> : <HeartHandshake size={20} />}
-      </button>
-    </div>
+    </>
   );
 }

@@ -25,7 +25,7 @@ export default function Dashboard() {
         {/* Header */}
         <div className="dashboard-header">
           <div>
-            <h1 className="dashboard-title">Olá, João</h1>
+            <h1 className="dashboard-title">Olá</h1>
             <p className="dashboard-subtitle">Aqui está o resumo da tua semana</p>
           </div>
           <button className="btn-primary">Gerar Novo Plano</button>

@@ -67,6 +67,11 @@ export default function BotOnboarding() {
   });
   const [stepIndex, setStepIndex] = useState(0);
   const [input, setInput] = useState('');
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isIntroStep, setIsIntroStep] = useState(true);
+
+  const totalIndicators = STEPS.length + 1;
+  const activeIndicator = isCompleted ? totalIndicators - 1 : isIntroStep ? 0 : stepIndex + 1;
 
   const currentStep = STEPS[stepIndex];
   const currentValue = profile[currentStep?.key] || '';
@@ -85,7 +90,7 @@ export default function BotOnboarding() {
 
     if (isLastStep) {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
-      navigate('/dashboard');
+      setIsCompleted(true);
       return;
     }
 
@@ -118,53 +123,77 @@ export default function BotOnboarding() {
 
           <div className="bot-progress-wrap" aria-label="Progresso do onboarding">
             <div className="bot-step-dots" aria-hidden="true">
-              {STEPS.map((step, index) => (
+              {Array.from({ length: totalIndicators }).map((_, index) => (
                 <span
-                  key={step.key}
-                  className={`bot-step-dot ${index <= stepIndex ? 'active' : ''}`}
+                  key={`step-dot-${index}`}
+                  className={`bot-step-dot ${index <= activeIndicator ? 'active' : ''}`}
                 />
               ))}
             </div>
           </div>
 
-          <form className="bot-profile-form" onSubmit={handleSubmit}>
-            <div className="bot-step-field" key={currentStep.key}>
-              <label>
-                {currentStep.label}
-
-                {currentStep.type === 'options' ? (
-                  <div className="bot-options-grid">
-                    {currentStep.options.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        className={`bot-option-btn ${currentValue === option ? 'active' : ''}`}
-                        onClick={() => advanceStep(option)}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <input
-                    type={currentStep.type}
-                    value={input}
-                    min={currentStep.key === 'weight' ? 25 : currentStep.key === 'height' ? 100 : currentStep.key === 'age' ? 12 : undefined}
-                    max={currentStep.key === 'weight' ? 300 : currentStep.key === 'height' ? 250 : currentStep.key === 'age' ? 100 : undefined}
-                    onChange={(event) => setInput(event.target.value)}
-                    placeholder={currentStep.placeholder}
-                    required
-                  />
-                )}
-              </label>
-            </div>
-
-            {currentStep.type !== 'options' && (
-              <button type="submit" className="bot-submit-btn">
-                Continuar <ArrowRight size={16} />
+          {isIntroStep ? (
+            <div className="bot-intro-card">
+              <h2>Olá, eu sou o NutriBot</h2>
+              <p>
+                Sou o teu companheiro pessoal dentro do NutrIQ. Vou conhecer o teu perfil e ajudar-te
+                a evoluir de forma simples, consistente e personalizada.
+              </p>
+              <button type="button" className="bot-submit-btn" onClick={() => setIsIntroStep(false)}>
+                Seguinte <ArrowRight size={16} />
               </button>
-            )}
-          </form>
+            </div>
+          ) : !isCompleted ? (
+            <form className="bot-profile-form" onSubmit={handleSubmit}>
+              <div className="bot-step-field" key={currentStep.key}>
+                <label>
+                  {currentStep.label}
+
+                  {currentStep.type === 'options' ? (
+                    <div className="bot-options-grid">
+                      {currentStep.options.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={`bot-option-btn ${currentValue === option ? 'active' : ''}`}
+                          onClick={() => advanceStep(option)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <input
+                      type={currentStep.type}
+                      value={input}
+                      min={currentStep.key === 'weight' ? 25 : currentStep.key === 'height' ? 100 : currentStep.key === 'age' ? 12 : undefined}
+                      max={currentStep.key === 'weight' ? 300 : currentStep.key === 'height' ? 250 : currentStep.key === 'age' ? 100 : undefined}
+                      onChange={(event) => setInput(event.target.value)}
+                      placeholder={currentStep.placeholder}
+                      required
+                    />
+                  )}
+                </label>
+              </div>
+
+              {currentStep.type !== 'options' && (
+                <button type="submit" className="bot-submit-btn">
+                  Continuar <ArrowRight size={16} />
+                </button>
+              )}
+            </form>
+          ) : (
+            <div className="bot-welcome-card">
+              <h2>Bem-vindo ao NutrIQ</h2>
+              <p>
+                Está tudo pronto. A partir de agora eu vou acompanhar os teus próximos passos,
+                ajustar recomendações e manter-te motivado todos os dias.
+              </p>
+              <button type="button" className="bot-submit-btn" onClick={() => navigate('/dashboard')}>
+                Entrar no dashboard
+              </button>
+            </div>
+          )}
         </div>
       </section>
     </div>
