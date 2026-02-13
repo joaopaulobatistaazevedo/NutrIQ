@@ -1,12 +1,12 @@
 package alnak.business_logic.entities;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class Recipe
-{
-    private Set<String> tags = new java.util.HashSet<>();
+public class Recipe {
+    private Set<String> tags = new HashSet<>();
     private int id;
     private String name;
     private String description;
@@ -23,13 +23,11 @@ public class Recipe
 
     public Recipe() {}
 
-    public int totalTimeMin()
-    {
+    public int totalTimeMin() {
         return prepTimeMin + cookTimeMin;
     }
 
-    public double estimatedCost()
-    {
+    public double estimatedCost() {
         return ingredients.stream()
             .mapToDouble(RecipeIngredient::estimatedCost)
             .sum();
@@ -87,17 +85,16 @@ public class Recipe
     public void setImageUrl(String imageUrl)                { this.imageUrl = imageUrl; }
     public Set<String> getTags()                            { return tags; }
     public void setTags(Set<String> tags)                   { this.tags = tags; }
-}
 
     // ── Embedded types (moved from separate files) ───────────────────
-    public static class RecipeIngredient
-    {
+
+    public static class RecipeIngredient {
         private int id;
         private int recipeId;
         private Ingredient ingredient;
         private double quantity;
         private Unit unit;
-        private String notes;        // optional: "finely chopped", "room temperature"
+        private String notes; // optional: "finely chopped", "room temperature"
 
         public RecipeIngredient() {}
 
@@ -136,7 +133,7 @@ public class Recipe
 
         private int id;
         private int recipeId;
-        private int stepOrder;       // 1-based
+        private int stepOrder; // 1-based
         private String description;
         private int durationMinutes; // 0 if not time-bounded
 
@@ -168,3 +165,4 @@ public class Recipe
         public int getDurationMinutes()             { return durationMinutes; }
         public void setDurationMinutes(int d)       { this.durationMinutes = d; }
     }
+}

@@ -15,6 +15,8 @@ import java.util.Map;
 
 public class Main {
     public static void main(String[] args) {
+        int port = resolvePort();
+
         AuthService authService = new AuthService();
         UserService userService = new UserService();
         AuthController authController = new AuthController(authService);
@@ -58,8 +60,8 @@ public class Main {
             ctx.json(userController.getById(userId));
         });
 
-        app.start(7070);
-        System.out.println("Server running on http://localhost:7070");
+        app.start(port);
+        System.out.println("Server running on http://localhost:" + port);
     }
 
     private static Long extractUserId(String authorizationHeader, JWTUtil jwtUtil) {
@@ -69,5 +71,24 @@ public class Main {
 
         String token = authorizationHeader.substring("Bearer ".length()).trim();
         return jwtUtil.parseUserId(token);
+    }
+
+    private static int resolvePort() {
+        String raw = System.getenv("PORT");
+        if (raw == null || raw.isBlank()) {
+            raw = System.getenv("APP_PORT");
+        }
+        if (raw == null || raw.isBlank()) {
+            return 7070;
+        }
+        try {
+            int parsed = Integer.parseInt(raw.trim());
+            if (parsed < 1 || parsed > 65535) {
+                throw new IllegalArgumentException("PORT fora do intervalo válido: " + raw);
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("PORT inválida: " + raw, e);
+        }
     }
 }

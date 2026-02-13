@@ -1,5 +1,9 @@
 package alnak.data;
 
+import alnak.business_logic.entities.Allergen;
+import alnak.business_logic.entities.Goal;
+import alnak.business_logic.entities.Restriction;
+import alnak.business_logic.entities.Sex;
 import alnak.business_logic.entities.UserProfile;
 
 import java.sql.*;

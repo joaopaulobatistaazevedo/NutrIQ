@@ -1,5 +1,6 @@
 package alnak.business_logic.entities;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -59,7 +60,6 @@ public class MealPlan {
     public void setStatus(PlanStatus status)        { this.status = status; }
     public List<MealPlanMeal> getMeals()            { return meals; }
     public void setMeals(List<MealPlanMeal> meals)  { this.meals = meals; }
-}
 
     // ── Embedded type for a meal within a plan (moved from MealPlanMeal.java) ─
     public static class MealPlanMeal {
@@ -67,18 +67,18 @@ public class MealPlan {
         private int id;
         private int mealPlanId;
         private int recipeId;
-        private java.time.DayOfWeek dayOfWeek;
+        private DayOfWeek dayOfWeek;
         private MealType mealType;
         private boolean completed;
         private String photoPath;
-        private java.time.LocalDateTime completedAt;
+        private LocalDateTime completedAt;
 
         /** Populated when fetching with JOIN — avoids a second query. */
         private Recipe recipe;
 
         public MealPlanMeal() {}
 
-        public MealPlanMeal(int mealPlanId, Recipe recipe, java.time.DayOfWeek day, MealType type) {
+        public MealPlanMeal(int mealPlanId, Recipe recipe, DayOfWeek day, MealType type) {
             this.mealPlanId = mealPlanId;
             this.recipe     = recipe;
             this.recipeId   = recipe.getId();
@@ -91,7 +91,7 @@ public class MealPlan {
         public void markCompleted(String photoPath) {
             this.completed    = true;
             this.photoPath    = photoPath;
-            this.completedAt  = java.time.LocalDateTime.now();
+            this.completedAt  = LocalDateTime.now();
         }
 
         public boolean hasPhoto() {
@@ -100,22 +100,23 @@ public class MealPlan {
 
         // ── Getters / Setters ─────────────────────────────────────────
 
-        public int getId() { return id; }
-        public void setId(int id)                       { this.id = id; }
-        public int getMealPlanId()                      { return mealPlanId; }
-        public void setMealPlanId(int mealPlanId)       { this.mealPlanId = mealPlanId; }
-        public int getRecipeId()                        { return recipeId; }
-        public void setRecipeId(int recipeId)           { this.recipeId = recipeId; }
-        public java.time.DayOfWeek getDayOfWeek()                 { return dayOfWeek; }
-        public void setDayOfWeek(java.time.DayOfWeek dayOfWeek)   { this.dayOfWeek = dayOfWeek; }
-        public MealType getMealType()                   { return mealType; }
-        public void setMealType(MealType mealType)      { this.mealType = mealType; }
-        public boolean isCompleted()                    { return completed; }
-        public void setCompleted(boolean completed)     { this.completed = completed; }
-        public String getPhotoPath()                    { return photoPath; }
-        public void setPhotoPath(String photoPath)      { this.photoPath = photoPath; }
-        public java.time.LocalDateTime getCompletedAt()           { return completedAt; }
-        public void setCompletedAt(java.time.LocalDateTime t)     { this.completedAt = t; }
-        public Recipe getRecipe()                       { return recipe; }
-        public void setRecipe(Recipe recipe)            { this.recipe = recipe; }
+        public int getId()                            { return id; }
+        public void setId(int id)                     { this.id = id; }
+        public int getMealPlanId()                    { return mealPlanId; }
+        public void setMealPlanId(int mealPlanId)     { this.mealPlanId = mealPlanId; }
+        public int getRecipeId()                      { return recipeId; }
+        public void setRecipeId(int recipeId)         { this.recipeId = recipeId; }
+        public DayOfWeek getDayOfWeek()               { return dayOfWeek; }
+        public void setDayOfWeek(DayOfWeek dayOfWeek) { this.dayOfWeek = dayOfWeek; }
+        public MealType getMealType()                 { return mealType; }
+        public void setMealType(MealType mealType)    { this.mealType = mealType; }
+        public boolean isCompleted()                  { return completed; }
+        public void setCompleted(boolean completed)   { this.completed = completed; }
+        public String getPhotoPath()                  { return photoPath; }
+        public void setPhotoPath(String photoPath)    { this.photoPath = photoPath; }
+        public LocalDateTime getCompletedAt()         { return completedAt; }
+        public void setCompletedAt(LocalDateTime t)   { this.completedAt = t; }
+        public Recipe getRecipe()                     { return recipe; }
+        public void setRecipe(Recipe recipe)          { this.recipe = recipe; }
     }
+}

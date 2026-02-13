@@ -65,8 +65,24 @@ public class UserProfile {
     public void setDailyCalories(int dailyCalories)   { this.dailyCalories = dailyCalories; }
     public double getBudgetWeekly()                   { return budgetWeekly; }
     public void setBudgetWeekly(double budgetWeekly)  { this.budgetWeekly = budgetWeekly; }
+    public double getMaxWeeklyBudget()                { return budgetWeekly; }
+    public void setMaxWeeklyBudget(double maxBudget)  { this.budgetWeekly = maxBudget; }
     public Set<Restriction> getRestrictions()         { return restrictions; }
-    public void setRestrictions(Set<Restriction> r)   { this.restrictions = r; }
+    public void setRestrictions(Set<Restriction> r)   {
+        this.restrictions = EnumSet.noneOf(Restriction.class);
+        if (r != null) this.restrictions.addAll(r);
+    }
+    public void replaceRestrictions(Set<Restriction> r) {
+        restrictions.clear();
+        if (r != null) restrictions.addAll(r);
+    }
     public Set<Allergen> getAllergens()               { return allergens; }
-    public void setAllergens(Set<Allergen> a)         { this.allergens = a; }
+    public void setAllergens(Set<Allergen> a)         {
+        this.allergens = EnumSet.noneOf(Allergen.class);
+        if (a != null) this.allergens.addAll(a);
+    }
+    public void replaceAllergens(Set<Allergen> a) {
+        allergens.clear();
+        if (a != null) allergens.addAll(a);
+    }
 }

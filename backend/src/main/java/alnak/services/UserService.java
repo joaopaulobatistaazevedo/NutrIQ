@@ -1,13 +1,16 @@
 package alnak.services;
 
+import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.UserProfile;
 import alnak.dto.UpdateProfileRequest;
 import alnak.business_logic.entities.User;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class UserService {
     private final Map<Long, User> usersById = new HashMap<>();
@@ -45,18 +48,10 @@ public class UserService {
             profile.setGoal(request.getGoal());
         }
         if (request.getRestrictions() != null) {
-            if (request.getRestrictions().isEmpty()) {
-                profile.getRestrictions().clear();
-            } else {
-                profile.getRestrictions().addAll(request.getRestrictions());
-            }
+            profile.replaceRestrictions(request.getRestrictions());
         }
         if (request.getAllergens() != null) {
-            if (request.getAllergens().isEmpty()) {
-                profile.getAllergens().clear();
-            } else {
-                profile.getAllergens().addAll(request.getAllergens());
-            }
+            profile.replaceAllergens(parseAllergens(request.getAllergens()));
         }
         if (request.getMaxWeeklyBudget() != null) {
             profile.setMaxWeeklyBudget(request.getMaxWeeklyBudget());
@@ -75,5 +70,17 @@ public class UserService {
 
     public User getById(Long userId) {
         return getMe(userId);
+    }
+
+    private Set<Allergen> parseAllergens(Set<String> allergensRaw) {
+        Set<Allergen> allergens = EnumSet.noneOf(Allergen.class);
+        for (String allergenRaw : allergensRaw) {
+            try {
+                allergens.add(Allergen.from(allergenRaw));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Alergénio inválido: " + allergenRaw);
+            }
+        }
+        return allergens;
     }
 }

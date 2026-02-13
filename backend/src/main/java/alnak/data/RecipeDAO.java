@@ -1,6 +1,11 @@
 package alnak.data;
 
+import alnak.business_logic.entities.Allergen;
+import alnak.business_logic.entities.Ingredient;
+import alnak.business_logic.entities.MealType;
+import alnak.business_logic.entities.NutritionalInfo;
 import alnak.business_logic.entities.Recipe;
+import alnak.business_logic.entities.Unit;
 
 import java.sql.*;
 import java.util.*;
