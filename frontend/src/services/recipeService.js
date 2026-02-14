@@ -44,3 +44,17 @@ export async function fetchRecipes({ limit = 200, mealType = '' } = {}) {
     throw new Error(normalizeError(error));
   }
 }
+
+export async function fetchRecipeById(recipeId) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+
+  try {
+    const { data } = await client.get(`/api/recipes/${id}`);
+    return data || null;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}

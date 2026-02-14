@@ -517,3 +517,67 @@
     justify-self: start;
   }
 }
+
+
+.shopping-generate-btn {
+  margin-bottom: 10px;
+}
+
+.shopping-comparison {
+  margin-bottom: 16px;
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+  background: #f7f9fc;
+  padding: 10px;
+}
+
+.shopping-comparison h3 {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.shopping-comparison-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #e2e8f0;
+  padding: 8px 0;
+}
+
+.shopping-comparison-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.shopping-comparison-row strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.shopping-comparison-row small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.shopping-comparison-prices {
+  text-align: right;
+}
+
+.shopping-comparison-prices span {
+  display: block;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.shopping-comparison-prices small {
+  color: #047857;
+  font-size: 11px;
+}
+
+.shopping-optimized-note {
+  margin-top: 8px;
+}

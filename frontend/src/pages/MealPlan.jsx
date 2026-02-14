@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
 import Layout from '../components/Layout';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
-import { PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
+import { CART_GENERATE_REQUEST_KEY, PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
 import '../styles/meal-plan.css';
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
@@ -111,6 +112,8 @@ export default function MealPlan() {
     return resolveAccountId(profile);
   }, []);
 
+  const navigate = useNavigate();
+
   const today = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -200,6 +203,13 @@ export default function MealPlan() {
     };
   }, [accountId]);
 
+
+  const handleGenerateCart = () => {
+    localStorage.setItem(CART_GENERATE_REQUEST_KEY, String(Date.now()));
+    window.dispatchEvent(new CustomEvent('nutribot:generate-cart-request', { detail: { accountId } }));
+    navigate('/shopping');
+  };
+
   const goToPreviousMonth = () => {
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
@@ -216,9 +226,9 @@ export default function MealPlan() {
             <h1 className="meal-plan-title">Calendário de Refeições</h1>
             <p className="meal-plan-subtitle">Organiza e acompanha o plano nutricional dia a dia</p>
           </div>
-          <button className="btn-primary" type="button">
+          <button className="btn-primary" type="button" onClick={handleGenerateCart}>
             <CalendarDays size={16} />
-            <span>Gerar Semana</span>
+            <span>Gerar carrinho</span>
           </button>
         </header>
 
