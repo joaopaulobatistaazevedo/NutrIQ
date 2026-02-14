@@ -48,8 +48,8 @@ Fluxo implementado:
 
 ```bash
 python3 recipe_main.py scrape \
-  --db recipes.db \
-  --output-json recipes_scraped.json \
+  --db data/recipes.db \
+  --output-json data/recipes_scraped.json \
   --max-recipes-per-source 60 \
   --max-pages-per-list 2 \
   --debug
@@ -61,20 +61,20 @@ Por padrão, no fim do scrape as receitas também são sincronizadas para a tabe
 Para desativar:
 
 ```bash
-python3 recipe_main.py scrape --skip-backend-sync
+python3 recipe_main.py scrape --db data/recipes.db --output-json data/recipes_scraped.json --skip-backend-sync
 ```
 
 ### 2) Import explícito JSON -> SQLite (script separado)
 
 ```bash
-python3 recipe_import.py --input recipes_scraped.json --db recipes.db
+python3 recipe_import.py --input data/recipes_scraped.json --db data/recipes.db
 ```
 
 ### 3) Sugerir refeições com os ingredientes disponíveis
 
 ```bash
 python3 recipe_main.py suggest \
-  --db recipes.db \
+  --db data/recipes.db \
   --report report.json
 ```
 
@@ -82,7 +82,7 @@ Modo estrito (apenas receitas 100% possíveis com os ingredientes disponíveis):
 
 ```bash
 python3 recipe_main.py suggest \
-  --db recipes.db \
+  --db data/recipes.db \
   --report report.json \
   --only-possible
 ```
@@ -91,7 +91,7 @@ python3 recipe_main.py suggest \
 
 ```bash
 python3 recipe_main.py run \
-  --db recipes.db \
+  --db data/recipes.db \
   --report report.json \
   --debug
 ```

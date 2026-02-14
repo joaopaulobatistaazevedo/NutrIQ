@@ -178,8 +178,8 @@ class GoalMealPlannerService:
             from recipe_scraper.sources import default_sources
             from recipe_scraper.storage import load_recipes
 
-            db = workspace / "recipes.db"
-            js = workspace / "recipes_scraped.json"
+            db = workspace / "data" / "recipes.db"
+            js = workspace / "data" / "recipes_scraped.json"
 
             raw: list = []
             if db.exists():

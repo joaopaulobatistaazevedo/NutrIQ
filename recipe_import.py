@@ -10,7 +10,7 @@ from recipe_scraper.storage import upsert_recipes
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Importa receitas JSON para SQLite.")
     parser.add_argument("--input", required=True, help="Arquivo JSON de receitas raspadas.")
-    parser.add_argument("--db", default="recipes.db", help="Arquivo SQLite de destino.")
+    parser.add_argument("--db", default="data/recipes.db", help="Arquivo SQLite de destino.")
     parser.add_argument(
         "--skip-backend-sync",
         action="store_true",

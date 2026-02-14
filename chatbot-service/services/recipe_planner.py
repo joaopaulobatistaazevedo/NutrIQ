@@ -25,8 +25,8 @@ class RecipePlannerService:
     def __init__(self) -> None:
         self._recipes: list[RecipeRecord] = []
         self._lock = Lock()
-        self._db_path = WORKSPACE_ROOT / "recipes.db"
-        self._json_path = WORKSPACE_ROOT / "recipes_scraped.json"
+        self._db_path = WORKSPACE_ROOT / "data" / "recipes.db"
+        self._json_path = WORKSPACE_ROOT / "data" / "recipes_scraped.json"
 
     def generate_weekly_plan(self, constraints: dict[str, Any]) -> dict[str, Any]:
         recipes = self._load_recipes_pool()

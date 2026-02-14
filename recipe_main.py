@@ -21,10 +21,10 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     scrape_parser = subparsers.add_parser("scrape", help="Scrape de receitas e import para SQLite.")
-    scrape_parser.add_argument("--db", default="recipes.db", help="Caminho do SQLite.")
+    scrape_parser.add_argument("--db", default="data/recipes.db", help="Caminho do SQLite.")
     scrape_parser.add_argument(
         "--output-json",
-        default="recipes_scraped.json",
+        default="data/recipes_scraped.json",
         help="Arquivo JSON com receitas raspadas.",
     )
     scrape_parser.add_argument(
@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
     suggest_parser = subparsers.add_parser(
         "suggest", help="Sugere refeicoes com base nos ingredientes."
     )
-    suggest_parser.add_argument("--db", default="recipes.db", help="Caminho do SQLite.")
+    suggest_parser.add_argument("--db", default="data/recipes.db", help="Caminho do SQLite.")
     suggest_parser.add_argument(
         "--ingredients",
         default=None,
@@ -101,7 +101,7 @@ def parse_args() -> argparse.Namespace:
     run_parser = subparsers.add_parser(
         "run", help="Executa scrape e logo depois imprime sugestoes de refeicoes."
     )
-    run_parser.add_argument("--db", default="recipes.db", help="Caminho do SQLite.")
+    run_parser.add_argument("--db", default="data/recipes.db", help="Caminho do SQLite.")
     run_parser.add_argument(
         "--ingredients",
         default=None,
