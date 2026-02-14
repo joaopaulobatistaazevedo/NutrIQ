@@ -403,9 +403,6 @@ export default function Dashboard() {
     }));
   };
 
-  const waterDrank = 1.5;
-  const waterGoal = 3;
-  const hydrationPct = Math.min((waterDrank / waterGoal) * 100, 100);
 
   return (
     <Layout>
@@ -434,35 +431,6 @@ export default function Dashboard() {
             <div className="dash-hero-right">
               <div className="dash-hero-meters">
                 <CalorieRing consumed={dashboardData.consumedCalories} goal={dashboardData.dailyGoal} />
-                <motion.div
-                  className="dash-hydration-card"
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }}
-                  viewport={{ once: true }}
-                >
-                  <div className="hydration-body">
-                    <div className="water-bottle" role="img" aria-label={`${waterDrank.toFixed(1)} litros de ${waterGoal} litros`}>
-                      <div className="water-bottle-top" />
-                      <div className="water-bottle-neck" />
-                      <div className="water-bottle-body">
-                        <motion.div
-                          className="water-bottle-fill"
-                          initial={{ height: 0 }}
-                          whileInView={{ height: `${hydrationPct}%` }}
-                          transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
-                          viewport={{ once: true }}
-                        />
-                        <div className="water-bottle-rings" />
-                        <div className="water-bottle-gloss" />
-                        <div className="water-bottle-reading">
-                          <strong>{waterDrank.toFixed(1)}L</strong>
-                          <span>/ {waterGoal}L</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
               </div>
               <div className="dash-hero-macros">
                 {macros.map((m) => (

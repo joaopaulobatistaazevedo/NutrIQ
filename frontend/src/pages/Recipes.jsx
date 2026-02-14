@@ -172,56 +172,56 @@ function CategoryCarousel({ category, onOpenNutritionistRecipe }) {
 
       <div className="card-body">
         <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
-        {category.recipes.map((recipe) => {
-          const sourceUrl = extractSourceUrl(recipe);
-          const hasSourceUrl = Boolean(sourceUrl);
-          const calories = recipeCalories(recipe);
+          {category.recipes.map((recipe) => {
+            const sourceUrl = extractSourceUrl(recipe);
+            const hasSourceUrl = Boolean(sourceUrl);
+            const calories = recipeCalories(recipe);
 
-          return (
-            <article key={recipe?.id || recipe?.name} className="recipe-card">
-              <img
-                src={recipeImageFor(recipe)}
-                alt={recipe?.name || 'Receita'}
-                loading="lazy"
-                className="recipe-thumb"
-                onError={(event) => {
-                  event.currentTarget.onerror = null;
-                  event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
-                }}
-              />
-              <p className="recipe-badge">
-                <Layers size={13} />
-                {category.title}
-              </p>
-              <h3>{recipe?.name || 'Receita sem nome'}</h3>
+            return (
+              <article key={recipe?.id || recipe?.name} className="recipe-card">
+                <img
+                  src={recipeImageFor(recipe)}
+                  alt={recipe?.name || 'Receita'}
+                  loading="lazy"
+                  className="recipe-thumb"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
+                  }}
+                />
+                <p className="recipe-badge">
+                  <Layers size={13} />
+                  {category.title}
+                </p>
+                <h3>{recipe?.name || 'Receita sem nome'}</h3>
 
-              <div className="recipe-meta">
-                <span>
-                  <Clock3 size={14} />
-                  {formatDuration(recipe)}
-                </span>
-                <span>
-                  <Flame size={14} />
-                  {calories > 0 ? `${calories} kcal` : 'kcal N/A'}
-                </span>
-                <span>
-                  <Euro size={14} />
-                  {formatPrice(recipe)}
-                </span>
-              </div>
+                <div className="recipe-meta">
+                  <span>
+                    <Clock3 size={14} />
+                    {formatDuration(recipe)}
+                  </span>
+                  <span>
+                    <Flame size={14} />
+                    {calories > 0 ? `${calories} kcal` : 'kcal N/A'}
+                  </span>
+                  <span>
+                    <Euro size={14} />
+                    {formatPrice(recipe)}
+                  </span>
+                </div>
 
-              {hasSourceUrl ? (
-                <a href={sourceUrl} target="_blank" rel="noreferrer" className="recipe-open-btn">
-                  Ver receita
-                </a>
-              ) : (
-                <button type="button" className="recipe-open-btn" onClick={() => onOpenNutritionistRecipe(recipe)}>
-                  Ver receita
-                </button>
-              )}
-            </article>
-          );
-        })}
+                {hasSourceUrl ? (
+                  <a href={sourceUrl} target="_blank" rel="noreferrer" className="recipe-open-btn">
+                    Ver receita
+                  </a>
+                ) : (
+                  <button type="button" className="recipe-open-btn" onClick={() => onOpenNutritionistRecipe(recipe)}>
+                    Ver receita
+                  </button>
+                )}
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -233,6 +233,19 @@ export default function Recipes() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedNutritionistRecipe, setSelectedNutritionistRecipe] = useState(null);
+  const [activeInnerTab, setActiveInnerTab] = useState('made');
+  const [createNotice, setCreateNotice] = useState('');
+  const [myRecipes, setMyRecipes] = useState([]);
+  const [recipeDraft, setRecipeDraft] = useState({
+    name: '',
+    ingredients: '',
+    steps: '',
+    utensils: '',
+    allergens: '',
+    visibility: 'private',
+    photoFile: null,
+    photoPreview: '',
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -243,7 +256,23 @@ export default function Recipes() {
       try {
         const data = await fetchRecipes({ limit: 300 });
         if (!isMounted) return;
-        setRecipes(Array.isArray(data) ? data : []);
+        const safeData = Array.isArray(data) ? data : [];
+        setRecipes(safeData);
+
+        setMyRecipes((previous) => {
+          if (previous.length > 0) {
+            return previous;
+          }
+
+          return safeData.slice(0, 3).map((recipe, index) => ({
+            id: `seed-${recipe?.id || index}`,
+            name: String(recipe?.name || `Receita ${index + 1}`),
+            description: String(recipe?.description || '').trim() || 'Sem descrição detalhada.',
+            image: recipeImageFor(recipe),
+            visibility: index === 0 ? 'private' : 'public',
+            sourceUrl: extractSourceUrl(recipe),
+          }));
+        });
       } catch (loadError) {
         if (!isMounted) return;
         setError(loadError?.message || 'Não foi possível carregar as receitas.');
@@ -257,6 +286,12 @@ export default function Recipes() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => () => {
+    if (String(recipeDraft.photoPreview || '').startsWith('blob:')) {
+      URL.revokeObjectURL(recipeDraft.photoPreview);
+    }
+  }, [recipeDraft.photoPreview]);
 
   const groupedCategories = useMemo(() => {
     const grouped = {
@@ -301,6 +336,104 @@ export default function Recipes() {
 
   const closeNutritionistModal = () => setSelectedNutritionistRecipe(null);
 
+  const updateDraftField = (field) => (event) => {
+    const value = event?.target?.value ?? '';
+    setCreateNotice('');
+    setRecipeDraft((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const handlePhotoChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setCreateNotice('');
+
+    setRecipeDraft((previous) => {
+      if (String(previous.photoPreview || '').startsWith('blob:')) {
+        URL.revokeObjectURL(previous.photoPreview);
+      }
+
+      if (!file) {
+        return {
+          ...previous,
+          photoFile: null,
+          photoPreview: '',
+        };
+      }
+
+      return {
+        ...previous,
+        photoFile: file,
+        photoPreview: URL.createObjectURL(file),
+      };
+    });
+  };
+
+  const removeDraftPhoto = () => {
+    setCreateNotice('');
+    setRecipeDraft((previous) => {
+      if (String(previous.photoPreview || '').startsWith('blob:')) {
+        URL.revokeObjectURL(previous.photoPreview);
+      }
+      return {
+        ...previous,
+        photoFile: null,
+        photoPreview: '',
+      };
+    });
+  };
+
+  const toggleMyRecipeVisibility = (recipeId) => {
+    setMyRecipes((previous) => previous.map((recipe) => {
+      if (recipe.id !== recipeId) {
+        return recipe;
+      }
+      return {
+        ...recipe,
+        visibility: recipe.visibility === 'private' ? 'public' : 'private',
+      };
+    }));
+  };
+
+  const handleCreateSubmit = (event) => {
+    event.preventDefault();
+
+    const recipeName = String(recipeDraft.name || '').trim();
+    if (!recipeName) {
+      setCreateNotice('Indica pelo menos o nome da receita.');
+      return;
+    }
+
+    const cardImage = recipeDraft.photoFile
+      ? URL.createObjectURL(recipeDraft.photoFile)
+      : '';
+
+    const createdRecipe = {
+      id: `mine-${Date.now()}`,
+      name: recipeName,
+      description: String(recipeDraft.steps || '').trim() || 'Receita criada manualmente.',
+      image: cardImage || 'https://placehold.co/900x560/e2e8f0/475569?text=Receita+Criada',
+      visibility: recipeDraft.visibility === 'public' ? 'public' : 'private',
+      sourceUrl: '',
+    };
+
+    setMyRecipes((previous) => [createdRecipe, ...previous]);
+    setRecipeDraft({
+      name: '',
+      ingredients: '',
+      steps: '',
+      utensils: '',
+      allergens: '',
+      visibility: 'private',
+      photoFile: null,
+      photoPreview: '',
+    });
+
+    setCreateNotice('Receita adicionada em "Suas receitas".');
+    setActiveInnerTab('mine');
+  };
+
   return (
     <Layout>
       <div className="page recipes-page">
@@ -315,21 +448,239 @@ export default function Recipes() {
             </div>
           </header>
 
-          {isLoading ? <div className="alert alert-info" role="status">A carregar receitas...</div> : null}
-          {!isLoading && error ? <div className="alert alert-danger" role="alert">{error}</div> : null}
-
-          <div className="recipes-categories">
-            {!isLoading && !error && groupedCategories.length === 0 ? (
-              <div className="alert alert-secondary" role="status">Sem receitas na base de dados.</div>
-            ) : null}
-            {groupedCategories.map((category) => (
-              <CategoryCarousel
-                key={category.id}
-                category={category}
-                onOpenNutritionistRecipe={setSelectedNutritionistRecipe}
-              />
-            ))}
+          <div className="recipes-inner-tabs" role="tablist" aria-label="Sub-abas de receitas">
+            <button
+              type="button"
+              role="tab"
+              className={`recipes-inner-tab ${activeInnerTab === 'made' ? 'active' : ''}`}
+              aria-selected={activeInnerTab === 'made'}
+              onClick={() => setActiveInnerTab('made')}
+            >
+              Receitas feitas
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`recipes-inner-tab ${activeInnerTab === 'create' ? 'active' : ''}`}
+              aria-selected={activeInnerTab === 'create'}
+              onClick={() => setActiveInnerTab('create')}
+            >
+              Criar receita
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className={`recipes-inner-tab ${activeInnerTab === 'mine' ? 'active' : ''}`}
+              aria-selected={activeInnerTab === 'mine'}
+              onClick={() => setActiveInnerTab('mine')}
+            >
+              Suas receitas
+            </button>
           </div>
+
+          {activeInnerTab === 'made' ? (
+            <>
+              {isLoading ? <div className="alert alert-info" role="status">A carregar receitas...</div> : null}
+              {!isLoading && error ? <div className="alert alert-danger" role="alert">{error}</div> : null}
+
+              <div className="recipes-categories">
+                {!isLoading && !error && groupedCategories.length === 0 ? (
+                  <div className="alert alert-secondary" role="status">Sem receitas na base de dados.</div>
+                ) : null}
+                {groupedCategories.map((category) => (
+                  <CategoryCarousel
+                    key={category.id}
+                    category={category}
+                    onOpenNutritionistRecipe={setSelectedNutritionistRecipe}
+                  />
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {activeInnerTab === 'create' ? (
+            <section className="recipes-create card" aria-label="Criar receita">
+              <header className="recipes-create-head">
+                <h3>Criar receita</h3>
+                <p>Preenche a base da receita com nome, ingredientes, passos, utensílios, alergénios e foto.</p>
+              </header>
+
+              <form className="recipes-create-form" onSubmit={handleCreateSubmit}>
+                <div className="recipes-create-grid">
+                  <div className="recipes-create-field recipes-create-field-full">
+                    <label htmlFor="recipe-name">Nome da receita</label>
+                    <input
+                      id="recipe-name"
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: Massa de atum e espinafres"
+                      value={recipeDraft.name}
+                      onChange={updateDraftField('name')}
+                    />
+                  </div>
+
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-ingredients">Ingredientes</label>
+                    <textarea
+                      id="recipe-ingredients"
+                      className="form-control"
+                      rows={6}
+                      placeholder={'Ex: 200g massa\n150g atum\n1 chávena espinafres'}
+                      value={recipeDraft.ingredients}
+                      onChange={updateDraftField('ingredients')}
+                    />
+                  </div>
+
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-steps">Passos</label>
+                    <textarea
+                      id="recipe-steps"
+                      className="form-control"
+                      rows={6}
+                      placeholder={'Ex: 1) Cozer a massa\n2) Saltear espinafres\n3) Misturar com atum'}
+                      value={recipeDraft.steps}
+                      onChange={updateDraftField('steps')}
+                    />
+                  </div>
+
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-utensils">Utensílios recomendados</label>
+                    <textarea
+                      id="recipe-utensils"
+                      className="form-control"
+                      rows={4}
+                      placeholder={'Ex: Panela\nFrigideira\nEscorredor'}
+                      value={recipeDraft.utensils}
+                      onChange={updateDraftField('utensils')}
+                    />
+                  </div>
+
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-allergens">Alergénios</label>
+                    <textarea
+                      id="recipe-allergens"
+                      className="form-control"
+                      rows={4}
+                      placeholder={'Ex: Glúten\nPeixe\nLactose'}
+                      value={recipeDraft.allergens}
+                      onChange={updateDraftField('allergens')}
+                    />
+                  </div>
+
+                  <div className="recipes-create-field recipes-create-field-full">
+                    <label>Visibilidade</label>
+                    <div className="recipes-visibility-options" role="radiogroup" aria-label="Visibilidade da receita">
+                      <label className={`recipes-visibility-pill ${recipeDraft.visibility === 'public' ? 'active' : ''}`}>
+                        <input
+                          type="radio"
+                          name="recipe-visibility"
+                          value="public"
+                          checked={recipeDraft.visibility === 'public'}
+                          onChange={updateDraftField('visibility')}
+                        />
+                        Pública
+                      </label>
+                      <label className={`recipes-visibility-pill ${recipeDraft.visibility === 'private' ? 'active' : ''}`}>
+                        <input
+                          type="radio"
+                          name="recipe-visibility"
+                          value="private"
+                          checked={recipeDraft.visibility === 'private'}
+                          onChange={updateDraftField('visibility')}
+                        />
+                        Privada
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="recipes-create-field recipes-create-field-full">
+                    <label htmlFor="recipe-photo">Foto da receita</label>
+                    <div className="recipes-photo-upload-row">
+                      <input
+                        id="recipe-photo"
+                        type="file"
+                        accept="image/*"
+                        className="form-control"
+                        onChange={handlePhotoChange}
+                      />
+                      {recipeDraft.photoPreview ? (
+                        <button type="button" className="btn btn-outline-secondary" onClick={removeDraftPhoto}>
+                          Remover foto
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {recipeDraft.photoPreview ? (
+                      <img src={recipeDraft.photoPreview} alt="Pré-visualização da receita" className="recipes-photo-preview" />
+                    ) : (
+                      <div className="recipes-photo-placeholder">Sem foto selecionada</div>
+                    )}
+                  </div>
+                </div>
+
+                {createNotice ? (
+                  <div className="alert alert-info recipes-create-notice" role="status">{createNotice}</div>
+                ) : null}
+
+                <div className="recipes-create-actions">
+                  <button type="submit" className="btn btn-primary">Guardar base da receita</button>
+                </div>
+              </form>
+            </section>
+          ) : null}
+
+          {activeInnerTab === 'mine' ? (
+            <section className="recipes-mine card" aria-label="Suas receitas">
+              <header className="recipes-mine-head">
+                <h3>Suas receitas</h3>
+                <p>Lista das tuas receitas. As privadas aparecem mais escuras e podes alterar a qualquer momento.</p>
+              </header>
+
+              {myRecipes.length === 0 ? (
+                <div className="alert alert-secondary" role="status">
+                  Ainda não tens receitas criadas. Vai à aba "Criar receita" para adicionar a primeira.
+                </div>
+              ) : (
+                <div className="recipes-mine-grid">
+                  {myRecipes.map((recipe) => {
+                    const isPrivate = recipe.visibility === 'private';
+                    return (
+                      <article key={recipe.id} className={`my-recipe-card ${isPrivate ? 'is-private' : 'is-public'}`}>
+                        <img
+                          src={recipe.image}
+                          alt={recipe.name}
+                          loading="lazy"
+                          className="my-recipe-thumb"
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
+                          }}
+                        />
+                        <div className="my-recipe-body">
+                          <div className="my-recipe-top">
+                            <h4>{recipe.name}</h4>
+                            <span className={`my-recipe-visibility ${isPrivate ? 'private' : 'public'}`}>
+                              {isPrivate ? 'Privada' : 'Pública'}
+                            </span>
+                          </div>
+                          <p>{recipe.description}</p>
+                          <div className="my-recipe-actions">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={() => toggleMyRecipeVisibility(recipe.id)}
+                            >
+                              {isPrivate ? 'Tornar pública' : 'Tornar privada'}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          ) : null}
         </div>
       </div>
 
