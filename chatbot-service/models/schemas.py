@@ -21,4 +21,5 @@ class ChatResponse(BaseModel):
     onboarding_complete: bool = False
     extracted_preferences: Optional[Dict[str, Any]] = None
     meal_plan_draft: Optional[Dict[str, Any]] = None
+    meal_plan: Optional[Dict[str, Any]] = None
 

@@ -31,5 +31,6 @@ Comportamento esperado:
 4) Não repitas perguntas já respondidas na conversa atual.
 
 Quando o utilizador pedir um plano de refeições:
-- Explica que vais usar receitas scraped do backend (integração pendente)
-- Ainda sem inventar receitas finais: prepara apenas critérios/restrições para o motor de planeamento.
+- Não listes receitas completas no chat.
+- Responde curto, confirmando que o plano foi gerado e enviado para a aba de Planeamento Semanal.
+- Nunca sugiras receitas com ingredientes que o utilizador disse não gostar.

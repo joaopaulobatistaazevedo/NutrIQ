@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X, Send, HeartHandshake, Trash2 } from 'lucide-react';
 import { sendAssistantMessage, sendOnboardingMessage } from '../services/chatbotService';
+import {
+  CHAT_CONTEXT_KEY,
+  CHAT_HISTORY_KEY,
+  CHAT_MESSAGES_KEY,
+  PROFILE_KEY,
+  WEEKLY_PLAN_KEY,
+} from '../constants/storageKeys';
 import '../styles/chatbot.css';
-
-const PROFILE_KEY = 'nutribot_profile';
-const CHAT_MESSAGES_KEY = 'nutribot_chat_messages';
-const CHAT_HISTORY_KEY = 'nutribot_chat_history';
-const CHAT_CONTEXT_KEY = 'nutribot_chat_context';
 
 const parseStorage = (key, fallback) => {
   try {
@@ -96,6 +98,7 @@ const mapAddressStyle = (sex) => {
 export default function ChatWidget() {
   const location = useLocation();
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const [activeProfile, setActiveProfile] = useState(() => parseStorage(PROFILE_KEY, null));
 
@@ -150,8 +153,45 @@ export default function ChatWidget() {
     }
   }, [messages, isOpen]);
 
+  useEffect(() => {
+    const onMealEditRequest = (event) => {
+      const detail = event?.detail || {};
+      if (detail.accountId && detail.accountId !== accountId) {
+        return;
+      }
+
+      const contextNote = detail.day_label && detail.slot
+        ? ` (${detail.day_label} • ${detail.slot})`
+        : '';
+
+      setIsOpen(true);
+      setError('');
+      setInput('');
+      setChatContext((previous) => ({
+        ...previous,
+        pending_edit_request: detail,
+      }));
+      setMessages((previous) => ([
+        ...previous,
+        {
+          id: Date.now(),
+          role: 'bot',
+          text: `O que pretende editar no Plano Alimentar?${contextNote}`,
+        },
+      ]));
+
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+    };
+
+    window.addEventListener('nutribot:meal-edit-request', onMealEditRequest);
+    return () => window.removeEventListener('nutribot:meal-edit-request', onMealEditRequest);
+  }, [accountId]);
+
   const buildUserContext = () => {
     const preferences = chatContext?.preferences || {};
+    const weeklyPlan = parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null);
 
     return {
       ...(activeProfile || {}),
@@ -160,6 +200,8 @@ export default function ChatWidget() {
       is_first_time: !chatContext?.onboarding_complete,
       new_liked_ingredients: chatContext?.new_liked_ingredients || [],
       requested_extra_ingredients: chatContext?.requested_extra_ingredients || [],
+      pending_edit_request: chatContext?.pending_edit_request || null,
+      weekly_plan: weeklyPlan,
     };
   };
 
@@ -172,6 +214,7 @@ export default function ChatWidget() {
     localStorage.removeItem(scopedKey(CHAT_MESSAGES_KEY, accountId));
     localStorage.removeItem(scopedKey(CHAT_HISTORY_KEY, accountId));
     localStorage.removeItem(scopedKey(CHAT_CONTEXT_KEY, accountId));
+    localStorage.removeItem(scopedKey(WEEKLY_PLAN_KEY, accountId));
   };
 
   const handleSubmit = async (event) => {
@@ -238,6 +281,18 @@ export default function ChatWidget() {
           meal_plan_draft: response.meal_plan_draft,
         }));
       }
+
+      if (response?.meal_plan) {
+        localStorage.setItem(scopedKey(WEEKLY_PLAN_KEY, accountId), JSON.stringify(response.meal_plan));
+        window.dispatchEvent(
+          new CustomEvent('nutribot:weekly-plan-updated', { detail: { accountId } })
+        );
+      }
+
+      setChatContext((previous) => ({
+        ...previous,
+        pending_edit_request: null,
+      }));
     } catch (apiError) {
       setError(apiError.message || 'Falha ao comunicar com o NutriBot.');
     } finally {
@@ -304,6 +359,7 @@ export default function ChatWidget() {
 
           <form className="chat-input-area" onSubmit={handleSubmit}>
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(inputEvent) => setInput(inputEvent.target.value)}
