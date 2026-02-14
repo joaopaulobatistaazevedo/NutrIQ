@@ -1,13 +1,15 @@
-// src/components/Layout.jsx
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { MAIN_NAV_ITEMS } from '../config/navigation';
+import { getMainNavItems } from '../config/navigation';
+import { getUserRole } from '../utils/authSession';
 import '../styles/layout.css';
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const role = getUserRole();
+  const navItems = useMemo(() => getMainNavItems(role), [role]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -24,7 +26,7 @@ export default function Layout({ children }) {
         return;
       }
 
-      const match = MAIN_NAV_ITEMS.find((item) => item.shortcutKey === event.key);
+      const match = navItems.find((item) => item.shortcutKey === event.key);
       if (!match || match.path === location.pathname) {
         return;
       }
@@ -35,7 +37,7 @@ export default function Layout({ children }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, navItems]);
 
   return (
     <div className="layout">

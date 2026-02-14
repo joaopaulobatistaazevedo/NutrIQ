@@ -1,8 +1,7 @@
-// src/pages/Login.jsx
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
-import { setAuthSession } from '../utils/authSession';
+import { getStoredRoleForEmail, setAuthSession } from '../utils/authSession';
 import { loginUser } from '../services/authService';
 import { fetchMyProfile } from '../services/userService';
 import { PROFILE_KEY } from '../constants/storageKeys';
@@ -51,15 +50,19 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
+      const trimmedEmail = email.trim();
+      const role = getStoredRoleForEmail(trimmedEmail);
+
       const auth = await loginUser({
-        email: email.trim(),
+        email: trimmedEmail,
         password,
       });
 
       setAuthSession({
         userId: auth.userId,
         token: auth.token,
-        email: email.trim(),
+        email: trimmedEmail,
+        role,
       });
 
       try {
@@ -78,7 +81,8 @@ export default function Login() {
         // Keep login successful even if profile sync fails.
       }
 
-      const redirectTo = location.state?.from || '/dashboard';
+      const roleDefaultRedirect = role === 'nutritionist' ? '/nutritionist' : '/dashboard';
+      const redirectTo = location.state?.from || roleDefaultRedirect;
       navigate(redirectTo, { replace: true });
     } catch (error) {
       setErrorMessage(error.message || 'Não foi possível fazer login.');
@@ -89,7 +93,6 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      {/* Animated blobs */}
       <div className="auth-blob ab-1" />
       <div className="auth-blob ab-2" />
       <div className="auth-blob ab-3" />
@@ -120,7 +123,6 @@ export default function Login() {
           <p className="auth-footer">Ainda não tens conta? <Link to="/register">Criar conta</Link></p>
         </div>
 
-        {/* Side visual */}
         <div className="auth-visual">
           <div className="auth-visual-inner">
             <h2>Planeia as tuas refeições de forma simples</h2>

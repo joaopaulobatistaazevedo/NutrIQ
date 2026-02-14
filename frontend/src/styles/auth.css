@@ -313,3 +313,25 @@
   .auth-card { border-radius: 20px; }
   .auth-card-inner { padding: 24px 18px; }
 }
+
+.auth-role-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.auth-role-option {
+  border: 1px solid rgba(148, 163, 184, 0.65);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-role-option.active {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+}

@@ -1,0 +1,162 @@
+.nutritionist-page {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nutritionist-header h1 {
+  font-size: clamp(1.8rem, 2.5vw, 2.3rem);
+  margin-bottom: 6px;
+  color: #0f172a;
+}
+
+.nutritionist-header p {
+  color: #475569;
+}
+
+.nutritionist-tabs {
+  display: inline-flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  padding: 6px;
+  width: fit-content;
+}
+
+.nutritionist-tab {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  padding: 10px 14px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+}
+
+.nutritionist-tab.active {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.nutritionist-form,
+.nutritionist-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 18px;
+  padding: clamp(16px, 2vw, 24px);
+}
+
+.nutritionist-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nutritionist-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.nutritionist-form input,
+.nutritionist-form select,
+.nutritionist-form textarea {
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.nutritionist-submit {
+  width: fit-content;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #10b981;
+  color: #f8fafc;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nutritionist-submit:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.nutritionist-feedback {
+  font-weight: 600;
+}
+
+.nutritionist-feedback.error {
+  color: #b91c1c;
+}
+
+.nutritionist-feedback.success {
+  color: #065f46;
+}
+
+.nutritionist-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nutritionist-stats-grid article {
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.nutritionist-stats-grid h3 {
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: #334155;
+}
+
+.nutritionist-stats-grid strong {
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+
+.nutritionist-mocked-note {
+  color: #475569;
+}
+
+.nutritionist-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nutritionist-stats-list article {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.nutritionist-stats-list h4 {
+  margin-bottom: 2px;
+  color: #0f172a;
+}
+
+.nutritionist-stats-list p {
+  color: #334155;
+}
+
+@media (max-width: 900px) {
+  .nutritionist-form-grid,
+  .nutritionist-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
