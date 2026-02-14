@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tabler/core": "^1.4.0",
     "axios": "^1.13.5",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.564.0",

@@ -87,24 +87,25 @@ function CategoryCarousel({ category }) {
   };
 
   return (
-    <section className="recipes-category">
-      <header className="recipes-category-header">
+    <section className="recipes-category card">
+      <header className="recipes-category-header card-header">
         <div>
           <h2>{category.title}</h2>
           <p>{category.description}</p>
         </div>
 
         <div className="recipes-carousel-controls">
-          <button type="button" className="recipes-control-btn" onClick={() => scrollByAmount(-1)} aria-label="Anterior">
+          <button type="button" className="recipes-control-btn btn btn-icon" onClick={() => scrollByAmount(-1)} aria-label="Anterior">
             <ChevronLeft size={18} />
           </button>
-          <button type="button" className="recipes-control-btn" onClick={() => scrollByAmount(1)} aria-label="Seguinte">
+          <button type="button" className="recipes-control-btn btn btn-icon" onClick={() => scrollByAmount(1)} aria-label="Seguinte">
             <ChevronRight size={18} />
           </button>
         </div>
       </header>
 
-      <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
+      <div className="card-body">
+        <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
         {category.recipes.map((recipe) => {
           const sourceUrl = String(recipe?.sourceUrl || '').trim();
           const hasSourceUrl = sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://');
@@ -154,6 +155,7 @@ function CategoryCarousel({ category }) {
             </article>
           );
         })}
+        </div>
       </div>
     </section>
   );
@@ -211,27 +213,29 @@ export default function Recipes() {
 
   return (
     <Layout>
-      <div className="recipes-page">
-        <header className="recipes-header">
-          <div>
-            <h1>Receitas por Base</h1>
-            <p>
-              Organização por categoria para veres receitas parecidas juntas
-              como pediste (ex: carbonara e bolonhesa na base massa).
-            </p>
+      <div className="page recipes-page">
+        <div className="container-xl">
+          <header className="page-header d-print-none mb-3">
+            <div>
+              <h2 className="page-title">Receitas por Base</h2>
+              <p className="text-secondary mb-0">
+                Organização por categoria para veres receitas parecidas juntas
+                como pediste (ex: carbonara e bolonhesa na base massa).
+              </p>
+            </div>
+          </header>
+
+          {isLoading ? <div className="alert alert-info" role="status">A carregar receitas...</div> : null}
+          {!isLoading && error ? <div className="alert alert-danger" role="alert">{error}</div> : null}
+
+          <div className="recipes-categories">
+            {!isLoading && !error && groupedCategories.length === 0 ? (
+              <div className="alert alert-secondary" role="status">Sem receitas na base de dados.</div>
+            ) : null}
+            {groupedCategories.map((category) => (
+              <CategoryCarousel key={category.id} category={category} />
+            ))}
           </div>
-        </header>
-
-        {isLoading ? <p className="recipes-feedback">A carregar receitas...</p> : null}
-        {!isLoading && error ? <p className="recipes-feedback recipes-feedback-error">{error}</p> : null}
-
-        <div className="recipes-categories">
-          {!isLoading && !error && groupedCategories.length === 0 ? (
-            <p className="recipes-feedback">Sem receitas na base de dados.</p>
-          ) : null}
-          {groupedCategories.map((category) => (
-            <CategoryCarousel key={category.id} category={category} />
-          ))}
         </div>
       </div>
     </Layout>

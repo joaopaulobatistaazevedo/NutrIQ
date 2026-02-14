@@ -1,70 +1,188 @@
 .nutri-social-page {
-  max-width: 980px;
+  max-width: 760px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding-bottom: 48px;
+  gap: 12px;
+  padding-bottom: 96px;
+}
+
+.nutri-social-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, rgba(232, 237, 243, 0.96), rgba(232, 237, 243, 0.76));
+  border-radius: 14px;
+  padding: 10px 2px 6px;
 }
 
 .nutri-social-header h1 {
   margin: 0;
   color: #0f172a;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .nutri-social-header p {
-  margin: 8px 0 0;
-  color: #475569;
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .nutri-social-streak {
-  margin-top: 12px;
+  margin-top: 10px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   border-radius: 999px;
-  border: 1px solid #fdba74;
+  border: 1px solid #fed7aa;
   background: #fff7ed;
   color: #9a3412;
+  font-size: 13px;
   font-weight: 700;
-  padding: 8px 14px;
+  padding: 6px 12px;
+}
+
+.nutri-social-stories {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.nutri-social-stories::-webkit-scrollbar {
+  display: none;
+}
+
+.nutri-social-story-item {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 58px;
+  cursor: pointer;
+}
+
+.nutri-social-feed-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+
+.nutri-social-story-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6, #0ea5e9);
+  box-shadow: 0 8px 18px rgba(139, 92, 246, 0.28);
+}
+
+.nutri-social-story-label {
+  font-size: 11px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.nutri-social-card,
+.nutri-social-sheet {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
 
 .nutri-social-card {
-  background: #ffffff;
-  border: 1px solid #dbe4ee;
-  border-radius: 16px;
-  padding: 18px;
+  padding: 10px;
 }
 
-.nutri-social-card h2 {
-  margin: 0 0 12px;
+.nutri-social-sheet {
+  padding: 14px;
+}
+
+.nutri-social-feed-head,
+.nutri-social-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.nutri-social-feed-head h2,
+.nutri-social-sheet-head h2 {
+  margin: 0;
   color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.nutri-social-feed-user {
+  border: 1px solid #dbeafe;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
+.nutri-social-icon-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #64748b;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
 }
 
 .nutri-social-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+
+.nutri-social-inline-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.nutri-social-inline-form .nutri-social-field {
+  flex: 1;
 }
 
 .nutri-social-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .nutri-social-field span {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  color: #334155;
+  color: #475569;
 }
 
 .nutri-social-field textarea,
 .nutri-social-field select,
 .nutri-social-field input[type='number'] {
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   padding: 10px 12px;
   font-size: 14px;
   color: #0f172a;
@@ -74,23 +192,24 @@
 .nutri-social-field textarea:focus,
 .nutri-social-field select:focus,
 .nutri-social-field input[type='number']:focus {
-  outline: 2px solid #bae6fd;
+  outline: 0;
   border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
 }
 
 .nutri-social-field.file-input input[type='file'] {
-  border: 1px dashed #94a3b8;
-  border-radius: 10px;
-  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 10px;
   background: #f8fafc;
 }
 
 .nutri-social-preview {
-  max-height: 260px;
-  border-radius: 12px;
+  max-height: 280px;
+  border-radius: 14px;
   width: 100%;
   object-fit: cover;
-  border: 1px solid #dbe4ee;
+  border: 1px solid #e2e8f0;
 }
 
 .nutri-social-share-toggle {
@@ -98,7 +217,7 @@
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  color: #0f172a;
+  color: #334155;
 }
 
 .nutri-social-share-toggle span {
@@ -107,14 +226,12 @@
   gap: 6px;
 }
 
-.nutri-social-submit {
-  border: none;
+.nutri-social-submit,
+.nutri-social-secondary-btn {
   border-radius: 12px;
-  background: #0ea5e9;
-  color: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 11px 14px;
+  padding: 9px 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -122,16 +239,35 @@
   cursor: pointer;
 }
 
-.nutri-social-submit:disabled {
+.nutri-social-submit {
+  border: none;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #ffffff;
+}
+
+.nutri-social-submit:disabled,
+.nutri-social-secondary-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.nutri-social-secondary-btn {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+}
+
+.nutri-social-secondary-btn.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff1f2;
 }
 
 .nutri-social-status,
 .nutri-social-feedback {
   margin: 0;
-  font-size: 14px;
-  color: #334155;
+  font-size: 13px;
+  color: #475569;
 }
 
 .nutri-social-feedback.error {
@@ -140,19 +276,19 @@
 
 .nutri-social-feed {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .nutri-social-post {
-  border: 1px solid #dbe4ee;
-  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   overflow: hidden;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .nutri-social-post img {
   width: 100%;
-  max-height: 280px;
+  max-height: 360px;
   object-fit: cover;
   display: block;
 }
@@ -163,23 +299,161 @@
 
 .nutri-social-post-body h3 {
   margin: 0;
+  font-size: 15px;
   color: #0f172a;
 }
 
 .nutri-social-post-body p {
-  margin: 8px 0;
+  margin: 6px 0 8px;
   color: #475569;
+  font-size: 14px;
 }
 
 .nutri-social-post-meta {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nutri-social-post-meta span {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.nutri-social-friends-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nutri-social-friend-list {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.nutri-social-friend-list h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.nutri-social-friend-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.nutri-social-friend-item:last-child {
+  border-bottom: 0;
+}
+
+.nutri-social-friend-item span {
+  color: #475569;
   font-size: 13px;
 }
 
+.nutri-social-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nutri-social-id-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nutri-social-id-cloud span {
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1d4ed8;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nutri-social-fab-stack {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.nutri-social-fab {
+  position: absolute;
+  border: none;
+  border-radius: 999px;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 14px 26px rgba(2, 132, 199, 0.34);
+}
+
+.nutri-social-fab-main {
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: 58px;
+  height: 58px;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+}
+
+.nutri-social-fab-friends {
+  right: 20px;
+  bottom: 22px;
+  width: 46px;
+  height: 46px;
+  background: #334155;
+  box-shadow: 0 10px 20px rgba(51, 65, 85, 0.34);
+}
+
+.nutri-social-fab.active {
+  filter: brightness(0.88);
+}
+
 @media (max-width: 768px) {
-  .nutri-social-card {
-    padding: 14px;
+  .nutri-social-page {
+    gap: 10px;
+    padding-bottom: 88px;
+  }
+
+  .nutri-social-header h1 {
+    font-size: 26px;
+  }
+
+  .nutri-social-inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nutri-social-friends-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nutri-social-fab-main {
+    width: 54px;
+    height: 54px;
+    bottom: 14px;
+  }
+
+  .nutri-social-fab-friends {
+    right: 14px;
+    bottom: 14px;
+    width: 42px;
+    height: 42px;
   }
 }

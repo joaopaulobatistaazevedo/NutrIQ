@@ -43,6 +43,7 @@ function getMonthCells(anchorDate) {
   return cells;
 }
 
+
 function capitalize(value) {
   if (!value) return value;
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -81,7 +82,6 @@ function slotMeta(slot) {
   return { icon: Moon, time: '20:00', kcal: 540 };
 }
 
-
 export default function MealPlan() {
   const accountId = useMemo(() => {
     const profile = parseStorage(PROFILE_KEY, null);
@@ -95,9 +95,7 @@ export default function MealPlan() {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
 
-  const [weeklyPlan, setWeeklyPlan] = useState(() =>
-    parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null)
-  );
+  const [weeklyPlan, setWeeklyPlan] = useState(() => parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
   const [monthCursor, setMonthCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
 
@@ -112,8 +110,8 @@ export default function MealPlan() {
   }, [selectedDate]);
 
   const selectedIso = useMemo(() => selectedDate.toISOString().slice(0, 10), [selectedDate]);
-
   const monthCells = useMemo(() => getMonthCells(monthCursor), [monthCursor]);
+
   const meals = useMemo(() => {
     const planDay = weeklyPlan?.days?.find((day) => day?.date === selectedIso);
 
@@ -129,11 +127,9 @@ export default function MealPlan() {
         time: meta.time,
         dish: meal.title,
         kcal: Number.isFinite(Number(meal.kcal)) ? Number(meal.kcal) : meta.kcal,
-        source: meal.source,
       };
     });
-  }, [selectedDate, selectedIso, weeklyPlan]);
-
+  }, [selectedIso, weeklyPlan]);
   useEffect(() => {
     let cancelled = false;
 
@@ -196,97 +192,101 @@ export default function MealPlan() {
 
   return (
     <Layout>
-      <div className="meal-plan">
-        <header className="meal-plan-header">
-          <div>
-            <h1 className="meal-plan-title">Calendário de Refeições</h1>
-            <p className="meal-plan-subtitle">Organiza e acompanha o plano nutricional dia a dia</p>
-          </div>
-          <button className="btn-primary" type="button" onClick={handleGenerateCart}>
-            <CalendarDays size={16} />
-            <span>Gerar carrinho</span>
-          </button>
-        </header>
-
-        <section className="meal-plan-grid">
-          <article className="calendar-card">
-            <div className="calendar-toolbar">
-              <button type="button" className="calendar-nav-btn" onClick={goToPreviousMonth} aria-label="Mês anterior">
-                <ChevronLeft size={16} />
+      <div className="page">
+        <div className="container-xl">
+          <div className="meal-plan">
+            <header className="meal-plan-header page-header d-print-none">
+              <div>
+                <h1 className="meal-plan-title page-title">Calendário de Refeições</h1>
+                <p className="meal-plan-subtitle text-secondary mb-0">Organiza e acompanha o plano nutricional dia a dia</p>
+              </div>
+              <button className="btn btn-primary d-inline-flex align-items-center gap-2" type="button" onClick={handleGenerateCart}>
+                <CalendarDays size={16} />
+                <span>Gerar carrinho</span>
               </button>
+            </header>
 
-              <h2>{monthLabel}</h2>
-
-              <button type="button" className="calendar-nav-btn" onClick={goToNextMonth} aria-label="Mês seguinte">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            <div className="calendar-week-row" role="presentation">
-              {WEEK_DAYS.map((day) => (
-                <span key={day} className="calendar-week-day">
-                  {day}
-                </span>
-              ))}
-            </div>
-
-            <div className="calendar-days-grid" role="grid" aria-label={`Dias de ${monthLabel}`}>
-              {monthCells.map((date, index) => {
-                if (!date) {
-                  return <span key={`empty-${index}`} className="calendar-empty-cell" aria-hidden="true" />;
-                }
-
-                const isToday = isSameDate(date, today);
-                const isSelected = isSameDate(date, selectedDate);
-
-                return (
-                  <button
-                    key={date.toISOString()}
-                    type="button"
-                    className={`calendar-day-btn ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
-                    onClick={() => setSelectedDate(date)}
-                  >
-                    {date.getDate()}
+            <section className="meal-plan-grid">
+              <article className="calendar-card card">
+                <div className="calendar-toolbar">
+                  <button type="button" className="calendar-nav-btn" onClick={goToPreviousMonth} aria-label="Mês anterior">
+                    <ChevronLeft size={16} />
                   </button>
-                );
-              })}
-            </div>
-          </article>
 
-          <article className="daily-plan-card">
-            <h2 className="daily-plan-title">{selectedLabel}</h2>
-            <p className="daily-plan-subtitle">Plano diário recomendado</p>
+                  <h2>{monthLabel}</h2>
 
-            <div className="daily-meals">
-              {!meals.length ? (
-                <p className="daily-meals-empty">
-                  Ainda não tens refeições planeadas. Fala com o chatbot para criares o teu plano!
-                </p>
-              ) : null}
+                  <button type="button" className="calendar-nav-btn" onClick={goToNextMonth} aria-label="Mês seguinte">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
 
-              {meals.map((meal) => {
-                const Icon = meal.icon;
-                return (
-                  <article key={meal.slot} className="daily-meal-item">
-                    <div className="daily-meal-head">
-                      <span className="daily-meal-slot">
-                        <Icon size={16} />
-                        {meal.slot}
-                      </span>
-                      <span className="daily-meal-time">
-                        <Clock3 size={14} />
-                        {meal.time}
-                      </span>
-                    </div>
+                <div className="calendar-week-row" role="presentation">
+                  {WEEK_DAYS.map((day) => (
+                    <span key={day} className="calendar-week-day">
+                      {day}
+                    </span>
+                  ))}
+                </div>
 
-                    <h3>{meal.dish}</h3>
-                    <p>{meal.kcal} kcal</p>
-                  </article>
-                );
-              })}
-            </div>
-          </article>
-        </section>
+                <div className="calendar-days-grid" role="grid" aria-label={`Dias de ${monthLabel}`}>
+                  {monthCells.map((date, index) => {
+                    if (!date) {
+                      return <span key={`empty-${index}`} className="calendar-empty-cell" aria-hidden="true" />;
+                    }
+
+                    const isToday = isSameDate(date, today);
+                    const isSelected = isSameDate(date, selectedDate);
+
+                    return (
+                      <button
+                        key={date.toISOString()}
+                        type="button"
+                        className={`calendar-day-btn ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedDate(date)}
+                      >
+                        {date.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="daily-plan-card card">
+                <h2 className="daily-plan-title">{selectedLabel}</h2>
+                <p className="daily-plan-subtitle">Plano diário recomendado</p>
+
+                <div className="daily-meals">
+                  {!meals.length ? (
+                    <p className="daily-meals-empty">
+                      Ainda não tens refeições planeadas. Fala com o chatbot para criares o teu plano!
+                    </p>
+                  ) : null}
+
+                  {meals.map((meal) => {
+                    const Icon = meal.icon;
+                    return (
+                      <article key={`${selectedIso}-${meal.slot}-${meal.dish}`} className="daily-meal-item">
+                        <div className="daily-meal-head">
+                          <span className="daily-meal-slot">
+                            <Icon size={16} />
+                            {meal.slot}
+                          </span>
+                          <span className="daily-meal-time">
+                            <Clock3 size={14} />
+                            {meal.time}
+                          </span>
+                        </div>
+
+                        <h3>{meal.dish}</h3>
+                        <p>{meal.kcal} kcal</p>
+                      </article>
+                    );
+                  })}
+                </div>
+              </article>
+            </section>
+          </div>
+        </div>
       </div>
     </Layout>
   );

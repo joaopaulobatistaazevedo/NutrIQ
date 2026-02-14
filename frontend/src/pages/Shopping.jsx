@@ -749,26 +749,28 @@ export default function Shopping() {
 
   return (
     <Layout>
-      <div className="shopping-page">
-        <PageHeader
-          className="shopping-header"
-          title="Lista de Compras"
-          subtitle="Gera automaticamente o carrinho com base no teu plano e compara preços por supermercado."
-          tag={(
-            <div className="shopping-header-tag">
-              <ShoppingCart size={16} />
-              Preços atuais
-            </div>
-          )}
-        />
+      <div className="page">
+        <div className="container-xl">
+          <div className="shopping-page">
+            <PageHeader
+              className="shopping-header page-header d-print-none"
+              title="Lista de Compras"
+              subtitle="Gera automaticamente o carrinho com base no teu plano e compara preços por supermercado."
+              tag={(
+                <div className="shopping-header-tag badge bg-primary-lt text-primary">
+                  <ShoppingCart size={16} />
+                  Preços atuais
+                </div>
+              )}
+            />
 
-        <div className="shopping-grid">
-          <section className="shopping-lists-panel">
+            <div className="shopping-grid">
+              <section className="shopping-lists-panel card">
             <h2>Listas por supermercado</h2>
 
             <button
               type="button"
-              className="suggestion-chip shopping-generate-btn"
+              className="suggestion-chip shopping-generate-btn btn btn-primary"
               onClick={() => void generateCartFromMealPlan()}
               disabled={isGeneratingCart}
             >
@@ -894,9 +896,9 @@ export default function Shopping() {
               </form>
               {importStatus ? <p className="shopping-feedback">{importStatus}</p> : null}
             </div>
-          </section>
+              </section>
 
-          <section className="shopping-cart-panel">
+              <section className="shopping-cart-panel card">
             <header className="shopping-cart-header">
               <h2>
                 {activeList?.name ? `Carrinho - ${activeList.name}` : 'Carrinho'} ({activeItems.length})
@@ -992,12 +994,14 @@ export default function Shopping() {
                 <strong>{formatCurrency(summary.subtotal, summary.currency)}</strong>
               </div>
 
-              <button type="button" className="checkout-btn" disabled={!activeItems.length}>
+              <button type="button" className="checkout-btn btn btn-success" disabled={!activeItems.length}>
                 Avançar para checkout
               </button>
               <p className="checkout-note">Esta lista usa os últimos preços importados em `/api/prices`.</p>
             </footer>
-          </section>
+              </section>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

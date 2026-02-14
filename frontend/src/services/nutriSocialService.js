@@ -62,3 +62,86 @@ export async function registerMealPhoto(token, payload) {
     throw new Error(normalizeError(error));
   }
 }
+
+export async function fetchFriends(token) {
+  try {
+    const { data } = await client.get('/api/social/friends', {
+      headers: buildAuthHeaders(token),
+    });
+    return Array.isArray(data?.friendIds) ? data.friendIds : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function fetchPendingReceivedRequests(token) {
+  try {
+    const { data } = await client.get('/api/social/friends/requests/received', {
+      headers: buildAuthHeaders(token),
+    });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function fetchPendingSentRequests(token) {
+  try {
+    const { data } = await client.get('/api/social/friends/requests/sent', {
+      headers: buildAuthHeaders(token),
+    });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function sendFriendRequest(token, addresseeId) {
+  try {
+    const { data } = await client.post(
+      '/api/social/friends/request',
+      { addresseeId: Number(addresseeId) },
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function acceptFriendRequest(token, friendshipId) {
+  try {
+    const { data } = await client.post(
+      `/api/social/friends/${Number(friendshipId)}/accept`,
+      {},
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function declineFriendRequest(token, friendshipId) {
+  try {
+    const { data } = await client.post(
+      `/api/social/friends/${Number(friendshipId)}/decline`,
+      {},
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function removeFriend(token, friendshipId) {
+  try {
+    const { data } = await client.delete(`/api/social/friends/${Number(friendshipId)}`, {
+      headers: buildAuthHeaders(token),
+    });
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}

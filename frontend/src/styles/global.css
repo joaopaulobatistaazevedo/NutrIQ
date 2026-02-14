@@ -6,6 +6,18 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bg-app: var(--tblr-bg-surface, #f3f6fb);
+  --bg-surface: var(--tblr-bg-surface, #ffffff);
+  --bg-surface-soft: var(--tblr-bg-surface-secondary, #f8fafd);
+  --border-soft: var(--tblr-border-color, #e2e8f0);
+  --text-primary: var(--tblr-body-color, #0f172a);
+  --text-secondary: var(--tblr-secondary-color, #64748b);
+  --brand: var(--tblr-primary, #0ea5e9);
+  --brand-strong: var(--tblr-primary, #0284c7);
+  --shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.06);
+}
+
 html,
 body,
 #root {
@@ -15,8 +27,11 @@ body,
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
-  background: #e8edf3;
-  color: #0f172a;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(14, 165, 233, 0.08), transparent 34%),
+    radial-gradient(circle at 92% 90%, rgba(16, 185, 129, 0.08), transparent 30%),
+    var(--bg-app);
+  color: var(--text-primary);
   line-height: 1.55;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -39,16 +54,16 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 600;
-  background: #e8edf3;
+  background: var(--bg-app);
 }
 
 .app-route-loading-dot {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #10B981;
+  background: var(--brand);
   animation: dot-pulse 1s ease-in-out infinite;
 }
 
@@ -64,6 +79,22 @@ button, input, select, textarea { font: inherit; }
 
 button {
   transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 a {

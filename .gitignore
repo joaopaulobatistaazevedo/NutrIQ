@@ -7,3 +7,5 @@ report.json
 *.db-shm
 *.db-wal
 *.lst
+
+!backend/database/meal_planner.db

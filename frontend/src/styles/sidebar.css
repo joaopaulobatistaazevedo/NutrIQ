@@ -72,6 +72,22 @@
   box-shadow: 0 0 20px rgba(52, 211, 153, 0.08);
 }
 
+.sidebar-item.sidebar-item-nutrisocial {
+  color: rgba(244, 114, 182, 0.92);
+  background: rgba(244, 114, 182, 0.08);
+}
+
+.sidebar-item.sidebar-item-nutrisocial:hover {
+  background: rgba(244, 114, 182, 0.16);
+  color: #fbcfe8;
+}
+
+.sidebar-item.sidebar-item-nutrisocial.active {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.22), rgba(192, 132, 252, 0.2));
+  color: #fdf2f8;
+  box-shadow: 0 0 22px rgba(236, 72, 153, 0.2);
+}
+
 .sidebar-item-icon {
   width: 18px;
   height: 18px;
@@ -82,6 +98,12 @@
 .sidebar-item.active .sidebar-item-icon {
   opacity: 1;
   color: #34d399;
+}
+
+.sidebar-item.sidebar-item-nutrisocial .sidebar-item-icon,
+.sidebar-item.sidebar-item-nutrisocial.active .sidebar-item-icon {
+  color: #f472b6;
+  opacity: 1;
 }
 
 .sidebar-item:hover .sidebar-item-icon {
