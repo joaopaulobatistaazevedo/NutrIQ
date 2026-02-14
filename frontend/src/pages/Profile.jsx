@@ -87,6 +87,7 @@ function mapApiToForm(apiUser, locationFallback) {
     goal: String(profile?.goal || '').trim(),
     maxWeeklyBudget: toFloatOrEmpty(profile?.budgetWeekly),
     dailyCalories: toIntOrEmpty(profile?.dailyCalories),
+    streakCount: toIntOrEmpty(profile?.streakCount),
   };
 }
 
@@ -115,6 +116,7 @@ export default function Profile() {
     goal: '',
     maxWeeklyBudget: '',
     dailyCalories: '',
+    streakCount: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -283,7 +285,7 @@ export default function Profile() {
             <div className="prof-id">
               <div className="prof-name-row">
                 <h1>{formState.name || 'Utilizador'}</h1>
-                <span className="prof-streak-pill"><Flame size={16} /> Streak 12 dias</span>
+                <span className="prof-streak-pill"><Flame size={16} /> Streak {Math.max(0, Number(formState.streakCount || 0))} dias</span>
               </div>
               <p className="prof-location">
                 <MapPin size={14} />

@@ -8,11 +8,13 @@ import alnak.business_logic.entities.User;
 import alnak.business_logic.entities.UserProfile;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -24,24 +26,24 @@ public class UserDAO {
     private final Connection conn;
 
     public UserDAO() {
-        this.conn = GlobalDatabase.getInstance().getConnection(); // ← changed
+        this.conn = GlobalDatabase.getInstance().getConnection();
     }
-
-    // ... all other methods stay identical except upsertProfile below ...
 
     private void upsertProfile(Long userId, UserProfile p) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("""
             INSERT INTO user_profiles
-              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE          -- ← MySQL syntax (was ON CONFLICT in SQLite)
-                age            = VALUES(age),
-                sex            = VALUES(sex),
-                height_cm      = VALUES(height_cm),
-                weight_kg      = VALUES(weight_kg),
-                goal           = VALUES(goal),
-                daily_calories = VALUES(daily_calories),
-                budget_weekly  = VALUES(budget_weekly)
+              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly, streak_count, last_meal_photo_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                age                  = VALUES(age),
+                sex                  = VALUES(sex),
+                height_cm            = VALUES(height_cm),
+                weight_kg            = VALUES(weight_kg),
+                goal                 = VALUES(goal),
+                daily_calories       = VALUES(daily_calories),
+                budget_weekly        = VALUES(budget_weekly),
+                streak_count         = VALUES(streak_count),
+                last_meal_photo_date = VALUES(last_meal_photo_date)
         """)) {
             ps.setLong(1, userId);
             ps.setInt(2, p.getAge());
@@ -51,11 +53,11 @@ public class UserDAO {
             setNullableString(ps, 6, p.getGoal() != null ? p.getGoal().name() : null);
             ps.setInt(7, p.getDailyCalories());
             ps.setDouble(8, p.getBudgetWeekly());
+            ps.setInt(9, Math.max(0, p.getStreakCount()));
+            setNullableDate(ps, 10, p.getLastMealPhotoDate());
             ps.executeUpdate();
         }
     }
-
-    // ── everything else is unchanged ─────────────────────────────────────────
 
     public User createUser(String name, String email, String passwordHash) {
         try (PreparedStatement ps = conn.prepareStatement(
@@ -150,9 +152,59 @@ public class UserDAO {
         }
     }
 
+    public int recordMealPhotoForStreak(Long userId) {
+        try {
+            conn.setAutoCommit(false);
+            try {
+                LocalDate today = LocalDate.now();
+                int currentStreak = 0;
+                LocalDate lastPhotoDate = null;
+
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT streak_count, last_meal_photo_date FROM user_profiles WHERE user_id = ? FOR UPDATE")) {
+                    ps.setLong(1, userId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            currentStreak = rs.getInt("streak_count");
+                            Date last = rs.getDate("last_meal_photo_date");
+                            if (last != null) {
+                                lastPhotoDate = last.toLocalDate();
+                            }
+                        }
+                    }
+                }
+
+                int updatedStreak = calculateUpdatedStreak(currentStreak, lastPhotoDate, today);
+
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        INSERT INTO user_profiles (user_id, streak_count, last_meal_photo_date)
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            streak_count = VALUES(streak_count),
+                            last_meal_photo_date = VALUES(last_meal_photo_date)
+                        """)) {
+                    ps.setLong(1, userId);
+                    ps.setInt(2, updatedStreak);
+                    ps.setDate(3, Date.valueOf(today));
+                    ps.executeUpdate();
+                }
+
+                conn.commit();
+                return updatedStreak;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public Optional<UserProfile> getProfile(Long userId) {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly FROM user_profiles WHERE user_id = ?")) {
+                "SELECT age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly, streak_count, last_meal_photo_date FROM user_profiles WHERE user_id = ?")) {
             ps.setLong(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
@@ -167,6 +219,9 @@ public class UserDAO {
                 if (goal != null) p.setGoal(Goal.from(goal));
                 if (rs.getObject("daily_calories") != null) p.setDailyCalories(rs.getInt("daily_calories"));
                 if (rs.getObject("budget_weekly") != null) p.setBudgetWeekly(rs.getDouble("budget_weekly"));
+                if (rs.getObject("streak_count") != null) p.setStreakCount(rs.getInt("streak_count"));
+                Date lastPhotoDate = rs.getDate("last_meal_photo_date");
+                if (lastPhotoDate != null) p.setLastMealPhotoDate(lastPhotoDate.toLocalDate());
                 p.setRestrictions(loadRestrictions(userId));
                 p.setAllergens(loadAllergens(userId));
                 return Optional.of(p);
@@ -253,6 +308,22 @@ public class UserDAO {
         return allergens;
     }
 
+    private int calculateUpdatedStreak(int currentStreak, LocalDate lastPhotoDate, LocalDate today) {
+        if (lastPhotoDate == null) {
+            return Math.max(1, currentStreak);
+        }
+
+        if (lastPhotoDate.isEqual(today)) {
+            return Math.max(currentStreak, 1);
+        }
+
+        if (lastPhotoDate.isEqual(today.minusDays(1))) {
+            return Math.max(currentStreak, 0) + 1;
+        }
+
+        return 1;
+    }
+
     private void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
         if (value == null) {
             ps.setNull(index, Types.VARCHAR);
@@ -261,8 +332,15 @@ public class UserDAO {
         ps.setString(index, value);
     }
 
+    private void setNullableDate(PreparedStatement ps, int index, LocalDate value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.DATE);
+            return;
+        }
+        ps.setDate(index, Date.valueOf(value));
+    }
+
     private boolean isUniqueConstraintViolation(SQLException e) {
-        // MySQL error code 1062 = Duplicate entry
         return e.getErrorCode() == 1062 ||
                 (e.getMessage() != null && e.getMessage().toLowerCase().contains("duplicate"));
     }

@@ -5,6 +5,7 @@ import {
   ShoppingCart,
   BarChart3,
   User,
+  Users,
 } from 'lucide-react';
 
 export const MAIN_NAV_ITEMS = [
@@ -14,6 +15,7 @@ export const MAIN_NAV_ITEMS = [
   { path: '/shopping', icon: ShoppingCart, label: 'Lista de Compras', shortcut: 'Alt+4', shortcutKey: '4' },
   { path: '/progress', icon: BarChart3, label: 'Progresso', shortcut: 'Alt+5', shortcutKey: '5' },
   { path: '/profile', icon: User, label: 'Perfil', shortcut: 'Alt+6', shortcutKey: '6' },
+  { path: '/nutrisocial', icon: Users, label: 'NutriSocial', shortcut: 'Alt+7', shortcutKey: '7' },
 ];
 
 export const PRIVATE_PATHS = MAIN_NAV_ITEMS.map((item) => item.path);
