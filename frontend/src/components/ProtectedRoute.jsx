@@ -8,11 +8,14 @@ export default function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  const role = getUserRole();
+
   if (requiredRole) {
-    const role = getUserRole();
     if (role !== requiredRole) {
       return <Navigate to={role === 'nutritionist' ? '/nutritionist' : '/dashboard'} replace />;
     }
+  } else if (role === 'nutritionist') {
+    return <Navigate to="/nutritionist" replace />;
   }
 
   return children;

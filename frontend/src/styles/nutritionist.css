@@ -1,26 +1,98 @@
 .nutritionist-page {
-  max-width: 980px;
+  --nutri-bg: #f3fff8;
+  --nutri-card: #ffffff;
+  --nutri-card-soft: #f6fffa;
+  --nutri-border: #cceedd;
+  --nutri-text: #114436;
+  --nutri-text-soft: #3f6f60;
+  --nutri-primary: #3bcf8e;
+  --nutri-primary-strong: #1ea96d;
+  --nutri-shadow: 0 18px 36px rgba(30, 169, 109, 0.12);
+
+  max-width: 1080px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
-.nutritionist-header h1 {
-  font-size: clamp(1.8rem, 2.5vw, 2.3rem);
-  margin-bottom: 6px;
-  color: #0f172a;
+.nutritionist-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--nutri-border);
+  background:
+    radial-gradient(circle at 85% 20%, rgba(59, 207, 142, 0.24), transparent 42%),
+    radial-gradient(circle at 10% 80%, rgba(143, 244, 200, 0.36), transparent 48%),
+    linear-gradient(135deg, #effff7 0%, #dcffef 100%);
+  border-radius: 24px;
+  padding: clamp(18px, 2.4vw, 30px);
+  box-shadow: var(--nutri-shadow);
 }
 
-.nutritionist-header p {
-  color: #475569;
+.nutritionist-hero-topline {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 68, 54, 0.18);
+  padding: 5px 12px;
+  color: var(--nutri-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.nutritionist-hero h1 {
+  margin-top: 12px;
+  font-size: clamp(1.65rem, 2.7vw, 2.5rem);
+  line-height: 1.2;
+  color: var(--nutri-text);
+}
+
+.nutritionist-hero > p {
+  margin-top: 8px;
+  max-width: 700px;
+  color: var(--nutri-text-soft);
+}
+
+.nutritionist-hero-metrics {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.nutritionist-hero-metrics article {
+  border: 1px solid rgba(17, 68, 54, 0.14);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.nutritionist-hero-metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nutri-text-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.nutritionist-hero-metrics strong {
+  margin-top: 4px;
+  display: block;
+  font-size: 1.38rem;
+  color: var(--nutri-text);
 }
 
 .nutritionist-tabs {
   display: inline-flex;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(148, 163, 184, 0.45);
+  gap: 6px;
+  background: rgba(238, 255, 248, 0.92);
+  border: 1px solid var(--nutri-border);
   border-radius: 12px;
   padding: 6px;
   width: fit-content;
@@ -28,28 +100,49 @@
 
 .nutritionist-tab {
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   padding: 10px 14px;
   font-weight: 700;
-  color: #334155;
+  color: var(--nutri-text-soft);
   cursor: pointer;
 }
 
 .nutritionist-tab.active {
-  background: #0f172a;
-  color: #f8fafc;
+  background: linear-gradient(135deg, var(--nutri-primary) 0%, var(--nutri-primary-strong) 100%);
+  color: #f3fff8;
+  box-shadow: 0 8px 20px rgba(30, 169, 109, 0.28);
+}
+
+.nutritionist-create-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 14px;
 }
 
 .nutritionist-form,
+.nutritionist-preview,
 .nutritionist-stats {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--nutri-border);
   border-radius: 18px;
   padding: clamp(16px, 2vw, 24px);
+  background: var(--nutri-card);
+  box-shadow: 0 12px 30px rgba(16, 112, 71, 0.08);
+}
+
+.nutritionist-form-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--nutri-text);
+  font-size: 1.18rem;
+}
+
+.nutritionist-form-head p {
+  color: var(--nutri-text-soft);
 }
 
 .nutritionist-form-grid {
@@ -62,29 +155,38 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: #1e293b;
-  font-weight: 600;
+  color: #1c5a49;
+  font-weight: 650;
 }
 
 .nutritionist-form input,
 .nutritionist-form select,
 .nutritionist-form textarea {
-  border: 1px solid rgba(148, 163, 184, 0.7);
+  border: 1px solid #c9ead9;
   border-radius: 10px;
   padding: 10px 12px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--nutri-card-soft);
+  color: var(--nutri-text);
+}
+
+.nutritionist-form input:focus,
+.nutritionist-form select:focus,
+.nutritionist-form textarea:focus {
+  outline: none;
+  border-color: var(--nutri-primary);
+  box-shadow: 0 0 0 4px rgba(59, 207, 142, 0.18);
 }
 
 .nutritionist-submit {
   width: fit-content;
   border: none;
-  border-radius: 10px;
-  padding: 10px 16px;
-  background: #10b981;
-  color: #f8fafc;
+  border-radius: 11px;
+  padding: 11px 18px;
+  background: linear-gradient(135deg, var(--nutri-primary) 0%, var(--nutri-primary-strong) 100%);
+  color: #f3fff8;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 10px 24px rgba(30, 169, 109, 0.32);
 }
 
 .nutritionist-submit:disabled {
@@ -101,7 +203,58 @@
 }
 
 .nutritionist-feedback.success {
-  color: #065f46;
+  color: #047857;
+}
+
+.nutritionist-preview {
+  background:
+    linear-gradient(180deg, rgba(243, 255, 248, 0.95) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.nutritionist-preview h3 {
+  font-size: 1.02rem;
+  color: var(--nutri-text);
+}
+
+.nutritionist-preview > p {
+  color: var(--nutri-text-soft);
+  font-weight: 600;
+}
+
+.nutritionist-preview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nutritionist-preview-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #bde8d2;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #1c5a49;
+  background: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.nutritionist-preview-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutritionist-preview-steps p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #225e4c;
+  border: 1px solid #d3f2e2;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .nutritionist-stats-grid {
@@ -111,25 +264,32 @@
 }
 
 .nutritionist-stats-grid article {
-  border: 1px solid rgba(148, 163, 184, 0.42);
-  border-radius: 12px;
-  padding: 12px;
-  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid #cdecd9;
+  border-radius: 14px;
+  padding: 13px;
+  background: linear-gradient(180deg, #f5fff9 0%, #ffffff 100%);
 }
 
 .nutritionist-stats-grid h3 {
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   margin-bottom: 6px;
-  color: #334155;
+  color: #366b59;
 }
 
 .nutritionist-stats-grid strong {
-  font-size: 1.5rem;
-  color: #0f172a;
+  font-size: 1.46rem;
+  color: #114436;
+}
+
+.nutritionist-stats-grid p {
+  margin-top: 4px;
+  color: #4f7f70;
+  font-size: 0.88rem;
 }
 
 .nutritionist-mocked-note {
-  color: #475569;
+  color: #487664;
+  font-size: 0.92rem;
 }
 
 .nutritionist-stats-list {
@@ -139,24 +299,61 @@
 }
 
 .nutritionist-stats-list article {
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid #d2efde;
   border-radius: 12px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.86);
+  background: #fbfffd;
+}
+
+.nutritionist-stats-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .nutritionist-stats-list h4 {
-  margin-bottom: 2px;
-  color: #0f172a;
+  color: #134738;
 }
 
+.nutritionist-stats-list span,
 .nutritionist-stats-list p {
-  color: #334155;
+  color: #4d7c6b;
 }
 
-@media (max-width: 900px) {
+.nutritionist-progress {
+  margin: 8px 0;
+  height: 9px;
+  border-radius: 999px;
+  background: #e5f7ed;
+  overflow: hidden;
+}
+
+.nutritionist-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #59d79d 0%, #1ea96d 100%);
+}
+
+.nutritionist-empty {
+  border: 1px dashed #b9e7cf;
+  border-radius: 12px;
+  padding: 14px;
+  color: #4d7c6b;
+  text-align: center;
+  background: #f4fff9;
+}
+
+@media (max-width: 960px) {
+  .nutritionist-hero-metrics,
+  .nutritionist-stats-grid,
   .nutritionist-form-grid,
-  .nutritionist-stats-grid {
+  .nutritionist-create-wrap {
     grid-template-columns: 1fr;
+  }
+
+  .nutritionist-tabs {
+    width: 100%;
+    justify-content: center;
   }
 }
