@@ -81,30 +81,6 @@ function slotMeta(slot) {
   return { icon: Moon, time: '20:00', kcal: 540 };
 }
 
-function getMealsByDate(date) {
-  const breakfast = [
-    'Overnight oats com banana e sementes',
-    'Iogurte grego com granola e frutos vermelhos',
-    'Pão integral com ovo mexido e queijo fresco',
-  ];
-  const lunch = [
-    'Frango grelhado com arroz integral e legumes',
-    'Bowl de quinoa com salmão e espinafres',
-    'Massa integral com atum, tomate e rúcula',
-  ];
-  const dinner = [
-    'Sopa de legumes e omelete de claras',
-    'Pescada no forno com batata-doce',
-    'Salada morna de grão com legumes assados',
-  ];
-
-  const idx = date.getDate();
-  return [
-    { slot: 'Pequeno-almoço', icon: Sunrise, time: '08:00', dish: breakfast[idx % breakfast.length], source: null },
-    { slot: 'Almoço', icon: Sun, time: '13:00', dish: lunch[(idx + 1) % lunch.length], source: null },
-    { slot: 'Jantar', icon: Moon, time: '20:00', dish: dinner[(idx + 2) % dinner.length], source: null },
-  ];
-}
 
 export default function MealPlan() {
   const accountId = useMemo(() => {
@@ -142,7 +118,7 @@ export default function MealPlan() {
     const planDay = weeklyPlan?.days?.find((day) => day?.date === selectedIso);
 
     if (!planDay?.meals?.length) {
-      return getMealsByDate(selectedDate);
+      return [];
     }
 
     return planDay.meals.map((meal) => {
@@ -282,6 +258,12 @@ export default function MealPlan() {
             <p className="daily-plan-subtitle">Plano diário recomendado</p>
 
             <div className="daily-meals">
+              {!meals.length ? (
+                <p className="daily-meals-empty">
+                  Ainda não tens refeições planeadas. Fala com o chatbot para criares o teu plano!
+                </p>
+              ) : null}
+
               {meals.map((meal) => {
                 const Icon = meal.icon;
                 return (

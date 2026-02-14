@@ -263,3 +263,14 @@
     font-size: 28px;
   }
 }
+
+.daily-meals-empty {
+  border: 1px dashed #d4deeb;
+  border-radius: 14px;
+  background: #f2f6fb;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 14px;
+}
+
