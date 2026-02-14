@@ -1,4 +1,4 @@
-package alnak.data;
+package alnak.data.global;
 
 import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.Goal;
@@ -24,8 +24,38 @@ public class UserDAO {
     private final Connection conn;
 
     public UserDAO() {
-        this.conn = Database.getInstance().getConnection();
+        this.conn = GlobalDatabase.getInstance().getConnection(); // ← changed
     }
+
+    // ... all other methods stay identical except upsertProfile below ...
+
+    private void upsertProfile(Long userId, UserProfile p) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("""
+            INSERT INTO user_profiles
+              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE          -- ← MySQL syntax (was ON CONFLICT in SQLite)
+                age            = VALUES(age),
+                sex            = VALUES(sex),
+                height_cm      = VALUES(height_cm),
+                weight_kg      = VALUES(weight_kg),
+                goal           = VALUES(goal),
+                daily_calories = VALUES(daily_calories),
+                budget_weekly  = VALUES(budget_weekly)
+        """)) {
+            ps.setLong(1, userId);
+            ps.setInt(2, p.getAge());
+            setNullableString(ps, 3, p.getSex() != null ? p.getSex().name() : null);
+            ps.setInt(4, p.getHeightCm());
+            ps.setDouble(5, p.getWeightKg());
+            setNullableString(ps, 6, p.getGoal() != null ? p.getGoal().name() : null);
+            ps.setInt(7, p.getDailyCalories());
+            ps.setDouble(8, p.getBudgetWeekly());
+            ps.executeUpdate();
+        }
+    }
+
+    // ── everything else is unchanged ─────────────────────────────────────────
 
     public User createUser(String name, String email, String passwordHash) {
         try (PreparedStatement ps = conn.prepareStatement(
@@ -159,41 +189,13 @@ public class UserDAO {
         getProfile(user.getId()).ifPresent(user::setProfile);
     }
 
-    private void upsertProfile(Long userId, UserProfile p) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("""
-            INSERT INTO user_profiles
-              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                age            = excluded.age,
-                sex            = excluded.sex,
-                height_cm      = excluded.height_cm,
-                weight_kg      = excluded.weight_kg,
-                goal           = excluded.goal,
-                daily_calories = excluded.daily_calories,
-                budget_weekly  = excluded.budget_weekly
-        """)) {
-            ps.setLong(1, userId);
-            ps.setInt(2, p.getAge());
-            setNullableString(ps, 3, p.getSex() != null ? p.getSex().name() : null);
-            ps.setInt(4, p.getHeightCm());
-            ps.setDouble(5, p.getWeightKg());
-            setNullableString(ps, 6, p.getGoal() != null ? p.getGoal().name() : null);
-            ps.setInt(7, p.getDailyCalories());
-            ps.setDouble(8, p.getBudgetWeekly());
-            ps.executeUpdate();
-        }
-    }
-
     private void replaceRestrictions(Long userId, Set<Restriction> restrictions) throws SQLException {
         try (PreparedStatement delete = conn.prepareStatement(
                 "DELETE FROM user_profile_restrictions WHERE user_id = ?")) {
             delete.setLong(1, userId);
             delete.executeUpdate();
         }
-
         if (restrictions == null || restrictions.isEmpty()) return;
-
         try (PreparedStatement insert = conn.prepareStatement(
                 "INSERT INTO user_profile_restrictions (user_id, restriction) VALUES (?, ?)")) {
             for (Restriction restriction : restrictions) {
@@ -211,9 +213,7 @@ public class UserDAO {
             delete.setLong(1, userId);
             delete.executeUpdate();
         }
-
         if (allergens == null || allergens.isEmpty()) return;
-
         try (PreparedStatement insert = conn.prepareStatement(
                 "INSERT INTO user_profile_allergens (user_id, allergen) VALUES (?, ?)")) {
             for (Allergen allergen : allergens) {
@@ -262,7 +262,8 @@ public class UserDAO {
     }
 
     private boolean isUniqueConstraintViolation(SQLException e) {
-        String msg = e.getMessage();
-        return msg != null && msg.toLowerCase().contains("unique");
+        // MySQL error code 1062 = Duplicate entry
+        return e.getErrorCode() == 1062 ||
+                (e.getMessage() != null && e.getMessage().toLowerCase().contains("duplicate"));
     }
 }

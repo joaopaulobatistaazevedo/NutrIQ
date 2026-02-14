@@ -1,4 +1,4 @@
-package alnak.data;
+package alnak.data.local;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,15 +8,15 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class Database {
+public class LocalDatabase {
 
     private static final Path DB_DIR = Path.of("database");
     private static final String DB_FILE_NAME = "meal_planner.db";
     private static final Path LEGACY_DB_PATH = Path.of(DB_FILE_NAME);
-    private static Database instance;
+    private static LocalDatabase instance;
     private Connection connection;
 
-    private Database() {
+    private LocalDatabase() {
         try {
             Path dbPath = DB_DIR.resolve(DB_FILE_NAME).toAbsolutePath().normalize();
             Path legacyPath = LEGACY_DB_PATH.toAbsolutePath().normalize();
@@ -35,8 +35,8 @@ public class Database {
         }
     }
 
-    public static synchronized Database getInstance() {
-        if (instance == null) instance = new Database();
+    public static synchronized LocalDatabase getInstance() {
+        if (instance == null) instance = new LocalDatabase();
         return instance;
     }
 

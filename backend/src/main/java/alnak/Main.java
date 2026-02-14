@@ -2,7 +2,7 @@ package alnak;
 
 import alnak.controllers.AuthController;
 import alnak.controllers.UserController;
-import alnak.data.UserDAO;
+import alnak.data.global.UserDAO;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
 import alnak.dto.UpdateProfileRequest;
