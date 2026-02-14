@@ -9,6 +9,7 @@ import {
   listIngredientPrices,
   listLatestPrices,
 } from '../services/priceService';
+import { fetchPersistedShoppingCart, savePersistedShoppingCart } from '../services/shoppingCartService';
 import { PROFILE_KEY, WEEKLY_PLAN_KEY, CART_GENERATE_REQUEST_KEY } from '../constants/storageKeys';
 import '../styles/shopping.css';
 
@@ -307,6 +308,31 @@ function buildGeneratedLists(prices, ingredientDemand) {
   };
 }
 
+
+
+function isPersistedCartSnapshot(payload) {
+  return !!(payload && typeof payload === 'object' && payload.lists && typeof payload.lists === 'object');
+}
+
+function buildCartSnapshot({
+  lists,
+  activeListId,
+  comparison,
+  optimizedTotal,
+  cartSource,
+  lastGeneratedSignature,
+}) {
+  return {
+    lists,
+    activeListId,
+    comparison,
+    optimizedTotal,
+    cartSource,
+    lastGeneratedSignature,
+    savedAt: new Date().toISOString(),
+  };
+}
+
 export default function Shopping() {
   const accountId = useMemo(() => {
     const profile = parseStorage(PROFILE_KEY, null);
@@ -343,6 +369,8 @@ export default function Shopping() {
       setLists(nextLists);
       setComparison([]);
       setOptimizedTotal(0);
+      setCartSource('manual');
+      setLastGeneratedSignature('');
       setActiveListId((previous) => (previous && nextLists[previous] ? previous : firstListId));
     } catch (error) {
       setLoadError(error.message || 'Não foi possível carregar os preços.');
@@ -395,12 +423,29 @@ export default function Shopping() {
         throw new Error('Não há preços disponíveis para os ingredientes do teu plano.');
       }
 
+      const generatedSignature = planSignature(currentPlan);
+      const selectedListId = generated.bestMarketKey || Object.keys(generated.lists)[0] || '';
+
       setLists(generated.lists);
       setComparison(generated.comparison);
       setOptimizedTotal(generated.optimizedTotal);
-      setActiveListId(generated.bestMarketKey || Object.keys(generated.lists)[0] || '');
+      setActiveListId(selectedListId);
       setCartSource('meal-plan');
-      setLastGeneratedSignature(planSignature(currentPlan));
+      setLastGeneratedSignature(generatedSignature);
+
+      try {
+        await savePersistedShoppingCart(
+          buildCartSnapshot({
+            lists: generated.lists,
+            activeListId: selectedListId,
+            comparison: generated.comparison,
+            optimizedTotal: generated.optimizedTotal,
+            cartSource: 'meal-plan',
+            lastGeneratedSignature: generatedSignature,
+          }),
+        );
+      } catch {
+      }
 
       if (generated.missingIngredients.length) {
         setGenerationStatus(
@@ -422,7 +467,49 @@ export default function Shopping() {
   }, [accountId, weeklyPlan]);
 
   useEffect(() => {
-    void loadPrices();
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const persisted = await fetchPersistedShoppingCart();
+        if (!cancelled && isPersistedCartSnapshot(persisted)) {
+          const persistedLists = persisted.lists || {};
+          const persistedActive = String(persisted.activeListId || '');
+          const fallbackListId = Object.keys(persistedLists)[0] || '';
+
+          setLists(persistedLists);
+          setComparison(Array.isArray(persisted.comparison) ? persisted.comparison : []);
+          setOptimizedTotal(Number(persisted.optimizedTotal || 0));
+          setCartSource(String(persisted.cartSource || 'meal-plan'));
+          setLastGeneratedSignature(String(persisted.lastGeneratedSignature || ''));
+          setActiveListId(persistedActive && persistedLists[persistedActive] ? persistedActive : fallbackListId);
+          setGenerationStatus('Carrinho carregado da base de dados.');
+          return;
+        }
+
+        if (!cancelled) {
+          await loadPrices();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message || 'Não foi possível carregar o carrinho persistido.');
+          await loadPrices();
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadPrices]);
 
   useEffect(() => {
@@ -478,6 +565,38 @@ export default function Shopping() {
 
     void generateCartFromMealPlan();
   }, [cartSource, generateCartFromMealPlan, lastGeneratedSignature, weeklyPlan]);
+
+
+
+  useEffect(() => {
+    if (cartSource !== 'meal-plan' || !Object.keys(lists).length) {
+      return;
+    }
+
+    const persistTimeout = setTimeout(() => {
+      void savePersistedShoppingCart(
+        buildCartSnapshot({
+          lists,
+          activeListId,
+          comparison,
+          optimizedTotal,
+          cartSource,
+          lastGeneratedSignature,
+        }),
+      );
+    }, 350);
+
+    return () => {
+      clearTimeout(persistTimeout);
+    };
+  }, [
+    lists,
+    activeListId,
+    comparison,
+    optimizedTotal,
+    cartSource,
+    lastGeneratedSignature,
+  ]);
 
   const activeList = activeListId ? lists[activeListId] : null;
   const activeItems = activeList?.items || EMPTY_ITEMS;

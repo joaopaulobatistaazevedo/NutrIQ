@@ -208,6 +208,18 @@ public class LocalDatabase {
                 )
             """);
 
+
+
+            // ── Shopping cart snapshots ─────────────────────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS shopping_cart_snapshots (
+                    user_id      INTEGER PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
             // ── Indexes ───────────────────────────────────────────
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_users_email          ON users(email)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_user_profiles_user    ON user_profiles(user_id)");
@@ -217,6 +229,7 @@ public class LocalDatabase {
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_market_prices_price      ON ingredient_market_prices(price)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ri_recipe             ON recipe_ingredients(recipe_id)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_steps_recipe          ON recipe_steps(recipe_id, step_order)");
+            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_cart_snapshots_updated ON shopping_cart_snapshots(updated_at)");
         }
     }
 

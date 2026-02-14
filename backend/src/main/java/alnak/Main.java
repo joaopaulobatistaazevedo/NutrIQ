@@ -6,6 +6,7 @@ import alnak.controllers.MealPlanController;
 import alnak.controllers.PriceController;
 import alnak.controllers.RecipeController;
 import alnak.controllers.SocialController;
+import alnak.controllers.ShoppingCartController;
 import alnak.controllers.UserController;
 import alnak.data.global.FriendshipDAO;
 import alnak.data.global.GlobalRecipeDAO;
@@ -14,6 +15,7 @@ import alnak.data.global.UserDAO;
 import alnak.data.local.IngredientMarketPriceDAO;
 import alnak.data.local.MealPlanDAO;
 import alnak.data.local.RecipeDAO;
+import alnak.data.local.ShoppingCartSnapshotDAO;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
 import alnak.dto.UpdateProfileRequest;
@@ -22,6 +24,7 @@ import alnak.services.MealPlanService;
 import alnak.services.PriceImportService;
 import alnak.services.RecipeService;
 import alnak.services.SocialService;
+import alnak.services.ShoppingCartService;
 import alnak.services.UserService;
 import alnak.utils.JWTUtil;
 import io.javalin.Javalin;
@@ -44,6 +47,7 @@ public class Main {
         RecipeDAO              recipeDAO              = new RecipeDAO();
         IngredientMarketPriceDAO ingredientMarketPriceDAO = new IngredientMarketPriceDAO();
         MealPlanDAO            mealPlanDAO            = new MealPlanDAO();
+        ShoppingCartSnapshotDAO shoppingCartSnapshotDAO = new ShoppingCartSnapshotDAO();
 
         // ── Services ──────────────────────────────────────────────
         JWTUtil          jwtUtil          = new JWTUtil();
@@ -54,6 +58,7 @@ public class Main {
         MealPlanService  mealPlanService  = new MealPlanService(mealPlanDAO, recipeDAO);
         SocialService    socialService    = new SocialService(
                 postDAO, friendshipDAO, globalRecipeDAO, recipeDAO);
+        ShoppingCartService shoppingCartService = new ShoppingCartService(shoppingCartSnapshotDAO);
 
         // ── Controllers ───────────────────────────────────────────
         AuthController     authController     = new AuthController(authService);
@@ -62,6 +67,7 @@ public class Main {
         RecipeController   recipeController   = new RecipeController(recipeService);
         MealPlanController mealPlanController = new MealPlanController(mealPlanService);
         SocialController   socialController   = new SocialController(socialService);
+        ShoppingCartController shoppingCartController = new ShoppingCartController(shoppingCartService);
 
         // ── App ───────────────────────────────────────────────────
         Javalin app = Javalin.create(config ->
@@ -120,6 +126,24 @@ public class Main {
         app.get("/api/prices/{ingredient}", ctx -> {
             String ingredient = ctx.pathParam("ingredient");
             ctx.json(priceController.listIngredientPrices(ingredient));
+        });
+
+
+
+        // ── Shopping cart routes ─────────────────────────────────
+        app.get("/api/shopping-cart", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            var cart = shoppingCartController.getMyCart(userId);
+            if (cart == null) {
+                ctx.status(404);
+                return;
+            }
+            ctx.json(cart);
+        });
+
+        app.put("/api/shopping-cart", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(shoppingCartController.saveMyCart(userId, ctx.body()));
         });
 
         // ── Recipe routes ─────────────────────────────────────────
