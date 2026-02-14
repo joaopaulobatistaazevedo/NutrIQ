@@ -1,94 +1,111 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckSquare, Circle, Minus, Plus, ShoppingCart, Store, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
+import {
+  getCheapestIngredientPrice,
+  importPriceReport,
+  listIngredientPrices,
+  listLatestPrices,
+} from '../services/priceService';
 import '../styles/shopping.css';
 
-const INITIAL_LISTS = {
-  pingo_doce: {
-    name: 'Pingo Doce',
-    items: [
-      {
-        id: 'pd-1',
-        name: 'Papel Higiénico Compacto 6 Rolos',
-        unitInfo: '6 UN | 0,40 €/UN',
-        unitPrice: 2.39,
-        discount: 0,
-        quantity: 1,
-        checked: false,
-      },
-      {
-        id: 'pd-2',
-        name: 'Iogurte Grego Natural',
-        unitInfo: '4 UN | 0,65 €/UN',
-        unitPrice: 2.6,
-        discount: 0.4,
-        quantity: 2,
-        checked: false,
-      },
-    ],
-  },
-  continente: {
-    name: 'Continente',
-    items: [
-      {
-        id: 'ct-1',
-        name: 'Peito de Frango (bandeja)',
-        unitInfo: '800 g | 8,20 €/kg',
-        unitPrice: 6.56,
-        discount: 0.5,
-        quantity: 1,
-        checked: false,
-      },
-      {
-        id: 'ct-2',
-        name: 'Massa Integral Fusilli',
-        unitInfo: '500 g | 1,58 €/UN',
-        unitPrice: 1.58,
-        discount: 0,
-        quantity: 2,
-        checked: true,
-      },
-    ],
-  },
-  lidl: {
-    name: 'Lidl',
-    items: [
-      {
-        id: 'ld-1',
-        name: 'Arroz Basmati',
-        unitInfo: '1 kg | 2,49 €/UN',
-        unitPrice: 2.49,
-        discount: 0.3,
-        quantity: 1,
-        checked: false,
-      },
-      {
-        id: 'ld-2',
-        name: 'Atum em Água',
-        unitInfo: '4 Latas | 0,90 €/UN',
-        unitPrice: 3.6,
-        discount: 0,
-        quantity: 1,
-        checked: false,
-      },
-    ],
-  },
-};
+const CARD_ACCENTS = ['is-pingo', 'is-continente', 'is-lidl'];
+const EMPTY_ITEMS = [];
 
-const SUGGESTED_ITEMS = [
-  { name: 'Banana (1kg)', unitInfo: '1 kg | 1,39 €/UN', unitPrice: 1.39 },
-  { name: 'Aveia Integral', unitInfo: '500 g | 1,89 €/UN', unitPrice: 1.89 },
-  { name: 'Leite magro', unitInfo: '1 L | 0,89 €/UN', unitPrice: 0.89 },
-];
-
-function formatCurrency(value) {
-  return value.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+function formatCurrency(value, currency = 'EUR') {
+  return Number(value || 0).toLocaleString('pt-PT', {
+    style: 'currency',
+    currency: currency || 'EUR',
+  });
 }
 
-function getCardAccent(storeKey) {
-  if (storeKey === 'pingo_doce') return 'is-pingo';
-  if (storeKey === 'continente') return 'is-continente';
-  return 'is-lidl';
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function normalizePriceItem(entry, index) {
+  const ingredientName = String(
+    entry?.ingredientName || entry?.ingredientNormalized || 'Ingrediente',
+  ).trim();
+  const productName = String(entry?.productName || ingredientName).trim();
+  const market = String(entry?.supermarket || 'Supermercado').trim();
+  const safeIngredient = slugify(entry?.ingredientNormalized || ingredientName) || 'ingrediente';
+
+  return {
+    id: `${slugify(market) || 'market'}-${safeIngredient}-${index}`,
+    ingredientName,
+    name: productName,
+    unitInfo:
+      String(entry?.note || '').trim() ||
+      (entry?.source ? `fonte: ${entry.source}` : 'preço importado'),
+    unitPrice: Number(entry?.price || 0),
+    discount: 0,
+    quantity: 1,
+    checked: false,
+    currency: String(entry?.currency || 'EUR').trim() || 'EUR',
+    productUrl: String(entry?.productUrl || '').trim(),
+  };
+}
+
+function buildListsFromPrices(prices) {
+  const lists = {};
+  let colorIndex = 0;
+
+  prices.forEach((entry, index) => {
+    const market = String(entry?.supermarket || 'Supermercado').trim() || 'Supermercado';
+    const key = slugify(market) || `market_${colorIndex}`;
+
+    if (!lists[key]) {
+      lists[key] = {
+        name: market,
+        accentClass: CARD_ACCENTS[colorIndex % CARD_ACCENTS.length],
+        items: [],
+      };
+      colorIndex += 1;
+    }
+
+    lists[key].items.push(normalizePriceItem(entry, index));
+  });
+
+  Object.values(lists).forEach((list) => {
+    list.items.sort((left, right) => left.ingredientName.localeCompare(right.ingredientName, 'pt'));
+  });
+
+  return lists;
+}
+
+function normalizeCheapestResult(entry) {
+  if (!entry) {
+    return null;
+  }
+
+  const ingredientName = String(
+    entry?.ingredientName || entry?.ingredientNormalized || 'Ingrediente',
+  ).trim();
+  const market = String(entry?.supermarket || 'Supermercado').trim() || 'Supermercado';
+  const safeIngredient = slugify(entry?.ingredientNormalized || ingredientName) || 'ingrediente';
+
+  return {
+    id: `cheapest-${safeIngredient}-${Date.now()}`,
+    ingredientName,
+    name: String(entry?.productName || ingredientName).trim(),
+    unitInfo:
+      String(entry?.note || '').trim() ||
+      (entry?.source ? `fonte: ${entry.source}` : 'preço importado'),
+    unitPrice: Number(entry?.price || 0),
+    discount: 0,
+    quantity: 1,
+    checked: false,
+    currency: String(entry?.currency || 'EUR').trim() || 'EUR',
+    productUrl: String(entry?.productUrl || '').trim(),
+    supermarket: market,
+  };
 }
 
 function itemImageFor(name) {
@@ -97,122 +114,310 @@ function itemImageFor(name) {
 }
 
 export default function Shopping() {
-  const [lists, setLists] = useState(INITIAL_LISTS);
-  const [activeListId, setActiveListId] = useState('pingo_doce');
+  const [lists, setLists] = useState({});
+  const [activeListId, setActiveListId] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [ingredientQuery, setIngredientQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [queryError, setQueryError] = useState('');
+  const [cheapestResult, setCheapestResult] = useState(null);
+  const [ingredientMatches, setIngredientMatches] = useState(EMPTY_ITEMS);
+  const [importPayload, setImportPayload] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState('');
 
-  const activeList = lists[activeListId];
-  const activeItems = activeList.items;
+  const loadPrices = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const prices = await listLatestPrices();
+      const nextLists = buildListsFromPrices(prices);
+      const firstListId = Object.keys(nextLists)[0] || '';
+      setLists(nextLists);
+      setActiveListId((previous) => (previous && nextLists[previous] ? previous : firstListId));
+    } catch (error) {
+      setLoadError(error.message || 'Não foi possível carregar os preços.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPrices();
+  }, [loadPrices]);
+
+  const activeList = activeListId ? lists[activeListId] : null;
+  const activeItems = activeList?.items || EMPTY_ITEMS;
 
   const updateItem = (itemId, updater) => {
-    setLists((previous) => ({
-      ...previous,
-      [activeListId]: {
-        ...previous[activeListId],
-        items: previous[activeListId].items.map((item) => (item.id === itemId ? updater(item) : item)),
-      },
-    }));
+    if (!activeListId) {
+      return;
+    }
+
+    setLists((previous) => {
+      const currentList = previous[activeListId];
+      if (!currentList) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [activeListId]: {
+          ...currentList,
+          items: currentList.items.map((item) => (item.id === itemId ? updater(item) : item)),
+        },
+      };
+    });
   };
 
   const removeItem = (itemId) => {
-    setLists((previous) => ({
-      ...previous,
-      [activeListId]: {
-        ...previous[activeListId],
-        items: previous[activeListId].items.filter((item) => item.id !== itemId),
-      },
-    }));
+    if (!activeListId) {
+      return;
+    }
+
+    setLists((previous) => {
+      const currentList = previous[activeListId];
+      if (!currentList) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [activeListId]: {
+          ...currentList,
+          items: currentList.items.filter((item) => item.id !== itemId),
+        },
+      };
+    });
   };
 
-  const addSuggestedItem = (suggestion) => {
-    setLists((previous) => ({
-      ...previous,
-      [activeListId]: {
-        ...previous[activeListId],
-        items: [
-          ...previous[activeListId].items,
-          {
-            id: `${activeListId}-${Date.now()}`,
-            name: suggestion.name,
-            unitInfo: suggestion.unitInfo,
-            unitPrice: suggestion.unitPrice,
-            discount: 0,
-            quantity: 1,
-            checked: false,
-          },
-        ],
-      },
-    }));
+  const addItemToActiveList = (item) => {
+    if (!item || !activeListId) {
+      return;
+    }
+
+    setLists((previous) => {
+      const currentList = previous[activeListId];
+      if (!currentList) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [activeListId]: {
+          ...currentList,
+          items: [
+            ...currentList.items,
+            {
+              ...item,
+              id: `${activeListId}-${Date.now()}`,
+              quantity: 1,
+              checked: false,
+            },
+          ],
+        },
+      };
+    });
+  };
+
+  const searchCheapestIngredient = async (event) => {
+    event.preventDefault();
+    const cleanedQuery = String(ingredientQuery || '').trim();
+    setCheapestResult(null);
+    setIngredientMatches(EMPTY_ITEMS);
+    setQueryError('');
+
+    if (!cleanedQuery) {
+      setQueryError('Escreve um ingrediente para pesquisar.');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const [cheapestResponse, matches] = await Promise.all([
+        getCheapestIngredientPrice(cleanedQuery),
+        listIngredientPrices(cleanedQuery),
+      ]);
+      setCheapestResult(normalizeCheapestResult(cheapestResponse));
+      setIngredientMatches(Array.isArray(matches) ? matches.slice(0, 6) : EMPTY_ITEMS);
+    } catch (error) {
+      setQueryError(error.message || 'Não foi possível pesquisar o ingrediente.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const importReportPayload = async (event) => {
+    event.preventDefault();
+    const cleanedPayload = String(importPayload || '').trim();
+    setImportStatus('');
+
+    if (!cleanedPayload) {
+      setImportStatus('Cola aqui o JSON do report antes de importar.');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const response = await importPriceReport(cleanedPayload);
+      await loadPrices();
+      const imported = Number(response?.importedEntries || 0);
+      const deduped = Number(response?.dedupedEntries || 0);
+      setImportStatus(`Importação concluída: ${imported} gravados (${deduped} deduplicados).`);
+      setImportPayload('');
+    } catch (error) {
+      setImportStatus(error.message || 'Falha ao importar report.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const summary = useMemo(() => {
     const subtotal = activeItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
-    const savings = activeItems.reduce((total, item) => total + item.discount * item.quantity, 0);
     const checkedItems = activeItems.filter((item) => item.checked).length;
     const totalUnits = activeItems.reduce((total, item) => total + item.quantity, 0);
-    return { subtotal, savings, checkedItems, totalUnits };
+    const currency = activeItems[0]?.currency || 'EUR';
+    return {
+      subtotal,
+      checkedItems,
+      totalUnits,
+      currency,
+    };
   }, [activeItems]);
+
+  const marketEntries = Object.entries(lists);
+  const hasData = marketEntries.length > 0;
 
   return (
     <Layout>
       <div className="shopping-page">
-        <header className="shopping-header">
-          <div>
-            <h1>Lista de Compras</h1>
-            <p>Organiza por loja, ajusta quantidades e acompanha o total em tempo real.</p>
-          </div>
-          <div className="shopping-header-tag">
-            <ShoppingCart size={16} />
-            Lista do dia
-          </div>
-        </header>
+        <PageHeader
+          className="shopping-header"
+          title="Lista de Compras"
+          subtitle="Dados reais importados do scraper, organizados por supermercado."
+          tag={(
+            <div className="shopping-header-tag">
+              <ShoppingCart size={16} />
+              Preços atuais
+            </div>
+          )}
+        />
 
         <div className="shopping-grid">
           <section className="shopping-lists-panel">
             <h2>Listas por supermercado</h2>
 
-            <div className="shopping-list-switchers">
-              {Object.entries(lists).map(([key, list]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`shopping-list-pill ${key === activeListId ? 'is-active' : ''}`}
-                  onClick={() => setActiveListId(key)}
-                >
-                  <Store size={14} />
-                  <span>{list.name}</span>
-                  <strong>{list.items.length}</strong>
-                </button>
-              ))}
-            </div>
-
-            <div className="shopping-suggestions">
-              <h3>Adicionar rápido</h3>
-              <div className="shopping-suggestion-items">
-                {SUGGESTED_ITEMS.map((item) => (
+            {isLoading ? (
+              <p className="shopping-feedback">A carregar preços...</p>
+            ) : loadError ? (
+              <p className="shopping-feedback shopping-feedback-error">{loadError}</p>
+            ) : !hasData ? (
+              <p className="shopping-feedback">
+                Não existem preços importados. Corre o scraper e faz import para o backend.
+              </p>
+            ) : (
+              <div className="shopping-list-switchers">
+                {marketEntries.map(([key, list]) => (
                   <button
-                    key={item.name}
+                    key={key}
                     type="button"
-                    className="suggestion-chip"
-                    onClick={() => addSuggestedItem(item)}
+                    className={`shopping-list-pill ${key === activeListId ? 'is-active' : ''}`}
+                    onClick={() => setActiveListId(key)}
                   >
-                    + {item.name}
+                    <Store size={14} />
+                    <span>{list.name}</span>
+                    <strong>{list.items.length}</strong>
                   </button>
                 ))}
               </div>
+            )}
+
+            <div className="shopping-suggestions">
+              <h3>Buscar ingrediente mais barato</h3>
+              <form className="shopping-search-form" onSubmit={searchCheapestIngredient}>
+                <input
+                  type="text"
+                  placeholder="Ex: ovos, azeite, massa"
+                  value={ingredientQuery}
+                  onChange={(event) => setIngredientQuery(event.target.value)}
+                />
+                <button type="submit" className="suggestion-chip" disabled={isSearching}>
+                  {isSearching ? 'A pesquisar...' : 'Pesquisar'}
+                </button>
+              </form>
+
+              {queryError ? <p className="shopping-feedback shopping-feedback-error">{queryError}</p> : null}
+
+              {cheapestResult ? (
+                <article className="shopping-cheapest-card">
+                  <h4>{cheapestResult.name}</h4>
+                  <p>{cheapestResult.supermarket}</p>
+                  <strong>{formatCurrency(cheapestResult.unitPrice, cheapestResult.currency)}</strong>
+                  <div className="shopping-cheapest-actions">
+                    <button
+                      type="button"
+                      className="suggestion-chip"
+                      onClick={() => addItemToActiveList(cheapestResult)}
+                      disabled={!activeListId}
+                    >
+                      + Adicionar à lista
+                    </button>
+                    {cheapestResult.productUrl ? (
+                      <a href={cheapestResult.productUrl} target="_blank" rel="noreferrer">
+                        Ver produto
+                      </a>
+                    ) : null}
+                  </div>
+
+                  {ingredientMatches.length ? (
+                    <div className="shopping-cheapest-matches">
+                      {ingredientMatches.map((match) => (
+                        <span key={`${match.supermarket}-${match.productName}-${match.price}`}>
+                          {match.supermarket}: {formatCurrency(match.price, match.currency)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ) : null}
+            </div>
+
+            <div className="shopping-import-panel">
+              <h3>Importar report.json</h3>
+              <form className="shopping-import-form" onSubmit={importReportPayload}>
+                <textarea
+                  value={importPayload}
+                  onChange={(event) => setImportPayload(event.target.value)}
+                  placeholder="Cola aqui o JSON do report do scraper..."
+                />
+                <button type="submit" className="suggestion-chip" disabled={isImporting}>
+                  {isImporting ? 'A importar...' : 'Importar para backend'}
+                </button>
+              </form>
+              {importStatus ? <p className="shopping-feedback">{importStatus}</p> : null}
             </div>
           </section>
 
           <section className="shopping-cart-panel">
             <header className="shopping-cart-header">
-              <h2>O meu carrinho ({activeItems.length})</h2>
+              <h2>
+                {activeList?.name ? `Carrinho - ${activeList.name}` : 'Carrinho'}
+                {' '}
+                ({activeItems.length})
+              </h2>
               <p>
                 {summary.checkedItems} / {activeItems.length} itens concluídos
               </p>
             </header>
 
             <div className="shopping-items">
+              {!activeList && !isLoading ? (
+                <p className="shopping-feedback">Seleciona um supermercado para ver os produtos.</p>
+              ) : null}
+
               {activeItems.map((item) => (
-                <article key={item.id} className={`shopping-item ${getCardAccent(activeListId)}`}>
+                <article key={item.id} className={`shopping-item ${activeList.accentClass}`}>
                   <div className="shopping-item-image" aria-hidden="true">
                     <img src={itemImageFor(item.name)} alt={item.name} loading="lazy" />
                   </div>
@@ -222,7 +427,17 @@ export default function Shopping() {
                       <div>
                         <h3>{item.name}</h3>
                         <p>{activeList.name}</p>
-                        <small>{item.unitInfo}</small>
+                        <small>{item.ingredientName}</small>
+                        {item.productUrl ? (
+                          <a
+                            className="shopping-item-link"
+                            href={item.productUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Ver produto
+                          </a>
+                        ) : null}
                       </div>
 
                       <button type="button" className="trash-btn" onClick={() => removeItem(item.id)} aria-label="Remover item">
@@ -258,7 +473,9 @@ export default function Shopping() {
                         <span>{item.checked ? 'Concluído' : 'Marcar'}</span>
                       </button>
 
-                      <strong className="line-total">{formatCurrency(item.unitPrice * item.quantity)}</strong>
+                      <strong className="line-total">
+                        {formatCurrency(item.unitPrice * item.quantity, item.currency)}
+                      </strong>
                     </div>
                   </div>
                 </article>
@@ -268,18 +485,18 @@ export default function Shopping() {
             <footer className="shopping-summary">
               <div className="summary-row">
                 <span>Poupança</span>
-                <strong className="saving">{formatCurrency(summary.savings)}</strong>
+                <strong className="saving">{formatCurrency(0, summary.currency)}</strong>
               </div>
               <div className="summary-row">
                 <span>Subtotal ({summary.totalUnits} un)</span>
-                <strong>{formatCurrency(summary.subtotal)}</strong>
+                <strong>{formatCurrency(summary.subtotal, summary.currency)}</strong>
               </div>
 
-              <button type="button" className="checkout-btn">
+              <button type="button" className="checkout-btn" disabled={!activeItems.length}>
                 Avançar para checkout
               </button>
               <p className="checkout-note">
-                Algumas promoções podem ser aplicadas apenas no checkout final.
+                Esta lista usa os últimos preços importados em `/api/prices`.
               </p>
             </footer>
           </section>

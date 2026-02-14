@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { HeartHandshake, ArrowRight } from 'lucide-react';
 import Dashboard from './Dashboard';
+import { PROFILE_KEY } from '../constants/storageKeys';
+import { getAuthSession, setAuthenticated } from '../utils/authSession';
+import { updateMyProfile } from '../services/userService';
 import '../styles/bot-onboarding.css';
-
-const PROFILE_KEY = 'nutribot_profile';
 
 const STEPS = [
   {
@@ -45,6 +46,24 @@ const STEPS = [
   },
 ];
 
+const mapSexToBackend = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'masculino') return 'M';
+  if (normalized === 'feminino') return 'F';
+  if (normalized === 'outro') return 'OTHER';
+  return null;
+};
+
+const toIntOrNull = (value) => {
+  const parsed = Number.parseInt(String(value || '').trim(), 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toFloatOrNull = (value) => {
+  const parsed = Number.parseFloat(String(value || '').trim().replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function BotOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,6 +88,8 @@ export default function BotOnboarding() {
   const [input, setInput] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [isIntroStep, setIsIntroStep] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const totalIndicators = STEPS.length + 1;
   const activeIndicator = isCompleted ? totalIndicators - 1 : isIntroStep ? 0 : stepIndex + 1;
@@ -76,30 +97,72 @@ export default function BotOnboarding() {
   const currentStep = STEPS[stepIndex];
   const currentValue = profile[currentStep?.key] || '';
 
-  const advanceStep = (value) => {
+  const saveProfileToBackend = async (nextProfile) => {
+    const session = getAuthSession();
+    const token = session?.token;
+    if (!token) {
+      return;
+    }
+
+    const payload = {};
+
+    const age = toIntOrNull(nextProfile.age);
+    if (age !== null) payload.age = age;
+
+    const heightCm = toIntOrNull(nextProfile.height);
+    if (heightCm !== null) payload.heightCm = heightCm;
+
+    const weightKg = toFloatOrNull(nextProfile.weight);
+    if (weightKg !== null) payload.weightKg = weightKg;
+
+    const sex = mapSexToBackend(nextProfile.sex);
+    if (sex) payload.sex = sex;
+
+    // Goal default para permitir cálculo de calorias quando possível.
+    payload.goal = 'MAINTAIN';
+
+    await updateMyProfile(token, payload);
+  };
+
+  const advanceStep = async (value) => {
+    if (isSavingProfile) {
+      return;
+    }
+
     const cleanValue = String(value).trim();
     if (!cleanValue || !currentStep) {
       return;
     }
 
+    setSaveError('');
+
     const nextProfile = { ...profile, [currentStep.key]: cleanValue };
     const isLastStep = stepIndex === STEPS.length - 1;
-
     setProfile(nextProfile);
-    setInput('');
 
     if (isLastStep) {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
-      setIsCompleted(true);
+      setIsSavingProfile(true);
+      try {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
+        await saveProfileToBackend(nextProfile);
+        setAuthenticated(true);
+        setInput('');
+        setIsCompleted(true);
+      } catch (error) {
+        setSaveError(error.message || 'Não foi possível guardar o perfil.');
+      } finally {
+        setIsSavingProfile(false);
+      }
       return;
     }
 
+    setInput('');
     setStepIndex((previous) => previous + 1);
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    advanceStep(input);
+    void advanceStep(input);
   };
 
   return (
@@ -156,7 +219,8 @@ export default function BotOnboarding() {
                           key={option}
                           type="button"
                           className={`bot-option-btn ${currentValue === option ? 'active' : ''}`}
-                          onClick={() => advanceStep(option)}
+                          onClick={() => { void advanceStep(option); }}
+                          disabled={isSavingProfile}
                         >
                           {option}
                         </button>
@@ -170,15 +234,20 @@ export default function BotOnboarding() {
                       max={currentStep.key === 'weight' ? 300 : currentStep.key === 'height' ? 250 : currentStep.key === 'age' ? 100 : undefined}
                       onChange={(event) => setInput(event.target.value)}
                       placeholder={currentStep.placeholder}
+                      disabled={isSavingProfile}
                       required
                     />
                   )}
                 </label>
               </div>
 
+              {saveError && (
+                <p className="bot-onboarding-error" role="alert">{saveError}</p>
+              )}
+
               {currentStep.type !== 'options' && (
-                <button type="submit" className="bot-submit-btn">
-                  Continuar <ArrowRight size={16} />
+                <button type="submit" className="bot-submit-btn" disabled={isSavingProfile}>
+                  {isSavingProfile ? 'A guardar perfil...' : 'Continuar'} {!isSavingProfile && <ArrowRight size={16} />}
                 </button>
               )}
             </form>

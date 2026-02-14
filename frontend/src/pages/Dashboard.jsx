@@ -1,6 +1,6 @@
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -27,9 +27,11 @@ import {
   Zap,
   Droplets,
   ChevronRight,
-  Utensils,
   Target,
 } from 'lucide-react';
+import { fetchMyProfile } from '../services/userService';
+import { listLatestPrices } from '../services/priceService';
+import { getAuthSession } from '../utils/authSession';
 import '../styles/dashboard.css';
 
 const fade = {
@@ -39,8 +41,60 @@ const fade = {
   viewport: { once: true, amount: 0.1 },
 };
 
+const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+function formatEuro(value) {
+  return Number(value || 0).toLocaleString('pt-PT', {
+    style: 'currency',
+    currency: 'EUR',
+  });
+}
+
+function toName(value) {
+  const clean = String(value || '').trim();
+  if (!clean) {
+    return 'Utilizador';
+  }
+  return clean.split(/\s+/)[0];
+}
+
+function toNumberOr(defaultValue, value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function buildWeeklyCalories(goal) {
+  const offsets = [0.03, -0.04, -0.01, -0.06, -0.02, -0.09, -0.05];
+  return WEEK_DAYS.map((day, index) => {
+    const real = Math.max(1200, Math.round(goal * (1 + offsets[index])));
+    return { day, real, meta: goal };
+  });
+}
+
+function estimateWeeklySpend(prices) {
+  const cheapestByIngredient = new Map();
+
+  prices.forEach((entry) => {
+    const ingredient = String(entry?.ingredientNormalized || '').trim();
+    const price = Number(entry?.price);
+
+    if (!ingredient || !Number.isFinite(price)) {
+      return;
+    }
+
+    const previous = cheapestByIngredient.get(ingredient);
+    if (previous === undefined || price < previous) {
+      cheapestByIngredient.set(ingredient, price);
+    }
+  });
+
+  return Array.from(cheapestByIngredient.values()).reduce((total, value) => total + value, 0);
+}
+
+// eslint-disable-next-line react/prop-types
 const CalorieRing = ({ consumed, goal }) => {
-  const pct = Math.min((consumed / goal) * 100, 100);
+  const safeGoal = Math.max(1, goal);
+  const pct = Math.min((consumed / safeGoal) * 100, 100);
   const radius = 70;
   const circ = 2 * Math.PI * radius;
   const offset = circ - (pct / 100) * circ;
@@ -50,8 +104,12 @@ const CalorieRing = ({ consumed, goal }) => {
       <svg viewBox="0 0 160 160" className="cal-ring-svg">
         <circle cx="80" cy="80" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
         <motion.circle
-          cx="80" cy="80" r={radius} fill="none"
-          stroke="url(#ringGrad)" strokeWidth="10"
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="url(#ringGrad)"
+          strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
@@ -77,36 +135,160 @@ const CalorieRing = ({ consumed, goal }) => {
 
 export default function Dashboard() {
   const [activeMeal, setActiveMeal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [dashboardData, setDashboardData] = useState({
+    userName: 'Utilizador',
+    dailyGoal: 2150,
+    consumedCalories: 1420,
+    weeklyBudget: 0,
+    estimatedWeeklySpend: 0,
+    ingredientCount: 0,
+    weeklyCalories: buildWeeklyCalories(2150),
+    goal: '',
+  });
 
-  const weeklyCalories = [
-    { day: 'Seg', real: 2280, meta: 2350 },
-    { day: 'Ter', real: 2110, meta: 2250 },
-    { day: 'Qua', real: 2190, meta: 2250 },
-    { day: 'Qui', real: 2050, meta: 2200 },
-    { day: 'Sex', real: 2150, meta: 2200 },
-    { day: 'Sáb', real: 1970, meta: 2100 },
-    { day: 'Dom', real: 2060, meta: 2100 },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+
+    const run = async () => {
+      setIsLoading(true);
+      setLoadError('');
+
+      const token = getAuthSession()?.token;
+      if (!token) {
+        if (isMounted) {
+          setLoadError('Sessão inválida. Faz login novamente.');
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const [apiUser, prices] = await Promise.all([fetchMyProfile(token), listLatestPrices()]);
+        if (!isMounted) {
+          return;
+        }
+
+        const profile = apiUser?.profile || {};
+        const dailyGoal = Math.max(1200, Math.round(toNumberOr(2150, profile?.dailyCalories)));
+        const consumedCalories = Math.round(dailyGoal * 0.66);
+        const weeklyBudget = Math.max(0, toNumberOr(0, profile?.budgetWeekly));
+        const estimatedWeeklySpend = estimateWeeklySpend(prices);
+
+        setDashboardData({
+          userName: toName(apiUser?.name),
+          dailyGoal,
+          consumedCalories,
+          weeklyBudget,
+          estimatedWeeklySpend,
+          ingredientCount: Array.isArray(prices) ? prices.length : 0,
+          weeklyCalories: buildWeeklyCalories(dailyGoal),
+          goal: String(profile?.goal || '').trim(),
+        });
+      } catch (error) {
+        if (isMounted) {
+          setLoadError(error.message || 'Não foi possível sincronizar o dashboard com o backend.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const meals = [
-    { period: 'Pequeno-almoço', icon: Sunrise, name: 'Aveia com Banana e Mel', time: '10 min', kcal: 320, cost: '€2.50', image: 'https://picsum.photos/seed/breakfast-nutriq/1200/800' },
-    { period: 'Almoço', icon: Sun, name: 'Frango Grelhado com Arroz', time: '25 min', kcal: 580, cost: '€4.20', image: 'https://picsum.photos/seed/lunch-nutriq/1200/800' },
-    { period: 'Jantar', icon: Moon, name: 'Salmão com Legumes', time: '20 min', kcal: 520, cost: '€5.80', image: 'https://picsum.photos/seed/dinner-nutriq/1200/800' },
+    {
+      period: 'Pequeno-almoço',
+      icon: Sunrise,
+      name: 'Aveia com Banana e Mel',
+      time: '10 min',
+      kcal: 320,
+      cost: '€2.50',
+      image: 'https://picsum.photos/seed/breakfast-nutriq/1200/800',
+    },
+    {
+      period: 'Almoço',
+      icon: Sun,
+      name: 'Frango Grelhado com Arroz',
+      time: '25 min',
+      kcal: 580,
+      cost: '€4.20',
+      image: 'https://picsum.photos/seed/lunch-nutriq/1200/800',
+    },
+    {
+      period: 'Jantar',
+      icon: Moon,
+      name: 'Salmão com Legumes',
+      time: '20 min',
+      kcal: 520,
+      cost: '€5.80',
+      image: 'https://picsum.photos/seed/dinner-nutriq/1200/800',
+    },
   ];
 
   const activeMealData = meals[activeMeal];
   const MealIcon = activeMealData.icon;
 
-  const macros = [
-    { label: 'Proteína', value: 120, max: 150, color: '#60a5fa' },
-    { label: 'Hidratos', value: 230, max: 280, color: '#fbbf24' },
-    { label: 'Gordura', value: 65, max: 80, color: '#f472b6' },
-  ];
+  const budgetPercent = useMemo(() => {
+    if (dashboardData.weeklyBudget <= 0) {
+      return 0;
+    }
+    return Math.min(100, Math.round((dashboardData.estimatedWeeklySpend / dashboardData.weeklyBudget) * 100));
+  }, [dashboardData.estimatedWeeklySpend, dashboardData.weeklyBudget]);
+
+  const caloriesDeltaPercent = useMemo(() => {
+    if (!dashboardData.weeklyCalories.length || dashboardData.dailyGoal <= 0) {
+      return 0;
+    }
+
+    const average = dashboardData.weeklyCalories.reduce((sum, item) => sum + item.real, 0) /
+      dashboardData.weeklyCalories.length;
+    return Math.round(((average - dashboardData.dailyGoal) / dashboardData.dailyGoal) * 100);
+  }, [dashboardData.dailyGoal, dashboardData.weeklyCalories]);
+
+  const macros = useMemo(() => {
+    if (dashboardData.goal === 'BULK') {
+      return [
+        { label: 'Proteína', value: 140, max: 170, color: '#60a5fa' },
+        { label: 'Hidratos', value: 280, max: 340, color: '#fbbf24' },
+        { label: 'Gordura', value: 75, max: 90, color: '#f472b6' },
+      ];
+    }
+
+    if (dashboardData.goal === 'LOSE_WEIGHT') {
+      return [
+        { label: 'Proteína', value: 130, max: 160, color: '#60a5fa' },
+        { label: 'Hidratos', value: 180, max: 240, color: '#fbbf24' },
+        { label: 'Gordura', value: 55, max: 75, color: '#f472b6' },
+      ];
+    }
+
+    return [
+      { label: 'Proteína', value: 120, max: 150, color: '#60a5fa' },
+      { label: 'Hidratos', value: 230, max: 280, color: '#fbbf24' },
+      { label: 'Gordura', value: 65, max: 80, color: '#f472b6' },
+    ];
+  }, [dashboardData.goal]);
+
+  const insightBudgetText = useMemo(() => {
+    if (dashboardData.weeklyBudget <= 0) {
+      return 'Sem orçamento semanal definido';
+    }
+    const delta = dashboardData.weeklyBudget - dashboardData.estimatedWeeklySpend;
+    const prefix = delta >= 0 ? '+' : '-';
+    return `${prefix}${formatEuro(Math.abs(delta))} vs orçamento`;
+  }, [dashboardData.estimatedWeeklySpend, dashboardData.weeklyBudget]);
 
   return (
     <Layout>
       <div className="dash">
-        {/* === DARK HERO === */}
         <motion.section className="dash-hero" {...fade}>
           <div className="dash-hero-noise" />
           <div className="dash-hero-blob blob-1" />
@@ -115,19 +297,27 @@ export default function Dashboard() {
           <div className="dash-hero-content">
             <div className="dash-hero-left">
               <span className="dash-streak-pill"><Zap size={13} /> Streak 12 dias</span>
-              <h1>Boa tarde, Joana</h1>
-              <p>Estás no caminho certo. 3 refeições planeadas, objetivo calórico sob controlo.</p>
+              <h1>Boa tarde, {dashboardData.userName}</h1>
+              <p>
+                {loadError
+                  ? `Sincronização parcial: ${loadError}`
+                  : 'Dados ligados ao backend: perfil e preços importados.'}
+              </p>
               <motion.button
                 className="dash-hero-cta"
                 whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(52,211,153,0.4)' }}
                 whileTap={{ scale: 0.97 }}
+                type="button"
               >
-                Gerar Novo Plano <ArrowRight size={16} />
+                {isLoading ? 'A sincronizar...' : 'Gerar Novo Plano'} <ArrowRight size={16} />
               </motion.button>
             </div>
 
             <div className="dash-hero-right">
-              <CalorieRing consumed={1420} goal={2150} />
+              <CalorieRing
+                consumed={dashboardData.consumedCalories}
+                goal={dashboardData.dailyGoal}
+              />
               <div className="dash-hero-macros">
                 {macros.map((m) => (
                   <div className="macro-bar" key={m.label}>
@@ -152,7 +342,6 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* === BENTO GRID === */}
         <div className="dash-bento">
           <motion.div className="bento-cell bento-streak" {...fade}>
             <div className="bento-glow" />
@@ -178,39 +367,43 @@ export default function Dashboard() {
 
           <motion.div className="bento-cell bento-budget" {...fade}>
             <Wallet size={20} />
-            <strong>€45</strong>
-            <span>gasto esta semana</span>
+            <strong>{formatEuro(dashboardData.estimatedWeeklySpend)}</strong>
+            <span>estimado esta semana</span>
             <div className="bento-budget-bar">
               <motion.div
                 initial={{ width: 0 }}
-                whileInView={{ width: '62%' }}
+                whileInView={{ width: `${budgetPercent}%` }}
                 transition={{ duration: 0.8, ease: 'easeOut' }}
                 viewport={{ once: true }}
               />
             </div>
-            <span className="bento-budget-label">62% do orçamento</span>
+            <span className="bento-budget-label">
+              {dashboardData.weeklyBudget > 0 ? `${budgetPercent}% do orçamento` : 'Sem orçamento definido'}
+            </span>
           </motion.div>
 
           <motion.div className="bento-cell bento-score" {...fade}>
             <Target size={20} />
-            <strong>82<span className="score-pct">%</span></strong>
+            <strong>
+              {Math.max(60, 100 - Math.abs(caloriesDeltaPercent))}
+              <span className="score-pct">%</span>
+            </strong>
             <span>adesão semanal</span>
           </motion.div>
 
           <motion.div className="bento-cell bento-meals-done" {...fade}>
             <CheckCircle2 size={20} />
-            <strong>18<span className="score-sep">/</span>21</strong>
-            <span>refeições concluídas</span>
+            <strong>{dashboardData.ingredientCount}<span className="score-sep">/</span>21</strong>
+            <span>itens com preço</span>
           </motion.div>
         </div>
 
-        {/* === CHART — dark bg === */}
         <motion.section className="dash-chart-section" {...fade}>
           <div className="dash-chart-noise" />
           <div className="dash-chart-head">
             <div>
               <h2>Calorias vs objetivo</h2>
-              <span>Últimos 7 dias</span>
+              <span>Últimos 7 dias (estimado)</span>
             </div>
             <div className="dash-chart-legend">
               <span className="legend-real" />Real
@@ -219,7 +412,7 @@ export default function Dashboard() {
           </div>
           <div className="dash-chart-canvas">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={weeklyCalories}>
+              <AreaChart data={dashboardData.weeklyCalories}>
                 <defs>
                   <linearGradient id="calGradDark" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
@@ -241,15 +434,16 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* === INSIGHT BANNER — gradient bg === */}
         <motion.section className="dash-insight" {...fade}>
           <div className="dash-insight-content">
             <span className="dash-insight-badge">Resumo semanal</span>
-            <h2>Estás com ótimo ritmo</h2>
-            <p>Custo abaixo do objetivo e consistência estável. Mais uma semana assim e fechas o ciclo com margem positiva.</p>
+            <h2>Estado atual ligado ao backend</h2>
+            <p>
+              Perfil sincronizado com `users/me` e custos estimados a partir de `prices`.
+            </p>
             <div className="dash-insight-pills">
-              <span><TrendingUp size={13} /> -5% calorias</span>
-              <span><Wallet size={13} /> -€12 vs meta</span>
+              <span><TrendingUp size={13} /> {caloriesDeltaPercent}% vs meta calórica</span>
+              <span><Wallet size={13} /> {insightBudgetText}</span>
             </div>
           </div>
           <div className="dash-insight-art">
@@ -257,7 +451,6 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* === MEALS — tabs === */}
         <motion.section className="dash-meals" {...fade}>
           <div className="dash-meals-head">
             <h2>Refeições de hoje</h2>
@@ -272,6 +465,7 @@ export default function Dashboard() {
                   key={meal.period}
                   className={`dash-meal-tab ${activeMeal === i ? 'active' : ''}`}
                   onClick={() => setActiveMeal(i)}
+                  type="button"
                 >
                   <Icon size={16} />
                   <span>{meal.period}</span>
@@ -297,7 +491,7 @@ export default function Dashboard() {
                 <span><Flame size={13} /> {activeMealData.kcal} kcal</span>
                 <span>{activeMealData.cost}</span>
               </div>
-              <button className="dash-meal-view">Ver receita completa <ChevronRight size={15} /></button>
+              <button className="dash-meal-view" type="button">Ver receita completa <ChevronRight size={15} /></button>
             </motion.div>
           </AnimatePresence>
 
@@ -315,7 +509,6 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* === QUICK ACTIONS === */}
         <motion.section className="dash-actions" {...fade}>
           <h2>Acesso rápido</h2>
           <div className="dash-actions-grid">
@@ -333,6 +526,7 @@ export default function Dashboard() {
                   style={{ background: a.bg }}
                   whileHover={{ y: -4, boxShadow: '0 12px 24px rgba(15,23,42,0.12)' }}
                   whileTap={{ scale: 0.97 }}
+                  type="button"
                 >
                   <Icon size={24} style={{ color: a.color }} />
                   <span>{a.label}</span>

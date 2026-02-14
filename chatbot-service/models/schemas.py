@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     user_id: str = "anonymous"
     conversation_history: List[Message] = Field(default_factory=list)
     user_context: Optional[Dict[str, Any]] = None
+    backend_token: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -20,3 +21,5 @@ class ChatResponse(BaseModel):
     onboarding_complete: bool = False
     extracted_preferences: Optional[Dict[str, Any]] = None
     meal_plan_draft: Optional[Dict[str, Any]] = None
+    meal_plan: Optional[Dict[str, Any]] = None
+

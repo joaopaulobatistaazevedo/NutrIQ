@@ -148,14 +148,30 @@
 /* Links */
 .auth-forgot {
   display: block;
+  width: 100%;
   text-align: right;
   font-size: 13px;
   color: #34d399;
   font-weight: 600;
   text-decoration: none;
   margin-bottom: 22px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 .auth-forgot:hover { text-decoration: underline; }
+
+.auth-error {
+  margin: 2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* Submit */
 .auth-submit {
@@ -175,6 +191,13 @@
 .auth-submit:hover {
   box-shadow: 0 8px 28px rgba(52, 211, 153, 0.35);
   transform: translateY(-1px);
+}
+
+.auth-submit:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 6px 20px rgba(52, 211, 153, 0.15);
 }
 
 /* Footer */

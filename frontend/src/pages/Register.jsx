@@ -1,6 +1,8 @@
 // src/pages/Register.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { setAuthSession } from '../utils/authSession';
+import { registerUser } from '../services/authService';
 import '../styles/auth.css';
 
 export default function Register() {
@@ -9,10 +11,44 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    navigate('/welcome-bot', { state: { name: name.trim() } });
+    setErrorMessage('');
+
+    if (password !== confirmPassword) {
+      setErrorMessage('As passwords não coincidem.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMessage('A password deve ter pelo menos 8 caracteres.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const auth = await registerUser({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
+
+      setAuthSession({
+        userId: auth.userId,
+        token: auth.token,
+        email: email.trim(),
+        name: name.trim(),
+      });
+
+      navigate('/welcome-bot', { state: { name: name.trim() }, replace: true });
+    } catch (error) {
+      setErrorMessage(error.message || 'Não foi possível criar a conta.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -46,10 +82,13 @@ export default function Register() {
               <label>Confirmar password</label>
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" required />
             </div>
-            <button type="submit" className="auth-submit">Criar conta</button>
+            {errorMessage && <p className="auth-error">{errorMessage}</p>}
+            <button type="submit" className="auth-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'A criar conta...' : 'Criar conta'}
+            </button>
           </form>
 
-          <p className="auth-footer">Já tens conta? <a href="/login">Entrar</a></p>
+          <p className="auth-footer">Já tens conta? <Link to="/login">Entrar</Link></p>
         </div>
 
         {/* Side visual */}
