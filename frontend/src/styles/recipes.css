@@ -23,7 +23,7 @@
 }
 
 .recipes-header p {
-  color: #90a0b6;
+  color: #64748b;
   max-width: 760px;
   line-height: 1.6;
   font-size: 14px;
@@ -37,9 +37,9 @@
 .recipes-feedback {
   font-size: 14px;
   color: #334155;
-  border: 1px solid #d9e2ec;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: #f7f9fc;
+  background: #ffffff;
   padding: 12px;
 }
 
@@ -50,11 +50,12 @@
 }
 
 .recipes-category {
-  background: #f9fbfd;
-  border: 1px solid #d4deeb;
-  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
   padding: 16px;
   min-width: 0;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
 .recipes-category-header {
@@ -73,7 +74,7 @@
 
 .recipes-category-header p {
   font-size: 13px;
-  color: #90a0b6;
+  color: #64748b;
   max-width: 700px;
 }
 
@@ -85,9 +86,9 @@
 .recipes-control-btn {
   width: 36px;
   height: 36px;
-  border: 1px solid #c5d0df;
+  border: 1px solid #dbe4ee;
   border-radius: 10px;
-  background: #f8fbff;
+  background: #ffffff;
   color: #64748b;
   display: grid;
   place-items: center;
@@ -96,8 +97,8 @@
 }
 
 .recipes-control-btn:hover {
-  background: #e9f0f9;
-  border-color: #b8c5d8;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
   color: #334155;
 }
 
@@ -136,9 +137,9 @@
   min-width: calc((100% - 32px) / 3);
   max-width: calc((100% - 32px) / 3);
   scroll-snap-align: start;
-  border: 1px solid #e0e8f2;
-  border-radius: 14px;
-  background: #f2f6fb;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
   padding: 14px;
   min-height: 280px;
   display: flex;
@@ -151,7 +152,7 @@
   object-fit: cover;
   margin: 0 0 10px;
   border-radius: 12px;
-  border: 1px solid #dce5f0;
+  border: 1px solid #e2e8f0;
   display: block;
 }
 
@@ -195,10 +196,10 @@
 .recipe-open-btn {
   margin-top: auto;
   width: 100%;
-  border: 1px solid #d4deeb;
+  border: 1px solid #dbe4ee;
   border-radius: 10px;
   background: #ffffff;
-  color: #0f766e;
+  color: #0369a1;
   font-weight: 700;
   font-size: 14px;
   padding: 10px;
@@ -212,9 +213,9 @@
 }
 
 .recipe-open-btn:hover {
-  background: #eef7f3;
-  border-color: #a7ddc7;
-  color: #0b6e5f;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .recipe-open-btn:disabled {

@@ -1,11 +1,14 @@
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Check,
+  Copy,
   Camera,
   Droplets,
   Flame,
   MapPin,
   Moon,
+  Sun,
   PencilLine,
   Salad,
   Target,
@@ -105,6 +108,15 @@ function persistLocalProfile(formState) {
 }
 
 export default function Profile() {
+  const authSession = getAuthSession();
+  const token = authSession?.token || '';
+  const userId = Number(authSession?.userId || 0);
+
+  const [profileTheme, setProfileTheme] = useState(() => {
+    const stored = String(localStorage.getItem('profile-theme') || '').trim();
+    return stored === 'dark' ? 'dark' : 'light';
+  });
+  const [copyStatus, setCopyStatus] = useState('');
   const [formState, setFormState] = useState({
     name: '',
     email: '',
@@ -123,8 +135,34 @@ export default function Profile() {
   const [loadError, setLoadError] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
 
-  const authSession = getAuthSession();
-  const token = authSession?.token || '';
+  const toggleProfileTheme = () => {
+    setProfileTheme((previous) => {
+      const next = previous === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('profile-theme', next);
+      return next;
+    });
+  };
+
+  const handleCopyUserId = async () => {
+    if (!userId) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(String(userId));
+      } else {
+        const el = document.createElement('textarea');
+        el.value = String(userId);
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setCopyStatus('ID copiado!');
+      window.setTimeout(() => setCopyStatus(''), 1800);
+    } catch {
+      setCopyStatus('Não foi possível copiar.');
+      window.setTimeout(() => setCopyStatus(''), 1800);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -272,7 +310,7 @@ export default function Profile() {
 
   return (
     <Layout>
-      <div className="prof">
+      <div className={`prof theme-${profileTheme}`}>
         <motion.section className="prof-cover" {...fade}>
           <div className="prof-cover-content">
             <div className="prof-avatar-wrap">
@@ -293,6 +331,13 @@ export default function Profile() {
                 {formState.location || 'Localização não definida'}
               </p>
               <p className="prof-bio">{profileBio}</p>
+              <div className="prof-user-id-row">
+                <span className="prof-user-id-pill">ID #{userId || '—'}</span>
+                <button type="button" className="prof-id-copy-btn" onClick={handleCopyUserId}>
+                  {copyStatus === 'ID copiado!' ? <Check size={14} /> : <Copy size={14} />}
+                  {copyStatus || 'Copiar ID'}
+                </button>
+              </div>
               <div className="prof-mini-metrics">
                 <span>{dailyCalories ? `${dailyCalories} kcal alvo` : 'Sem calorias definidas'}</span>
                 <span>
@@ -315,6 +360,10 @@ export default function Profile() {
               </motion.button>
               <button className="prof-btn outline" type="button" onClick={scrollToProfileForm}>
                 <Target size={16} /> {goalLabel}
+              </button>
+              <button className="prof-btn outline" type="button" onClick={toggleProfileTheme}>
+                {profileTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                {profileTheme === 'dark' ? 'Modo claro' : 'Modo escuro'}
               </button>
             </div>
 
