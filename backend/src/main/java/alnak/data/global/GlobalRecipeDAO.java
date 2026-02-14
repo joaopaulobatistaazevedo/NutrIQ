@@ -8,7 +8,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,6 +68,61 @@ public class GlobalRecipeDAO {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list recipes", e);
+        }
+    }
+
+    /**
+     * Read a single recipe by id from global MySQL recipes table.
+     */
+    public Optional<Recipe> getRecipeById(int id) {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT id, name, description, meal_type, prep_time_min, cook_time_min,
+                       servings, calories, protein_g, carbs_g, fat_g, image_url
+                FROM recipes
+                WHERE id = ?
+                """)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(mapRecipeRow(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to get recipe by id", e);
+        }
+    }
+
+    /**
+     * Search recipes by name in global MySQL recipes table.
+     */
+    public List<Recipe> searchRecipes(String query, Integer limit) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, name, description, meal_type, prep_time_min, cook_time_min,
+                       servings, calories, protein_g, carbs_g, fat_g, image_url
+                FROM recipes
+                WHERE LOWER(name) LIKE LOWER(?)
+                ORDER BY id DESC
+                """);
+        if (limit != null && limit > 0) {
+            sql.append(" LIMIT ?");
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            ps.setString(1, "%" + query.trim() + "%");
+            if (limit != null && limit > 0) {
+                ps.setInt(2, limit);
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Recipe> items = new ArrayList<>();
+                while (rs.next()) {
+                    items.add(mapRecipeRow(rs));
+                }
+                return items;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to search recipes", e);
         }
     }
 

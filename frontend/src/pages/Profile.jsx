@@ -8,7 +8,6 @@ import {
   Flame,
   MapPin,
   Moon,
-  Sun,
   PencilLine,
   Salad,
   Target,
@@ -112,10 +111,6 @@ export default function Profile() {
   const token = authSession?.token || '';
   const userId = Number(authSession?.userId || 0);
 
-  const [profileTheme, setProfileTheme] = useState(() => {
-    const stored = String(localStorage.getItem('profile-theme') || '').trim();
-    return stored === 'dark' ? 'dark' : 'light';
-  });
   const [copyStatus, setCopyStatus] = useState('');
   const [formState, setFormState] = useState({
     name: '',
@@ -134,14 +129,6 @@ export default function Profile() {
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
-
-  const toggleProfileTheme = () => {
-    setProfileTheme((previous) => {
-      const next = previous === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('profile-theme', next);
-      return next;
-    });
-  };
 
   const handleCopyUserId = async () => {
     if (!userId) return;
@@ -310,7 +297,7 @@ export default function Profile() {
 
   return (
     <Layout>
-      <div className={`prof theme-${profileTheme}`}>
+      <div className="prof">
         <motion.section className="prof-cover" {...fade}>
           <div className="prof-cover-content">
             <div className="prof-avatar-wrap">
@@ -360,10 +347,6 @@ export default function Profile() {
               </motion.button>
               <button className="prof-btn outline" type="button" onClick={scrollToProfileForm}>
                 <Target size={16} /> {goalLabel}
-              </button>
-              <button className="prof-btn outline" type="button" onClick={toggleProfileTheme}>
-                {profileTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                {profileTheme === 'dark' ? 'Modo claro' : 'Modo escuro'}
               </button>
             </div>
 

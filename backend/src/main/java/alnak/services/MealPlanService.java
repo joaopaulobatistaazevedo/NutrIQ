@@ -4,7 +4,8 @@ import alnak.business_logic.entities.MealPlan;
 import alnak.business_logic.entities.MealType;
 import alnak.business_logic.entities.PlanStatus;
 import alnak.business_logic.entities.Recipe;
-import alnak.data.local.MealPlanDAO;
+import alnak.data.global.GlobalMealPlanDAO;
+import alnak.data.global.GlobalRecipeDAO;
 import alnak.data.local.RecipeDAO;
 
 import java.time.DayOfWeek;
@@ -14,19 +15,19 @@ import java.util.Optional;
 
 /**
  * Business logic for meal plans.
- *
- * The DAO is an AbstractList ordered newest-first; the service works in
- * terms of plan IDs (from HTTP routes) and resolves positions internally.
- * All callers only ever see/use IDs.
  */
 public class MealPlanService {
 
-    private final MealPlanDAO mealPlanDAO;
-    private final RecipeDAO   recipeDAO;
+    private final GlobalMealPlanDAO globalMealPlanDAO;
+    private final GlobalRecipeDAO   globalRecipeDAO;
+    private final RecipeDAO         recipeDAO;
 
-    public MealPlanService(MealPlanDAO mealPlanDAO, RecipeDAO recipeDAO) {
-        this.mealPlanDAO = mealPlanDAO;
-        this.recipeDAO   = recipeDAO;
+    public MealPlanService(GlobalMealPlanDAO globalMealPlanDAO,
+                           GlobalRecipeDAO globalRecipeDAO,
+                           RecipeDAO recipeDAO) {
+        this.globalMealPlanDAO = globalMealPlanDAO;
+        this.globalRecipeDAO   = globalRecipeDAO;
+        this.recipeDAO         = recipeDAO;
     }
 
     // ── Plan lifecycle ────────────────────────────────────────────
@@ -36,43 +37,50 @@ public class MealPlanService {
      *
      * @param weekStart Monday of the target week (ISO date string, e.g. "2025-06-09")
      */
-    public MealPlan createPlan(String weekStart) {
+    public MealPlan createPlan(long userId, String weekStart) {
         LocalDate date = parseWeekStart(weekStart);
         MealPlan plan = new MealPlan(date);
         plan.setStatus(PlanStatus.ACTIVE);
-        mealPlanDAO.add(plan);    // populates plan.id via RETURN_GENERATED_KEYS
+        globalMealPlanDAO.addPlan(userId, plan);
         return plan;
     }
 
     /**
      * Returns all plans, newest first.
      */
-    public List<MealPlan> listAll() {
-        // AbstractList.subList / stream copy — avoids holding a live DAO reference
-        return List.copyOf(mealPlanDAO);
+    public List<MealPlan> listAll(long userId) {
+        List<MealPlan> plans = globalMealPlanDAO.listPlans(userId);
+        plans.forEach(this::hydratePlanMeals);
+        return plans;
     }
 
     /**
      * Returns the most recent active plan, if one exists.
      */
-    public Optional<MealPlan> getActivePlan() {
-        return mealPlanDAO.getActive();
+    public Optional<MealPlan> getActivePlan(long userId) {
+        Optional<MealPlan> global = globalMealPlanDAO.getActive(userId);
+        if (global.isPresent()) {
+            MealPlan plan = global.get();
+            hydratePlanMeals(plan);
+            return Optional.of(plan);
+        }
+        return Optional.empty();
     }
 
     /**
      * Find a plan by its database id.
      */
-    public MealPlan getPlanById(int planId) {
-        return findPlanById(planId);   // throws if not found
+    public MealPlan getPlanById(long userId, int planId) {
+        return findPlanById(userId, planId);   // throws if not found
     }
 
     /**
      * Update the status of a plan (e.g. ACTIVE → COMPLETED).
      */
-    public MealPlan updateStatus(int planId, String statusRaw) {
+    public MealPlan updateStatus(long userId, int planId, String statusRaw) {
         PlanStatus status = parsePlanStatus(statusRaw);
-        MealPlan plan = findPlanById(planId);
-        mealPlanDAO.setStatus(plan.getId(), status);
+        MealPlan plan = findPlanById(userId, planId);
+        globalMealPlanDAO.setStatus(userId, plan.getId(), status);
         plan.setStatus(status);
         return plan;
     }
@@ -80,9 +88,8 @@ public class MealPlanService {
     /**
      * Delete a plan and all its meals (cascade is handled by the DAO).
      */
-    public void deletePlan(int planId) {
-        int index = requirePlanIndex(planId);
-        mealPlanDAO.remove(index);
+    public void deletePlan(long userId, int planId) {
+        globalMealPlanDAO.deletePlan(userId, planId);
     }
 
     // ── Meal management ───────────────────────────────────────────
@@ -96,15 +103,15 @@ public class MealPlanService {
      * @param mealTypeRaw meal type string, e.g. "BREAKFAST"
      * @return the persisted meal (with id populated)
      */
-    public MealPlan.MealPlanMeal addMeal(int planId, int recipeId,
+    public MealPlan.MealPlanMeal addMeal(long userId, int planId, int recipeId,
                                          String dayRaw, String mealTypeRaw) {
-        MealPlan plan    = findPlanById(planId);
+        MealPlan plan    = findPlanById(userId, planId);
         Recipe   recipe  = requireRecipe(recipeId);
         DayOfWeek  day   = parseDayOfWeek(dayRaw);
         MealType   type  = parseMealType(mealTypeRaw);
 
         MealPlan.MealPlanMeal meal = new MealPlan.MealPlanMeal(planId, recipe, day, type);
-        mealPlanDAO.addMeal(meal);   // populates meal.id
+        globalMealPlanDAO.addMeal(userId, meal);
 
         // keep the in-memory plan consistent so callers don't need to re-fetch
         plan.getMeals().add(meal);
@@ -113,19 +120,18 @@ public class MealPlanService {
 
     /**
      * Remove a meal slot from a plan.
-     * Uses a direct DELETE via {@link MealPlanDAO#removeMeal(int)}.
      *
      * @param planId the owning plan (validated for existence)
      * @param mealId the meal row id to delete
      */
-    public void removeMeal(int planId, int mealId) {
-        MealPlan plan = findPlanById(planId);
+    public void removeMeal(long userId, int planId, int mealId) {
+        MealPlan plan = findPlanById(userId, planId);
         boolean owned = plan.getMeals().stream()
                 .anyMatch(m -> m.getId() == mealId);
         if (!owned)
             throw new IllegalArgumentException(
                     "Meal " + mealId + " does not belong to plan " + planId);
-        mealPlanDAO.removeMeal(mealId);
+        globalMealPlanDAO.removeMeal(userId, planId, mealId);
     }
 
     /**
@@ -135,8 +141,8 @@ public class MealPlanService {
      * @param mealId      the meal slot to update
      * @param newRecipeId replacement recipe — must exist locally
      */
-    public MealPlan.MealPlanMeal swapRecipe(int planId, int mealId, int newRecipeId) {
-        MealPlan plan   = findPlanById(planId);
+    public MealPlan.MealPlanMeal swapRecipe(long userId, int planId, int mealId, int newRecipeId) {
+        MealPlan plan   = findPlanById(userId, planId);
         Recipe   recipe = requireRecipe(newRecipeId);
 
         MealPlan.MealPlanMeal meal = plan.getMeals().stream()
@@ -145,7 +151,7 @@ public class MealPlanService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Meal " + mealId + " does not belong to plan " + planId));
 
-        mealPlanDAO.swapRecipe(mealId, newRecipeId);
+        globalMealPlanDAO.swapRecipe(userId, planId, mealId, newRecipeId);
         meal.setRecipeId(newRecipeId);
         meal.setRecipe(recipe);
         return meal;
@@ -158,15 +164,15 @@ public class MealPlanService {
      * @param mealId    the meal to complete
      * @param photoPath optional path/URL to the completion photo
      */
-    public MealPlan.MealPlanMeal completeMeal(int planId, int mealId, String photoPath) {
-        MealPlan plan = findPlanById(planId);
+    public MealPlan.MealPlanMeal completeMeal(long userId, int planId, int mealId, String photoPath) {
+        MealPlan plan = findPlanById(userId, planId);
         MealPlan.MealPlanMeal meal = plan.getMeals().stream()
                 .filter(m -> m.getId() == mealId)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Meal " + mealId + " does not belong to plan " + planId));
 
-        mealPlanDAO.completeMeal(mealId, photoPath);
+        globalMealPlanDAO.completeMeal(userId, planId, mealId, photoPath);
         meal.markCompleted(photoPath);   // updates in-memory state
         return meal;
     }
@@ -176,8 +182,8 @@ public class MealPlanService {
      *
      * @param dayRaw e.g. "TUESDAY"
      */
-    public List<MealPlan.MealPlanMeal> getMealsForDay(int planId, String dayRaw) {
-        MealPlan  plan = findPlanById(planId);
+    public List<MealPlan.MealPlanMeal> getMealsForDay(long userId, int planId, String dayRaw) {
+        MealPlan  plan = findPlanById(userId, planId);
         DayOfWeek day  = parseDayOfWeek(dayRaw);
         return plan.mealsForDay(day.getValue());
     }
@@ -185,20 +191,10 @@ public class MealPlanService {
     /**
      * Returns all meals of a given type (e.g. all breakfasts) in a plan.
      */
-    public List<MealPlan.MealPlanMeal> getMealsByType(int planId, String mealTypeRaw) {
-        MealPlan plan = findPlanById(planId);
+    public List<MealPlan.MealPlanMeal> getMealsByType(long userId, int planId, String mealTypeRaw) {
+        MealPlan plan = findPlanById(userId, planId);
         MealType type = parseMealType(mealTypeRaw);
         return plan.mealsOfType(type);
-    }
-
-    // ── Stats ─────────────────────────────────────────────────────
-
-    public int completedMealCount() {
-        return mealPlanDAO.completedMealCount();
-    }
-
-    public List<String> allPhotos() {
-        return mealPlanDAO.photos();
     }
 
     // ── Private helpers ───────────────────────────────────────────
@@ -207,22 +203,27 @@ public class MealPlanService {
      * Iterates the DAO (newest-first list) to find a plan by id.
      * Throws {@link IllegalArgumentException} if not found.
      */
-    private MealPlan findPlanById(int planId) {
-        return mealPlanDAO.stream()
-                .filter(p -> p.getId() == planId)
-                .findFirst()
+    private MealPlan findPlanById(long userId, int planId) {
+        Optional<MealPlan> global = globalMealPlanDAO.getPlanById(userId, planId);
+        MealPlan plan = global
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Plano de refeições não encontrado: " + planId));
+        hydratePlanMeals(plan);
+        return plan;
     }
 
-    /**
-     * Returns the list index of a plan by id — needed for remove().
-     */
-    private int requirePlanIndex(int planId) {
-        for (int i = 0; i < mealPlanDAO.size(); i++) {
-            if (mealPlanDAO.get(i).getId() == planId) return i;
+    private void hydratePlanMeals(MealPlan plan) {
+        if (plan == null || plan.getMeals() == null) {
+            return;
         }
-        throw new IllegalArgumentException("Plano de refeições não encontrado: " + planId);
+
+        for (MealPlan.MealPlanMeal meal : plan.getMeals()) {
+            if (meal.getRecipe() != null) {
+                continue;
+            }
+            Recipe recipe = globalRecipeDAO.getRecipeById(meal.getRecipeId()).orElseGet(() -> recipeDAO.get(meal.getRecipeId()));
+            meal.setRecipe(recipe);
+        }
     }
 
     private Recipe requireRecipe(int recipeId) {

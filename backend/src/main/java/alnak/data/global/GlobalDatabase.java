@@ -2,16 +2,23 @@ package alnak.data.global;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GlobalDatabase
 {
 
     private static GlobalDatabase instance;
-    private Connection connection;
+    private final Connection connection;
+    private final ThreadLocal<Connection> threadConnection;
+    private final String jdbcUrl;
+    private final Set<Connection> openedConnections;
 
     private static final Dotenv DOTENV = Dotenv.configure()
             .ignoreIfMissing()
@@ -32,11 +39,45 @@ public class GlobalDatabase
 
     private GlobalDatabase() {
         try {
-            String url = String.format(
+            this.jdbcUrl = String.format(
                     "jdbc:mysql://%s:%s/%s?%s",
                     HOST, PORT, DB_NAME, PARAMS
             );
-            connection = DriverManager.getConnection(url, USER, PASSWORD);
+
+            this.threadConnection = new ThreadLocal<>();
+                this.openedConnections = ConcurrentHashMap.newKeySet();
+            this.connection = (Connection) Proxy.newProxyInstance(
+                    Connection.class.getClassLoader(),
+                    new Class[]{Connection.class},
+                    (proxy, method, args) -> {
+                        String name = method.getName();
+
+                        if ("close".equals(name)) {
+                            Connection c = threadConnection.get();
+                            if (c != null) {
+                                try {
+                                    if (!c.isClosed()) {
+                                        c.close();
+                                    }
+                                } finally {
+                                    openedConnections.remove(c);
+                                    threadConnection.remove();
+                                }
+                            }
+                            return null;
+                        }
+
+                        Connection c = currentConnection();
+                        try {
+                            return method.invoke(c, args);
+                        } catch (InvocationTargetException e) {
+                            throw e.getCause();
+                        }
+                    }
+            );
+
+            Runtime.getRuntime().addShutdownHook(new Thread(this::closeAllOpenedConnections));
+
             initSchema();
             System.out.println("MySQL connected: " + HOST + ":" + PORT + "/" + DB_NAME);
         } catch (SQLException e) {
@@ -51,6 +92,28 @@ public class GlobalDatabase
 
     public Connection getConnection() {
         return connection;
+    }
+
+    private Connection currentConnection() throws SQLException {
+        Connection c = threadConnection.get();
+        if (c == null || c.isClosed()) {
+            c = DriverManager.getConnection(jdbcUrl, USER, PASSWORD);
+            threadConnection.set(c);
+            openedConnections.add(c);
+        }
+        return c;
+    }
+
+    private void closeAllOpenedConnections() {
+        for (Connection c : openedConnections) {
+            try {
+                if (c != null && !c.isClosed()) {
+                    c.close();
+                }
+            } catch (SQLException ignored) {
+            }
+        }
+        openedConnections.clear();
     }
 
     private void initSchema() throws SQLException {
@@ -137,6 +200,33 @@ public class GlobalDatabase
                 )
             """);
 
+            // ── Meal plans (global per user) ─────────────────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS meal_plans (
+                    id         INT PRIMARY KEY AUTO_INCREMENT,
+                    user_id    INT          NOT NULL,
+                    created_at DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    week_start DATE,
+                    status     VARCHAR(20)  DEFAULT 'ACTIVE',
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS meal_plan_meals (
+                    id            INT PRIMARY KEY AUTO_INCREMENT,
+                    meal_plan_id  INT         NOT NULL,
+                    recipe_id     INT         NOT NULL,
+                    day_of_week   INT         NOT NULL,
+                    meal_type     VARCHAR(50) NOT NULL,
+                    is_completed  TINYINT     DEFAULT 0,
+                    photo_path    VARCHAR(500),
+                    completed_at  DATETIME,
+                    FOREIGN KEY (meal_plan_id) REFERENCES meal_plans(id) ON DELETE CASCADE,
+                    FOREIGN KEY (recipe_id)    REFERENCES recipes(id)
+                )
+            """);
+
             // ── User–Recipe ratings ───────────────────────────────
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_recipe_ratings (
@@ -173,6 +263,9 @@ public class GlobalDatabase
             createIndexIfMissing(s, "CREATE INDEX idx_posts_user       ON posts(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_recipe     ON posts(recipe_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_ratings_recipe   ON user_recipe_ratings(recipe_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_user  ON meal_plans(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_week  ON meal_plans(week_start)");
+            createIndexIfMissing(s, "CREATE INDEX idx_mp_meals_plan    ON meal_plan_meals(meal_plan_id)");
         }
     }
 

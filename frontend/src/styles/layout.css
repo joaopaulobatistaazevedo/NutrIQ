@@ -49,6 +49,12 @@
   filter: saturate(1.05);
 }
 
+html[data-theme='dark'] .layout-content::before {
+  background-image:
+    radial-gradient(circle at 12% 12%, rgba(34, 211, 238, 0.12), transparent 34%),
+    radial-gradient(circle at 88% 88%, rgba(168, 85, 247, 0.12), transparent 34%);
+}
+
 /* Tablet */
 @media (max-width: 1024px) {
   .layout-content {

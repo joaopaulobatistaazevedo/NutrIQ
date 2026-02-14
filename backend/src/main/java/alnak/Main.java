@@ -1,6 +1,5 @@
 package alnak;
 
-import alnak.business_logic.entities.Recipe;
 import alnak.controllers.AuthController;
 import alnak.controllers.MealPlanController;
 import alnak.controllers.PriceController;
@@ -10,10 +9,10 @@ import alnak.controllers.ShoppingCartController;
 import alnak.controllers.UserController;
 import alnak.data.global.FriendshipDAO;
 import alnak.data.global.GlobalRecipeDAO;
+import alnak.data.global.GlobalMealPlanDAO;
 import alnak.data.global.PostDAO;
 import alnak.data.global.UserDAO;
 import alnak.data.local.IngredientMarketPriceDAO;
-import alnak.data.local.MealPlanDAO;
 import alnak.data.local.RecipeDAO;
 import alnak.data.local.ShoppingCartSnapshotDAO;
 import alnak.dto.LoginRequest;
@@ -42,11 +41,11 @@ public class Main {
         PostDAO          postDAO          = new PostDAO();
         FriendshipDAO    friendshipDAO    = new FriendshipDAO();
         GlobalRecipeDAO  globalRecipeDAO  = new GlobalRecipeDAO();
+        GlobalMealPlanDAO globalMealPlanDAO = new GlobalMealPlanDAO();
 
         // Local (SQLite)
         RecipeDAO              recipeDAO              = new RecipeDAO();
         IngredientMarketPriceDAO ingredientMarketPriceDAO = new IngredientMarketPriceDAO();
-        MealPlanDAO            mealPlanDAO            = new MealPlanDAO();
         ShoppingCartSnapshotDAO shoppingCartSnapshotDAO = new ShoppingCartSnapshotDAO();
 
         // ── Services ──────────────────────────────────────────────
@@ -54,8 +53,8 @@ public class Main {
         AuthService      authService      = new AuthService(userDAO, jwtUtil);
         UserService      userService      = new UserService(userDAO);
         PriceImportService priceImportService = new PriceImportService(ingredientMarketPriceDAO);
-        RecipeService    recipeService    = new RecipeService(recipeDAO);
-        MealPlanService  mealPlanService  = new MealPlanService(mealPlanDAO, recipeDAO);
+        RecipeService    recipeService    = new RecipeService(recipeDAO, globalRecipeDAO);
+        MealPlanService  mealPlanService  = new MealPlanService(globalMealPlanDAO, globalRecipeDAO, recipeDAO);
         SocialService    socialService    = new SocialService(
                 postDAO, friendshipDAO, globalRecipeDAO, recipeDAO);
         ShoppingCartService shoppingCartService = new ShoppingCartService(shoppingCartSnapshotDAO);
@@ -197,65 +196,80 @@ public class Main {
 
         // ── Meal plan routes ──────────────────────────────────────
         // Static segments before wildcards (same rule as recipes).
-        app.get("/api/meal-plans/active", ctx ->
-                ctx.json(mealPlanController.getActivePlan()));
+        app.get("/api/meal-plans/active", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(mealPlanController.getActivePlan(userId));
+        });
 
-        app.get("/api/meal-plans", ctx ->
-                ctx.json(mealPlanController.listPlans()));
+        app.get("/api/meal-plans", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(mealPlanController.listPlans(userId));
+        });
 
-        app.post("/api/meal-plans", ctx ->
-                ctx.status(201).json(mealPlanController.createPlan(ctx.body())));
+        app.post("/api/meal-plans", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.status(201).json(mealPlanController.createPlan(userId, ctx.body()));
+        });
 
         app.get("/api/meal-plans/{planId}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
-            ctx.json(mealPlanController.getPlan(planId));
+            ctx.json(mealPlanController.getPlan(userId, planId));
         });
 
         app.put("/api/meal-plans/{planId}/status", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
-            ctx.json(mealPlanController.updateStatus(planId, ctx.body()));
+            ctx.json(mealPlanController.updateStatus(userId, planId, ctx.body()));
         });
 
         app.delete("/api/meal-plans/{planId}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
-            mealPlanController.deletePlan(planId);
+            mealPlanController.deletePlan(userId, planId);
             ctx.status(204);
         });
 
         app.post("/api/meal-plans/{planId}/meals", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
-            ctx.status(201).json(mealPlanController.addMeal(planId, ctx.body()));
+            ctx.status(201).json(mealPlanController.addMeal(userId, planId, ctx.body()));
         });
 
         app.delete("/api/meal-plans/{planId}/meals/{mealId}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
             int mealId = Integer.parseInt(ctx.pathParam("mealId"));
-            mealPlanController.removeMeal(planId, mealId);
+            mealPlanController.removeMeal(userId, planId, mealId);
             ctx.status(204);
         });
 
         app.put("/api/meal-plans/{planId}/meals/{mealId}/swap", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
             int mealId = Integer.parseInt(ctx.pathParam("mealId"));
-            ctx.json(mealPlanController.swapMeal(planId, mealId, ctx.body()));
+            ctx.json(mealPlanController.swapMeal(userId, planId, mealId, ctx.body()));
         });
 
         app.post("/api/meal-plans/{planId}/meals/{mealId}/complete", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int planId = Integer.parseInt(ctx.pathParam("planId"));
             int mealId = Integer.parseInt(ctx.pathParam("mealId"));
-            ctx.json(mealPlanController.completeMeal(planId, mealId, ctx.body()));
+            ctx.json(mealPlanController.completeMeal(userId, planId, mealId, ctx.body()));
         });
 
         app.get("/api/meal-plans/{planId}/meals/day/{day}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int    planId = Integer.parseInt(ctx.pathParam("planId"));
             String day    = ctx.pathParam("day");
-            ctx.json(mealPlanController.getMealsForDay(planId, day));
+            ctx.json(mealPlanController.getMealsForDay(userId, planId, day));
         });
 
         app.get("/api/meal-plans/{planId}/meals/type/{type}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             int    planId = Integer.parseInt(ctx.pathParam("planId"));
             String type   = ctx.pathParam("type");
-            ctx.json(mealPlanController.getMealsByType(planId, type));
+            ctx.json(mealPlanController.getMealsByType(userId, planId, type));
         });
 
         // ── Social routes ─────────────────────────────────────────

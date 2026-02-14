@@ -18,6 +18,16 @@
   --shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 
+html[data-theme='dark'] {
+  --bg-app: #0b1220;
+  --bg-surface: #111a2e;
+  --bg-surface-soft: #0f172a;
+  --border-soft: #25324a;
+  --text-primary: #e6edf8;
+  --text-secondary: #9fb0c8;
+  --shadow-soft: 0 16px 36px rgba(2, 8, 23, 0.42);
+}
+
 html,
 body,
 #root {
@@ -36,6 +46,14 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at 10% 12%, rgba(56, 189, 248, 0.12), transparent 36%),
+    radial-gradient(circle at 86% 86%, rgba(168, 85, 247, 0.14), transparent 34%),
+    var(--bg-app);
+  color: var(--text-primary);
 }
 
 #root {
@@ -91,6 +109,10 @@ button {
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+html[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: #334155;
 }
 
 ::-webkit-scrollbar-track {
