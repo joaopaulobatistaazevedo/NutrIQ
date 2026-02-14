@@ -6,6 +6,7 @@ Este backend agora usa persistencia real em SQLite para:
 - perfil (`user_profiles`)
 - restricoes (`user_profile_restrictions`)
 - alergenios (`user_profile_allergens`)
+- precos scraped por supermercado (`ingredient_market_prices`)
 
 ## 1. Requisitos
 
@@ -96,6 +97,37 @@ curl -s http://localhost:7071/api/debug/users
 curl -s http://localhost:7071/api/debug/users/1
 ```
 
+### 3.7 Importar o `report.json` do scraper
+
+No root do projeto (onde existe `report.json` gerado pelo scraper):
+
+```bash
+curl -s -X POST http://localhost:7071/api/prices/import \
+  -H "Content-Type: application/json" \
+  --data-binary @../report.json
+```
+
+Resposta esperada (exemplo):
+
+```json
+{
+  "marketsProcessed": 2,
+  "totalEntries": 14,
+  "deduplicatedEntries": 14,
+  "importedEntries": 14,
+  "skippedEntries": 2,
+  "invalidEntries": 0
+}
+```
+
+### 3.8 Consultar precos importados
+
+```bash
+curl -s http://localhost:7071/api/prices
+curl -s http://localhost:7071/api/prices/tomate
+curl -s http://localhost:7071/api/prices/tomate/cheapest
+```
+
 ## 4. Confirmar persistencia no SQLite
 
 Base de dados criada em:
@@ -112,6 +144,7 @@ sqlite3 database/meal_planner.db "SELECT id, name, email, created_at FROM users;
 sqlite3 database/meal_planner.db "SELECT user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly FROM user_profiles;"
 sqlite3 database/meal_planner.db "SELECT user_id, restriction FROM user_profile_restrictions ORDER BY user_id, restriction;"
 sqlite3 database/meal_planner.db "SELECT user_id, allergen FROM user_profile_allergens ORDER BY user_id, allergen;"
+sqlite3 database/meal_planner.db "SELECT ingredient_normalized, supermarket, price, currency, scraped_at FROM ingredient_market_prices ORDER BY ingredient_normalized, supermarket;"
 ```
 
 ## 5. Limpar estado de testes (opcional)
@@ -135,3 +168,5 @@ Depois volta a arrancar o servidor.
   - falta `Bearer <token>`.
 - `Alergenio invalido: ...`:
   - valor nao existe no enum `Allergen`.
+- `Payload inválido: campo 'results_by_market' ausente ou inválido.`:
+  - o JSON enviado para `POST /api/prices/import` não é o formato do `report.json`.
