@@ -110,7 +110,24 @@ PY
   if [[ "$recipe_count" -gt 0 ]]; then echo "- Seed já existe (${recipe_count} receitas)."; return; fi
   echo "- Base vazia, a semear receitas de recipes_scraped.json..."
   cd "$ROOT_DIR"
-  "$PYTHON_BIN" scripts/seed_recipes.py
+  local seed_json="$ROOT_DIR/data/recipes_scraped.json"
+  if [[ ! -f "$seed_json" ]]; then
+    seed_json="$ROOT_DIR/recipes_scraped.json"
+  fi
+  if [[ ! -f "$seed_json" ]]; then
+    echo "[ERRO] Ficheiro de seed não encontrado. Procurei em:"
+    echo "       - $ROOT_DIR/data/recipes_scraped.json"
+    echo "       - $ROOT_DIR/recipes_scraped.json"
+    exit 1
+  fi
+
+  MYSQL_HOST=127.0.0.1 \
+  MYSQL_PORT="$MYSQL_PORT" \
+  MYSQL_DB=bugsbyte \
+  MYSQL_USER=bugsbyte \
+  MYSQL_PASS=uma_password_forte \
+  MYSQL_PARAMS='useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC' \
+  "$PYTHON_BIN" recipe_import.py --input "$seed_json" --db data/recipes.db
 }
 
 start_chatbot() {
