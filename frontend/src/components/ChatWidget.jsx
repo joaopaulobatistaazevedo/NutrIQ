@@ -23,10 +23,30 @@ const parseStorage = (key, fallback) => {
   }
 };
 
-const buildWelcomeMessage = (name) => ({
+const normalizeSex = (sex) => String(sex || '').trim().toLowerCase();
+
+const getWelcomeText = (name, sex) => {
+  const normalizedSex = normalizeSex(sex);
+
+  if (normalizedSex === 'masculino') {
+    return `Olá ${name}! Bem-vindo. Eu sou o NutriBot, pronto para te ajudar com alimentação e meal planning.`;
+  }
+
+  if (normalizedSex === 'feminino') {
+    return `Olá ${name}! Bem-vinda. Eu sou o NutriBot, pronto para te ajudar com alimentação e meal planning.`;
+  }
+
+  if (normalizedSex === 'outro') {
+    return `Olá ${name}! Boas-vindas. Eu sou o NutriBot, pronto para te ajudar com alimentação e meal planning.`;
+  }
+
+  return `Olá ${name}! Eu sou o NutriBot, pronto para te ajudar com alimentação e meal planning.`;
+};
+
+const buildWelcomeMessage = (name, sex) => ({
   id: Date.now(),
   role: 'bot',
-  text: `Olá ${name}! Eu sou o NutriBot, pronto para te ajudar com alimentação e meal planning.`,
+  text: getWelcomeText(name, sex),
 });
 
 const toUiMessage = (item) => ({
@@ -35,48 +55,94 @@ const toUiMessage = (item) => ({
   text: item.content,
 });
 
-const buildInitialMessages = (welcomeName) => {
-  const storedMessages = parseStorage(CHAT_MESSAGES_KEY, []);
+const resolveAccountId = (profile) => {
+  const username = String(profile?.username || '').trim().toLowerCase();
+  if (!username) {
+    return 'anonymous';
+  }
+  return username.replace(/\s+/g, '_');
+};
+
+const scopedKey = (base, accountId) => `${base}:${accountId}`;
+
+const buildInitialMessages = ({ welcomeName, welcomeSex, accountId }) => {
+  const storedMessages = parseStorage(scopedKey(CHAT_MESSAGES_KEY, accountId), []);
   if (Array.isArray(storedMessages) && storedMessages.length > 0) {
     return storedMessages;
   }
 
-  const storedHistory = parseStorage(CHAT_HISTORY_KEY, []);
+  const storedHistory = parseStorage(scopedKey(CHAT_HISTORY_KEY, accountId), []);
   if (Array.isArray(storedHistory) && storedHistory.length > 0) {
     return storedHistory.map(toUiMessage);
   }
 
-  return [buildWelcomeMessage(welcomeName)];
+  return [buildWelcomeMessage(welcomeName, welcomeSex)];
+};
+
+const mapAddressStyle = (sex) => {
+  const normalizedSex = normalizeSex(sex);
+  if (normalizedSex === 'masculino') {
+    return 'masculino';
+  }
+  if (normalizedSex === 'feminino') {
+    return 'feminino';
+  }
+  if (normalizedSex === 'outro') {
+    return 'neutro';
+  }
+  return null;
 };
 
 export default function ChatWidget() {
   const location = useLocation();
   const messagesEndRef = useRef(null);
 
-  const storedProfile = useMemo(() => parseStorage(PROFILE_KEY, null), []);
-  const welcomeName = storedProfile?.username || 'campeão';
+  const [activeProfile, setActiveProfile] = useState(() => parseStorage(PROFILE_KEY, null));
+
+  useEffect(() => {
+    setActiveProfile(parseStorage(PROFILE_KEY, null));
+  }, [location.pathname]);
+
+  const accountId = useMemo(() => resolveAccountId(activeProfile), [activeProfile]);
+  const welcomeName = activeProfile?.username || 'campeão';
+  const welcomeSex = activeProfile?.sex || '';
 
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
-  const [messages, setMessages] = useState(() => buildInitialMessages(welcomeName));
-  const [conversationHistory, setConversationHistory] = useState(() => parseStorage(CHAT_HISTORY_KEY, []));
-  const [chatContext, setChatContext] = useState(() => parseStorage(CHAT_CONTEXT_KEY, { onboarding_complete: false }));
+  const [messages, setMessages] = useState(() =>
+    buildInitialMessages({ welcomeName, welcomeSex, accountId })
+  );
+  const [conversationHistory, setConversationHistory] = useState(() =>
+    parseStorage(scopedKey(CHAT_HISTORY_KEY, accountId), [])
+  );
+  const [chatContext, setChatContext] = useState(() =>
+    parseStorage(scopedKey(CHAT_CONTEXT_KEY, accountId), { onboarding_complete: false })
+  );
+
+  useEffect(() => {
+    setMessages(buildInitialMessages({ welcomeName, welcomeSex, accountId }));
+    setConversationHistory(parseStorage(scopedKey(CHAT_HISTORY_KEY, accountId), []));
+    setChatContext(parseStorage(scopedKey(CHAT_CONTEXT_KEY, accountId), { onboarding_complete: false }));
+    setInput('');
+    setError('');
+    setIsSending(false);
+  }, [accountId, welcomeName, welcomeSex]);
 
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
 
   useEffect(() => {
-    localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(messages));
-  }, [messages]);
+    localStorage.setItem(scopedKey(CHAT_MESSAGES_KEY, accountId), JSON.stringify(messages));
+  }, [messages, accountId]);
 
   useEffect(() => {
-    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(conversationHistory));
-  }, [conversationHistory]);
+    localStorage.setItem(scopedKey(CHAT_HISTORY_KEY, accountId), JSON.stringify(conversationHistory));
+  }, [conversationHistory, accountId]);
 
   useEffect(() => {
-    localStorage.setItem(CHAT_CONTEXT_KEY, JSON.stringify(chatContext));
-  }, [chatContext]);
+    localStorage.setItem(scopedKey(CHAT_CONTEXT_KEY, accountId), JSON.stringify(chatContext));
+  }, [chatContext, accountId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -88,8 +154,9 @@ export default function ChatWidget() {
     const preferences = chatContext?.preferences || {};
 
     return {
-      ...(storedProfile || {}),
+      ...(activeProfile || {}),
       ...preferences,
+      address_style: mapAddressStyle(activeProfile?.sex),
       is_first_time: !chatContext?.onboarding_complete,
       new_liked_ingredients: chatContext?.new_liked_ingredients || [],
       requested_extra_ingredients: chatContext?.requested_extra_ingredients || [],
@@ -97,12 +164,14 @@ export default function ChatWidget() {
   };
 
   const handleClearChat = () => {
-    setMessages([buildWelcomeMessage(welcomeName)]);
+    setMessages([buildWelcomeMessage(welcomeName, welcomeSex)]);
     setConversationHistory([]);
+    setChatContext({ onboarding_complete: false });
     setInput('');
     setError('');
-    localStorage.removeItem(CHAT_MESSAGES_KEY);
-    localStorage.removeItem(CHAT_HISTORY_KEY);
+    localStorage.removeItem(scopedKey(CHAT_MESSAGES_KEY, accountId));
+    localStorage.removeItem(scopedKey(CHAT_HISTORY_KEY, accountId));
+    localStorage.removeItem(scopedKey(CHAT_CONTEXT_KEY, accountId));
   };
 
   const handleSubmit = async (event) => {
@@ -129,7 +198,7 @@ export default function ChatWidget() {
 
     try {
       const shouldUseOnboarding = !chatContext?.onboarding_complete;
-      const userId = storedProfile?.username || 'anonymous';
+      const userId = activeProfile?.username || accountId || 'anonymous';
 
       const response = shouldUseOnboarding
         ? await sendOnboardingMessage({

@@ -12,6 +12,26 @@ import {
 } from 'lucide-react';
 import '../styles/sidebar.css';
 
+const PROFILE_KEY = 'nutribot_profile';
+const AUTH_KEY = 'nutribot_auth';
+
+const clearNutribotSessionData = () => {
+  const keysToRemove = [];
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key) {
+      continue;
+    }
+
+    if (key === PROFILE_KEY || key === AUTH_KEY || key.startsWith('nutribot_chat_')) {
+      keysToRemove.push(key);
+    }
+  }
+
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
+};
+
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +48,7 @@ export default function Sidebar() {
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    // Por agora só navega para login
+    clearNutribotSessionData();
     navigate('/login');
   };
 
