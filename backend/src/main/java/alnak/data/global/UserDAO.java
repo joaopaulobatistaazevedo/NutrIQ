@@ -133,6 +133,49 @@ public class UserDAO {
         }
     }
 
+    public List<User> searchUsersByNameOrEmail(String query, int limit) {
+        String cleanQuery = query == null ? "" : query.trim();
+        if (cleanQuery.isEmpty()) {
+            return List.of();
+        }
+
+        int normalizedLimit = Math.max(1, Math.min(50, limit));
+
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT id, name, email, password_hash
+                FROM users
+                WHERE LOWER(name) LIKE LOWER(?)
+                   OR LOWER(email) LIKE LOWER(?)
+                ORDER BY
+                  CASE
+                    WHEN LOWER(name) = LOWER(?) THEN 0
+                    WHEN LOWER(name) LIKE LOWER(?) THEN 1
+                    ELSE 2
+                  END,
+                  name ASC,
+                  id ASC
+                LIMIT ?
+                """)) {
+            String contains = "%" + cleanQuery + "%";
+            String startsWith = cleanQuery + "%";
+            ps.setString(1, contains);
+            ps.setString(2, contains);
+            ps.setString(3, cleanQuery);
+            ps.setString(4, startsWith);
+            ps.setInt(5, normalizedLimit);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                List<User> users = new ArrayList<>();
+                while (rs.next()) {
+                    users.add(mapCoreUser(rs));
+                }
+                return users;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void saveProfile(Long userId, UserProfile profile) {
         try {
             conn.setAutoCommit(false);

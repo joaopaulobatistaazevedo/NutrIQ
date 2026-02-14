@@ -58,7 +58,7 @@ public class Main {
         RecipeService    recipeService    = new RecipeService(recipeDAO, globalRecipeDAO);
         MealPlanService  mealPlanService  = new MealPlanService(globalMealPlanDAO, globalRecipeDAO, recipeDAO);
         SocialService    socialService    = new SocialService(
-                postDAO, friendshipDAO, globalRecipeDAO, recipeDAO);
+                postDAO, friendshipDAO, globalRecipeDAO, userDAO, recipeDAO);
         ShoppingCartService shoppingCartService = new ShoppingCartService(shoppingCartSnapshotDAO);
 
         // ── Controllers ───────────────────────────────────────────
@@ -355,6 +355,13 @@ public class Main {
         app.post("/api/social/friends/request", ctx -> {
             Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             ctx.status(201).json(socialController.sendFriendRequest(userId, ctx.body()));
+        });
+
+        app.get("/api/social/users/search", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            String q = ctx.queryParam("q");
+            Integer limit = ctx.queryParam("limit") == null ? null : intParam(ctx.queryParam("limit"), 10);
+            ctx.json(socialController.searchUsers(userId, q, limit));
         });
 
         app.post("/api/social/friends/{friendshipId}/accept", ctx -> {

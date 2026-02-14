@@ -11,6 +11,7 @@ import {
   fetchPendingReceivedRequests,
   fetchPendingSentRequests,
   getPostInteractions,
+  searchUsersForFriendRequest,
   sendFriendRequest,
   togglePostKudo,
 } from '../services/nutriSocialService';
@@ -31,19 +32,42 @@ function prettyDate(value) {
   return parsed.toLocaleString('pt-PT');
 }
 
-function usernameFromId(userId, currentUserId) {
+function usernameFromId(userId, currentUserId, userDirectory) {
+  const numericUserId = Number(userId || 0);
+  if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
+    return 'Utilizador';
+  }
   if (Number(userId) === Number(currentUserId)) {
     return 'Tu';
   }
-  return `Chef #${userId}`;
+  const user = userDirectory.get(numericUserId);
+  const candidateName = String(user?.name || '').trim();
+  return candidateName || `Chef #${numericUserId}`;
+}
+
+function avatarForUser(userId, userDirectory) {
+  const numericUserId = Number(userId || 0);
+  const user = userDirectory.get(numericUserId);
+  const label = String(user?.name || `Chef ${numericUserId || '0'}`).trim();
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=E2E8F0&color=0F172A&rounded=true&size=96`;
+}
+
+function relationStatusLabel(status) {
+  const normalized = String(status || '').trim().toUpperCase();
+  if (normalized === 'FRIEND') return 'Já amigo';
+  if (normalized === 'REQUEST_SENT') return 'Pedido enviado';
+  if (normalized === 'REQUEST_RECEIVED') return 'Pedido recebido';
+  return 'Disponível';
 }
 
 export default function NutriSocial() {
   const authSession = getAuthSession();
   const token = String(authSession?.token || '').trim();
   const currentUserId = Number(authSession?.userId || 0);
+  const sessionName = String(authSession?.name || '').trim();
 
   const [streakCount, setStreakCount] = useState(0);
+  const [currentUserName, setCurrentUserName] = useState('');
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState('');
 
@@ -51,11 +75,15 @@ export default function NutriSocial() {
   const [friendActionLoadingId, setFriendActionLoadingId] = useState('');
   const [friendStatus, setFriendStatus] = useState('');
   const [friendError, setFriendError] = useState('');
-  const [newFriendId, setNewFriendId] = useState('');
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [friendSuggestions, setFriendSuggestions] = useState([]);
+  const [selectedFriendId, setSelectedFriendId] = useState('');
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [activePanel, setActivePanel] = useState('');
 
   const [feedPosts, setFeedPosts] = useState([]);
   const [friendIds, setFriendIds] = useState([]);
+  const [friendUsers, setFriendUsers] = useState([]);
   const [pendingReceived, setPendingReceived] = useState([]);
   const [pendingSent, setPendingSent] = useState([]);
   const [interactionsByPost, setInteractionsByPost] = useState({});
@@ -84,7 +112,23 @@ export default function NutriSocial() {
 
       setFeedPosts(Array.isArray(feed) ? feed : []);
       setStreakCount(Math.max(0, Number(profile?.profile?.streakCount || 0)));
-      setFriendIds(Array.isArray(friends) ? friends : []);
+      setCurrentUserName(String(profile?.name || sessionName || '').trim());
+      const friendIdsFromApi = Array.isArray(friends?.friendIds) ? friends.friendIds : [];
+      const friendUsersFromApi = Array.isArray(friends?.friends) ? friends.friends : [];
+      const normalizedFriends = friendUsersFromApi
+        .map((friend) => ({
+          id: Number(friend?.id),
+          name: String(friend?.name || '').trim(),
+          email: String(friend?.email || '').trim(),
+        }))
+        .filter((friend) => Number.isInteger(friend.id) && friend.id > 0);
+
+      setFriendUsers(normalizedFriends);
+      setFriendIds(
+        (friendIdsFromApi.length > 0 ? friendIdsFromApi : normalizedFriends.map((friend) => friend.id))
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0),
+      );
       setPendingReceived(Array.isArray(receivedRequests) ? receivedRequests : []);
       setPendingSent(Array.isArray(sentRequests) ? sentRequests : []);
     } catch (error) {
@@ -104,10 +148,110 @@ export default function NutriSocial() {
     setInteractionsByPost(getPostInteractions(postIds));
   }, [feedPosts]);
 
-  const storyIds = useMemo(() => {
-    const unique = [currentUserId, ...friendIds].filter((value, index, array) => value && array.indexOf(value) === index);
-    return unique.slice(0, 10);
-  }, [currentUserId, friendIds]);
+  useEffect(() => {
+    let cancelled = false;
+    const cleanQuery = String(friendSearchQuery || '').trim();
+
+    if (activePanel !== 'friends' || !token) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (cleanQuery.length < 2) {
+      setFriendSuggestions([]);
+      setSelectedFriendId('');
+      setIsSearchingUsers(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingUsers(true);
+      try {
+        const suggestions = await searchUsersForFriendRequest(token, cleanQuery, 12);
+        if (cancelled) {
+          return;
+        }
+        setFriendSuggestions(suggestions);
+        const hasSelected = suggestions.some((item) => Number(item?.id) === Number(selectedFriendId));
+        if (!hasSelected) {
+          const firstAvailable = suggestions.find((item) => String(item?.relationStatus || '').toUpperCase() === 'NONE');
+          setSelectedFriendId(firstAvailable ? String(firstAvailable.id) : '');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFriendError(error?.message || 'Não foi possível pesquisar utilizadores.');
+          setFriendSuggestions([]);
+          setSelectedFriendId('');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSearchingUsers(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activePanel, friendSearchQuery, token]);
+
+  const userDirectory = useMemo(() => {
+    const map = new Map();
+
+    if (currentUserId > 0) {
+      map.set(currentUserId, {
+        id: currentUserId,
+        name: currentUserName || sessionName || 'Tu',
+        email: '',
+      });
+    }
+
+    friendUsers.forEach((friend) => {
+      const id = Number(friend?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return;
+      }
+      map.set(id, {
+        id,
+        name: String(friend?.name || '').trim() || `Chef #${id}`,
+        email: String(friend?.email || '').trim(),
+      });
+    });
+
+    return map;
+  }, [currentUserId, currentUserName, friendUsers, sessionName]);
+
+  const storyUsers = useMemo(() => {
+    const list = [];
+    if (currentUserId > 0) {
+      list.push({
+        id: currentUserId,
+        name: currentUserName || sessionName || 'Tu',
+      });
+    }
+    friendUsers.forEach((friend) => {
+      const id = Number(friend?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return;
+      }
+      if (!list.some((entry) => entry.id === id)) {
+        list.push({
+          id,
+          name: String(friend?.name || '').trim() || `Chef #${id}`,
+        });
+      }
+    });
+    return list.slice(0, 10);
+  }, [currentUserId, currentUserName, friendUsers, sessionName]);
+
+  const selectedFriendSuggestion = useMemo(
+    () => friendSuggestions.find((item) => Number(item?.id) === Number(selectedFriendId)) || null,
+    [friendSuggestions, selectedFriendId],
+  );
 
   const getPostInteraction = (postId) => {
     const key = String(postId || '').trim();
@@ -116,10 +260,15 @@ export default function NutriSocial() {
 
   const handleSendFriendRequest = async (event) => {
     event.preventDefault();
-    const cleanId = String(newFriendId || '').trim();
+    const candidateId = Number(selectedFriendId);
 
-    if (!cleanId) {
-      setFriendError('Indica um ID de utilizador para enviar o pedido.');
+    if (!Number.isInteger(candidateId) || candidateId <= 0) {
+      setFriendError('Escolhe um utilizador na lista para enviar o pedido.');
+      return;
+    }
+
+    if (selectedFriendSuggestion && String(selectedFriendSuggestion?.relationStatus || '').toUpperCase() !== 'NONE') {
+      setFriendError(`Não é possível enviar pedido: ${relationStatusLabel(selectedFriendSuggestion.relationStatus)}.`);
       return;
     }
 
@@ -128,10 +277,12 @@ export default function NutriSocial() {
     setFriendStatus('');
 
     try {
-      await sendFriendRequest(token, cleanId);
+      await sendFriendRequest(token, candidateId);
       await loadData();
       setFriendStatus('Pedido de amizade enviado com sucesso.');
-      setNewFriendId('');
+      setFriendSearchQuery('');
+      setFriendSuggestions([]);
+      setSelectedFriendId('');
     } catch (error) {
       setFriendError(error?.message || 'Não foi possível enviar o pedido de amizade.');
     } finally {
@@ -233,13 +384,13 @@ export default function NutriSocial() {
           <div className="card mb-3">
             <div className="card-body py-3">
               <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
-                {storyIds.map((id, index) => (
-                  <button key={`story-${id}`} type="button" className="nutri-social-story-item">
-                    <span className="nutri-social-story-avatar">{String(id).slice(-2)}</span>
-                    <span className="nutri-social-story-label">{index === 0 ? 'Tu' : `#${id}`}</span>
+                {storyUsers.map((user, index) => (
+                  <button key={`story-${user.id}`} type="button" className="nutri-social-story-item">
+                    <span className="nutri-social-story-avatar">{String(user?.name || '').trim().slice(0, 2).toUpperCase() || String(user.id).slice(-2)}</span>
+                    <span className="nutri-social-story-label">{index === 0 ? 'Tu' : user.name}</span>
                   </button>
                 ))}
-                {storyIds.length === 0 ? <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p> : null}
+                {storyUsers.length === 0 ? <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p> : null}
               </div>
             </div>
           </div>
@@ -256,18 +407,49 @@ export default function NutriSocial() {
               <div className="card-body">
                 <form className="row g-2 mb-3" onSubmit={handleSendFriendRequest}>
                   <div className="col">
-                    <label className="form-label">ID do utilizador</label>
+                    <label className="form-label">Procurar por nome</label>
                     <input
                       className="form-control"
-                      type="number"
-                      min={1}
-                      value={newFriendId}
-                      onChange={(event) => setNewFriendId(event.target.value)}
-                      placeholder="Ex: 2"
+                      type="text"
+                      value={friendSearchQuery}
+                      onChange={(event) => {
+                        setFriendSearchQuery(event.target.value);
+                        setFriendError('');
+                        setFriendStatus('');
+                      }}
+                      placeholder="Ex: joao"
                     />
+                    <div className="form-text">
+                      Escreve pelo menos 2 caracteres para pesquisar utilizadores.
+                    </div>
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label">Resultados</label>
+                    <select
+                      className="form-select"
+                      value={selectedFriendId}
+                      onChange={(event) => setSelectedFriendId(event.target.value)}
+                      disabled={friendSuggestions.length === 0}
+                    >
+                      <option value="">Seleciona um utilizador</option>
+                      {friendSuggestions.map((suggestion) => (
+                        <option key={`friend-suggestion-${suggestion.id}`} value={suggestion.id}>
+                          {suggestion.name || `Utilizador #${suggestion.id}`} {suggestion.email ? `(${suggestion.email})` : ''} - {relationStatusLabel(suggestion.relationStatus)}
+                        </option>
+                      ))}
+                    </select>
+                    {isSearchingUsers ? <div className="form-text">A pesquisar utilizadores...</div> : null}
                   </div>
                   <div className="col-auto d-flex align-items-end">
-                    <button type="submit" className="btn btn-primary d-inline-flex align-items-center gap-2" disabled={friendActionLoadingId === 'send'}>
+                    <button
+                      type="submit"
+                      className="btn btn-primary d-inline-flex align-items-center gap-2"
+                      disabled={
+                        friendActionLoadingId === 'send'
+                        || !selectedFriendSuggestion
+                        || String(selectedFriendSuggestion?.relationStatus || '').toUpperCase() !== 'NONE'
+                      }
+                    >
                       <UserPlus size={16} />
                       {friendActionLoadingId === 'send' ? 'A enviar...' : 'Adicionar amigo'}
                     </button>
@@ -283,11 +465,14 @@ export default function NutriSocial() {
                     <div className="col-12 col-lg-4">
                       <div className="border rounded-3 p-3 h-100">
                         <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
-                        {friendIds.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
-                        {friendIds.length > 0 ? (
-                          <div className="d-flex flex-wrap gap-2">
-                            {friendIds.map((friendId) => (
-                              <span className="badge" key={`friend-id-${friendId}`}>#{friendId}</span>
+                        {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
+                        {friendUsers.length > 0 ? (
+                          <div className="d-flex flex-column gap-2">
+                            {friendUsers.map((friend) => (
+                              <div className="small" key={`friend-id-${friend.id}`}>
+                                <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
+                                {friend.email ? <span className="text-secondary"> ({friend.email})</span> : null}
+                              </div>
                             ))}
                           </div>
                         ) : null}
@@ -378,7 +563,7 @@ export default function NutriSocial() {
                       <div className="card-header d-flex justify-content-between align-items-center">
                         <div className="d-flex align-items-center gap-2">
                           <span className="avatar avatar-sm">{String(post.userId || '').slice(-2)}</span>
-                          <span className="fw-semibold">{usernameFromId(post.userId, currentUserId)}</span>
+                          <span className="fw-semibold">{usernameFromId(post.userId, currentUserId, userDirectory)}</span>
                         </div>
                         <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
                       </div>
@@ -403,6 +588,43 @@ export default function NutriSocial() {
                           </span>
                         </div>
 
+                        {kudosCount > 0 ? (
+                          (() => {
+                            const kudoUsers = Object.entries(interaction.kudosByUser || {})
+                              .map(([userId, createdAt]) => ({
+                                userId: Number(userId),
+                                createdAt: String(createdAt || ''),
+                              }))
+                              .filter((item) => Number.isInteger(item.userId) && item.userId > 0)
+                              .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+                            const highlightedUsers = kudoUsers.slice(0, 3);
+                            const remainingUsers = Math.max(0, kudoUsers.length - highlightedUsers.length);
+
+                            return (
+                              <div className="nutri-social-kudo-summary mb-2">
+                                <div className="nutri-social-kudo-avatars">
+                                  {highlightedUsers.map((item, index) => (
+                                    <img
+                                      key={`kudo-${post.id}-${item.userId}-${index}`}
+                                      className="nutri-social-kudo-avatar"
+                                      src={avatarForUser(item.userId, userDirectory)}
+                                      alt={usernameFromId(item.userId, currentUserId, userDirectory)}
+                                      title={usernameFromId(item.userId, currentUserId, userDirectory)}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="nutri-social-kudo-text">
+                                  {remainingUsers > 0
+                                    ? `e mais ${remainingUsers} utilizadores`
+                                    : highlightedUsers.length === 1
+                                      ? '1 utilizador deu kudo'
+                                      : `${highlightedUsers.length} utilizadores deram kudos`}
+                                </span>
+                              </div>
+                            );
+                          })()
+                        ) : null}
+
                         <form className="nutri-social-comment-form" onSubmit={(event) => handleCommentSubmit(event, post.id)}>
                           <input
                             className="form-control"
@@ -425,7 +647,7 @@ export default function NutriSocial() {
                           <div className="nutri-social-comment-list mt-2">
                             {comments.slice(0, 4).map((comment) => (
                               <div className="nutri-social-comment-item" key={comment.id}>
-                                <strong>{usernameFromId(comment.userId, currentUserId)}</strong>
+                                <strong>{usernameFromId(comment.userId, currentUserId, userDirectory)}</strong>
                                 <span>{comment.text}</span>
                                 <small>{prettyDate(comment.createdAt)}</small>
                               </div>

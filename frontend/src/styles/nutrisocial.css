@@ -465,6 +465,37 @@
   gap: 8px;
 }
 
+.nutri-social-kudo-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-social-kudo-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.nutri-social-kudo-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  object-fit: cover;
+  margin-left: -6px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.nutri-social-kudo-avatar:first-child {
+  margin-left: 0;
+}
+
+.nutri-social-kudo-text {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  font-weight: 600;
+}
+
 .nutri-social-comment-form {
   display: grid;
   grid-template-columns: 1fr auto;

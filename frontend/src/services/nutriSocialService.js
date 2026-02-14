@@ -69,7 +69,29 @@ export async function fetchFriends(token) {
     const { data } = await client.get('/api/social/friends', {
       headers: buildAuthHeaders(token),
     });
-    return Array.isArray(data?.friendIds) ? data.friendIds : [];
+    const friendIds = Array.isArray(data?.friendIds) ? data.friendIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0) : [];
+    const friends = Array.isArray(data?.friends) ? data.friends : [];
+    return { friendIds, friends };
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function searchUsersForFriendRequest(token, query, limit = 10) {
+  const cleanQuery = String(query || '').trim();
+  if (cleanQuery.length < 2) {
+    return [];
+  }
+
+  try {
+    const { data } = await client.get('/api/social/users/search', {
+      headers: buildAuthHeaders(token),
+      params: {
+        q: cleanQuery,
+        limit: Math.max(1, Math.min(20, Number(limit) || 10)),
+      },
+    });
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     throw new Error(normalizeError(error));
   }
