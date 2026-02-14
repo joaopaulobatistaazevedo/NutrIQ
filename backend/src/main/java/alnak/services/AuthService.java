@@ -1,7 +1,7 @@
 package alnak.services;
 
 import alnak.business_logic.entities.User;
-import alnak.data.UserDAO;
+import alnak.data.global.UserDAO;
 import alnak.dto.AuthResponse;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;

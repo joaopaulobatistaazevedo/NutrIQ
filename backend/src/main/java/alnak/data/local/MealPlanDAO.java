@@ -1,4 +1,4 @@
-package alnak.data;
+package alnak.data.local;
 
 import alnak.business_logic.entities.MealPlan;
 import alnak.business_logic.entities.MealType;
@@ -21,7 +21,7 @@ public class MealPlanDAO extends AbstractList<MealPlan> {
     private final RecipeDAO recipeDAO;
 
     public MealPlanDAO() {
-        this.conn      = Database.getInstance().getConnection();
+        this.conn      = LocalDatabase.getInstance().getConnection();
         this.recipeDAO = new RecipeDAO();
     }
 

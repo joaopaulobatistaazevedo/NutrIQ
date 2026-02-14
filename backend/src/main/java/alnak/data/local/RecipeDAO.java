@@ -1,4 +1,4 @@
-package alnak.data;
+package alnak.data.local;
 
 import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.Ingredient;
@@ -19,7 +19,7 @@ public class RecipeDAO extends AbstractMap<Integer, Recipe> {
     private final Connection conn;
 
     public RecipeDAO() {
-        this.conn = Database.getInstance().getConnection();
+        this.conn = LocalDatabase.getInstance().getConnection();
     }
 
     // ── AbstractMap contract ──────────────────────────────────────

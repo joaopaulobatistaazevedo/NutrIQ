@@ -1,7 +1,7 @@
 package alnak.services;
 
 import alnak.business_logic.entities.IngredientMarketPrice;
-import alnak.data.IngredientMarketPriceDAO;
+import alnak.data.local.IngredientMarketPriceDAO;
 import alnak.dto.PriceImportResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
