@@ -1,30 +1,28 @@
-/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Flame, Layers, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers } from 'lucide-react';
 import Layout from '../components/Layout';
-import PageHeader from '../components/PageHeader';
 import { fetchRecipes } from '../services/recipeService';
 import '../styles/recipes.css';
 
 const CATEGORY_META = {
   BREAKFAST: {
     id: 'breakfast',
-    title: 'Pequeno-almoço',
+    title: 'Base: Pequeno-almoço',
     description: 'Receitas para começar o dia com energia.',
   },
   LUNCH: {
     id: 'lunch',
-    title: 'Almoço',
+    title: 'Base: Almoço',
     description: 'Pratos principais para meio do dia.',
   },
   DINNER: {
     id: 'dinner',
-    title: 'Jantar',
+    title: 'Base: Jantar',
     description: 'Receitas ideais para o final do dia.',
   },
   SNACK: {
     id: 'snack',
-    title: 'Snack',
+    title: 'Base: Snack',
     description: 'Opções rápidas entre refeições.',
   },
 };
@@ -33,36 +31,37 @@ const CATEGORY_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
 
 function normalizeMealType(value) {
   const normalized = String(value || '').trim().toUpperCase();
-  if (CATEGORY_META[normalized]) {
-    return normalized;
-  }
+  if (CATEGORY_META[normalized]) return normalized;
   return 'DINNER';
 }
 
 function formatDuration(recipe) {
   const total = Number(recipe?.totalTimeMin || 0);
-  if (total > 0) {
-    return `${total} min`;
-  }
+  if (total > 0) return `${total} min`;
   const prep = Number(recipe?.prepTimeMin || 0);
   const cook = Number(recipe?.cookTimeMin || 0);
   const fallback = prep + cook;
-  if (fallback > 0) {
-    return `${fallback} min`;
+  return fallback > 0 ? `${fallback} min` : '--';
+}
+
+function formatPrice(recipe) {
+  const candidates = [recipe?.price, recipe?.estimatedCostPerServing, recipe?.estimatedCost];
+  for (const candidate of candidates) {
+    const amount = Number(candidate);
+    if (Number.isFinite(amount) && amount > 0) {
+      return `€${amount.toFixed(2)}`;
+    }
   }
-  return '--';
+  return '€--';
 }
 
 function recipeImageFor(recipe) {
   const fromBackend = String(recipe?.imageUrl || '').trim();
-  if (fromBackend) {
-    return fromBackend;
-  }
+  if (fromBackend) return fromBackend;
   const seed = encodeURIComponent(String(recipe?.name || 'recipe').toLowerCase().replace(/\s+/g, '-'));
   return `https://picsum.photos/seed/${seed}/900/560`;
 }
 
-// eslint-disable-next-line react/prop-types
 function CategoryCarousel({ category }) {
   const trackRef = useRef(null);
 
@@ -107,26 +106,26 @@ function CategoryCarousel({ category }) {
 
       <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
         {category.recipes.map((recipe) => {
-          const imageSrc = recipeImageFor(recipe);
-          const sourceUrl = String(recipe.sourceUrl || '').trim();
+          const sourceUrl = String(recipe?.sourceUrl || '').trim();
           const hasSourceUrl = sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://');
 
           return (
-            <article key={recipe.id} className="recipe-card">
+            <article key={recipe?.id || recipe?.name} className="recipe-card">
               <img
-                src={imageSrc}
-                alt={recipe.name}
+                src={recipeImageFor(recipe)}
+                alt={recipe?.name || 'Receita'}
                 loading="lazy"
                 className="recipe-thumb"
                 onError={(event) => {
-                  event.currentTarget.src = recipeImageFor({ name: `${recipe.name}-fallback` });
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
                 }}
               />
               <p className="recipe-badge">
                 <Layers size={13} />
                 {category.title}
               </p>
-              <h3>{recipe.name}</h3>
+              <h3>{recipe?.name || 'Receita sem nome'}</h3>
 
               <div className="recipe-meta">
                 <span>
@@ -135,11 +134,11 @@ function CategoryCarousel({ category }) {
                 </span>
                 <span>
                   <Flame size={14} />
-                  {Number(recipe.calories || 0) > 0 ? `${Math.round(recipe.calories)} kcal` : 'kcal N/A'}
+                  {Number(recipe?.calories || 0) > 0 ? `${Math.round(recipe.calories)} kcal` : 'kcal N/A'}
                 </span>
                 <span>
-                  <Users size={14} />
-                  {Math.max(1, Number(recipe.servings || 1))} porções
+                  <Euro size={14} />
+                  {formatPrice(recipe)}
                 </span>
               </div>
 
@@ -149,7 +148,7 @@ function CategoryCarousel({ category }) {
                 </a>
               ) : (
                 <button type="button" className="recipe-open-btn" disabled>
-                  Sem link de origem
+                  Ver receita
                 </button>
               )}
             </article>
@@ -173,19 +172,13 @@ export default function Recipes() {
       setError('');
       try {
         const data = await fetchRecipes({ limit: 300 });
-        if (!isMounted) {
-          return;
-        }
-        setRecipes(data);
+        if (!isMounted) return;
+        setRecipes(Array.isArray(data) ? data : []);
       } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-        setError(loadError.message || 'Não foi possível carregar as receitas.');
+        if (!isMounted) return;
+        setError(loadError?.message || 'Não foi possível carregar as receitas.');
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     };
 
@@ -204,7 +197,7 @@ export default function Recipes() {
     };
 
     recipes.forEach((recipe) => {
-      const mealType = normalizeMealType(recipe.mealType);
+      const mealType = normalizeMealType(recipe?.mealType);
       grouped[mealType].push(recipe);
     });
 
@@ -219,19 +212,23 @@ export default function Recipes() {
   return (
     <Layout>
       <div className="recipes-page">
-        <PageHeader
-          className="recipes-header"
-          title="Receitas da Base de Dados"
-          subtitle="Receitas carregadas da tabela `recipes` do backend, com as respetivas fotos."
-        />
+        <header className="recipes-header">
+          <div>
+            <h1>Receitas por Base</h1>
+            <p>
+              Organização por categoria para veres receitas parecidas juntas
+              como pediste (ex: carbonara e bolonhesa na base massa).
+            </p>
+          </div>
+        </header>
 
         {isLoading ? <p className="recipes-feedback">A carregar receitas...</p> : null}
         {!isLoading && error ? <p className="recipes-feedback recipes-feedback-error">{error}</p> : null}
-        {!isLoading && !error && groupedCategories.length === 0 ? (
-          <p className="recipes-feedback">Sem receitas na base de dados. Corre o scraper/import primeiro.</p>
-        ) : null}
 
         <div className="recipes-categories">
+          {!isLoading && !error && groupedCategories.length === 0 ? (
+            <p className="recipes-feedback">Sem receitas na base de dados.</p>
+          ) : null}
           {groupedCategories.map((category) => (
             <CategoryCarousel key={category.id} category={category} />
           ))}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart3, Flame, TrendingUp, Wallet } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import Layout from '../components/Layout';
-import PageHeader from '../components/PageHeader';
 import { fetchMyProfile } from '../services/userService';
 import { listLatestPrices } from '../services/priceService';
 import { getAuthSession } from '../utils/authSession';
@@ -124,24 +124,29 @@ export default function Progress() {
     };
   }, [budget, calories]);
 
+  const chartData = useMemo(
+    () =>
+      WEEK.map((day, index) => ({
+        day,
+        calories: calories[index],
+        priceLabel: `€${budget[index].toFixed(2)}`,
+      })),
+    [budget, calories],
+  );
+
   return (
     <Layout>
       <div className="progress-page">
-        <PageHeader
-          className="progress-header"
-          title="Progresso Semanal"
-          subtitle={
-            loadError
-              ? `Ligação parcial ao backend: ${loadError}`
-              : 'Resumo estimado com base no perfil do utilizador e preços importados.'
-          }
-          tag={(
-            <div className="progress-tag">
-              <BarChart3 size={16} />
-              {isLoading ? 'A sincronizar...' : 'Últimos 7 dias'}
-            </div>
-          )}
-        />
+        <header className="progress-header">
+          <div>
+            <h1>Progresso Semanal</h1>
+            <p>Resumo simples da tua evolução em calorias, consistência e custo diário.</p>
+          </div>
+          <div className="progress-tag">
+            <BarChart3 size={16} />
+            {isLoading ? 'A sincronizar...' : 'Últimos 7 dias'}
+          </div>
+        </header>
 
         <section className="progress-summary-grid">
           <article className="progress-summary-card">
@@ -158,43 +163,39 @@ export default function Progress() {
 
           <article className="progress-summary-card">
             <span className="progress-summary-icon"><TrendingUp size={16} /></span>
-            <strong>{summary.adherence}%</strong>
+            <strong>{summary.adherence > 0 ? '+' : ''}{summary.adherence}%</strong>
             <p>Consistência</p>
           </article>
         </section>
 
-        <section className="progress-chart-card">
-          <h2>Calorias por dia</h2>
-          <div className="progress-bars">
-            {calories.map((value, index) => {
-              const height = Math.max(26, (value / 2400) * 100);
-              return (
-                <div key={WEEK[index]} className="progress-bar-col">
-                  <div className="progress-bar-track">
-                    <div className="progress-bar-fill" style={{ height: `${height}%` }} />
-                  </div>
-                  <span>{WEEK[index]}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="progress-table-card">
-          <h2>Detalhe diário</h2>
-          <div className="progress-table">
-            <div className="progress-row progress-head">
-              <span>Dia</span>
-              <span>Calorias</span>
-              <span>Custo</span>
+        <section className="progress-combined-card">
+          <div className="progress-combined-block">
+            <h2>Calorias por dia</h2>
+            <div className="progress-merged-chart">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 28, right: 14, left: 4, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#dce5f0" />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                    tick={{ fill: '#90a0b6', fontSize: 12 }}
+                    tickFormatter={(value) => `${value}`}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(34, 204, 154, 0.08)' }}
+                    contentStyle={{ borderRadius: 12, border: '1px solid #d4deeb', background: '#f9fbfd' }}
+                    labelStyle={{ color: '#1e293b' }}
+                    formatter={(value) => [`${value} kcal`, 'Calorias']}
+                  />
+                  <Bar dataKey="calories" fill="#22cc9a" radius={[8, 8, 0, 0]} maxBarSize={52}>
+                    <LabelList dataKey="priceLabel" position="top" fill="#334155" fontSize={12} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            {WEEK.map((day, index) => (
-              <div className="progress-row" key={day}>
-                <span>{day}</span>
-                <span>{calories[index]} kcal</span>
-                <span>€{budget[index].toFixed(2)}</span>
-              </div>
-            ))}
+            {loadError ? <p className="progress-load-note">{loadError}</p> : null}
           </div>
         </section>
       </div>

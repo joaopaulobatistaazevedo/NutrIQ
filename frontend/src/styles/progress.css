@@ -75,7 +75,8 @@
 }
 
 .progress-chart-card,
-.progress-table-card {
+.progress-table-card,
+.progress-combined-card {
   background: #eef2f7;
   border-radius: 18px;
   padding: 20px;
@@ -83,10 +84,26 @@
 }
 
 .progress-chart-card h2,
-.progress-table-card h2 {
+.progress-table-card h2,
+.progress-combined-card h2 {
   font-size: 18px;
   color: #0f172a;
   margin-bottom: 14px;
+}
+
+.progress-combined-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.progress-combined-block h2 {
+  margin-bottom: 14px;
+}
+
+.progress-merged-chart {
+  width: 100%;
+  height: 320px;
 }
 
 .progress-bars {
@@ -149,6 +166,56 @@
   color: #0f172a;
 }
 
+/* Dashboard palette sync */
+.progress-header h1,
+.progress-chart-card h2,
+.progress-table-card h2,
+.progress-summary-card strong,
+.progress-row.progress-head {
+  color: var(--app-text-strong);
+}
+
+.progress-header p,
+.progress-summary-card p,
+.progress-bar-col span {
+  color: var(--app-text-muted);
+}
+
+.progress-tag,
+.progress-summary-card,
+.progress-chart-card,
+.progress-table-card,
+.progress-combined-card {
+  background: var(--app-surface-1);
+  border-color: var(--app-border-1);
+}
+
+.progress-tag,
+.progress-row {
+  color: var(--app-text-main);
+}
+
+.progress-summary-icon {
+  background: var(--app-accent-soft);
+  color: var(--app-accent-strong);
+}
+
+.progress-bar-track {
+  background: #b8c5d8;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(180deg, #22cc9a, #18b384);
+}
+
+.progress-row {
+  background: var(--app-surface-2);
+}
+
+.progress-row.progress-head {
+  background: #dce6f2;
+}
+
 @media (max-width: 900px) {
   .progress-summary-grid {
     grid-template-columns: 1fr;
@@ -173,4 +240,72 @@
   .progress-row {
     grid-template-columns: 0.8fr 1fr 1fr;
   }
+}
+
+/* Reference style sync (like MealPlan) */
+.progress-header {
+  padding: 4px 2px;
+}
+
+.progress-header h1 {
+  color: #0f172a;
+}
+
+.progress-header p {
+  color: #90a0b6;
+}
+
+.progress-tag {
+  background: #f8fbff;
+  border: 1px solid #c5d0df;
+  color: #334155;
+}
+
+.progress-summary-card,
+.progress-chart-card,
+.progress-table-card,
+.progress-combined-card {
+  background: #f9fbfd;
+  border: 1px solid #d4deeb;
+}
+
+.progress-summary-card strong,
+.progress-chart-card h2,
+.progress-table-card h2,
+.progress-combined-card h2,
+.progress-row.progress-head {
+  color: #1e293b;
+}
+
+.progress-summary-card p,
+.progress-bar-col span {
+  color: #90a0b6;
+}
+
+.progress-summary-icon {
+  background: #eaf8f2;
+  color: #0f766e;
+}
+
+.progress-bar-track {
+  background: #dce5f0;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(180deg, #22cc9a, #18b384);
+}
+
+.progress-row {
+  background: #f2f6fb;
+  color: #64748b;
+}
+
+.progress-row.progress-head {
+  background: #e9eff7;
+}
+
+.progress-load-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #b45309;
 }

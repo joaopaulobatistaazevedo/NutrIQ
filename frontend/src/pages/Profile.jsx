@@ -9,9 +9,7 @@ import {
   PencilLine,
   Salad,
   Target,
-  TrendingUp,
   Bike,
-  Clock3,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { PROFILE_KEY } from '../constants/storageKeys';
@@ -285,7 +283,7 @@ export default function Profile() {
             <div className="prof-id">
               <div className="prof-name-row">
                 <h1>{formState.name || 'Utilizador'}</h1>
-                <span className="prof-streak-pill"><Flame size={12} /> Streak 12 dias</span>
+                <span className="prof-streak-pill"><Flame size={16} /> Streak 12 dias</span>
               </div>
               <p className="prof-location">
                 <MapPin size={14} />
@@ -317,39 +315,23 @@ export default function Profile() {
                 <Target size={16} /> {goalLabel}
               </button>
             </div>
-          </div>
-        </motion.section>
 
-        <motion.section className="prof-story" {...fade}>
-          <article className="prof-story-image">
-            <div className="prof-story-chip">
-              <Clock3 size={14} /> meal prep 3x semana
-            </div>
-          </article>
-
-          <article className="prof-story-content">
-            <h2>Jornada atual</h2>
-            <p>
-              O foco deste mês é consistência. Estes indicadores são ajustados com base no teu
-              perfil real guardado no backend.
-            </p>
-
-            <ul className="prof-routine-list">
+            <div className="prof-journey-inline">
+              <span className="prof-journey-label">Jornada atual</span>
+              <ul className="prof-journey-list">
               {routine.map((item) => {
                 const Icon = item.icon;
                 return (
                   <li key={item.title}>
-                    <span className="prof-routine-ic"><Icon size={15} /></span>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>{item.detail}</p>
-                    </div>
-                    <span className="prof-routine-trend"><TrendingUp size={12} /> {item.trend}</span>
+                    <span className="prof-journey-ic"><Icon size={13} /></span>
+                    <span className="prof-journey-title">{item.title}</span>
+                    <strong>{item.trend}</strong>
                   </li>
                 );
               })}
-            </ul>
-          </article>
+              </ul>
+            </div>
+          </div>
         </motion.section>
 
         <motion.section className="prof-gallery" {...fade}>
