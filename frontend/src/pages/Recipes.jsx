@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers } from 'lucide-react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import '../styles/recipes.css';
 
 const RECIPE_CATEGORIES = [
@@ -130,15 +131,11 @@ export default function Recipes() {
   return (
     <Layout>
       <div className="recipes-page">
-        <header className="recipes-header">
-          <div>
-            <h1>Receitas por Base</h1>
-            <p>
-              Organização por categoria para veres receitas parecidas juntas
-              como pediste (ex: carbonara e bolonhesa na base massa).
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          className="recipes-header"
+          title="Receitas por Base"
+          subtitle="Organização por categoria para veres receitas parecidas juntas como pediste (ex: carbonara e bolonhesa na base massa)."
+        />
 
         <div className="recipes-categories">
           {RECIPE_CATEGORIES.map((category) => (

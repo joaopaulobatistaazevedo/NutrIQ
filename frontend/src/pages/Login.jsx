@@ -1,7 +1,8 @@
 // src/pages/Login.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
+import { setAuthenticated } from '../utils/authSession';
 import '../styles/auth.css';
 
 export default function Login() {
@@ -11,6 +12,7 @@ export default function Login() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setAuthenticated(true);
     navigate('/dashboard');
   };
 
@@ -37,11 +39,11 @@ export default function Login() {
               <label>Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
             </div>
-            <a href="#" className="auth-forgot">Esqueceste-te da password?</a>
+            <button type="button" className="auth-forgot">Esqueceste-te da password?</button>
             <button type="submit" className="auth-submit">Entrar</button>
           </form>
 
-          <p className="auth-footer">Ainda não tens conta? <a href="/register">Criar conta</a></p>
+          <p className="auth-footer">Ainda não tens conta? <Link to="/register">Criar conta</Link></p>
         </div>
 
         {/* Side visual */}

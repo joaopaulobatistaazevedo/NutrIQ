@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { BarChart3, Flame, TrendingUp, Wallet } from 'lucide-react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import '../styles/progress.css';
 
 const WEEK = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -18,16 +19,17 @@ export default function Progress() {
   return (
     <Layout>
       <div className="progress-page">
-        <header className="progress-header">
-          <div>
-            <h1>Progresso Semanal</h1>
-            <p>Resumo simples da tua evolução em calorias, consistência e custo diário.</p>
-          </div>
-          <div className="progress-tag">
-            <BarChart3 size={16} />
-            Últimos 7 dias
-          </div>
-        </header>
+        <PageHeader
+          className="progress-header"
+          title="Progresso Semanal"
+          subtitle="Resumo simples da tua evolução em calorias, consistência e custo diário."
+          tag={(
+            <div className="progress-tag">
+              <BarChart3 size={16} />
+              Últimos 7 dias
+            </div>
+          )}
+        />
 
         <section className="progress-summary-grid">
           <article className="progress-summary-card">

@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { HeartHandshake, ArrowRight } from 'lucide-react';
 import Dashboard from './Dashboard';
+import { PROFILE_KEY } from '../constants/storageKeys';
+import { setAuthenticated } from '../utils/authSession';
 import '../styles/bot-onboarding.css';
-
-const PROFILE_KEY = 'nutribot_profile';
 
 const STEPS = [
   {
@@ -90,6 +90,7 @@ export default function BotOnboarding() {
 
     if (isLastStep) {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(nextProfile));
+      setAuthenticated(true);
       setIsCompleted(true);
       return;
     }

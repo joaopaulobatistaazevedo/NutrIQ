@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CheckSquare, Circle, Minus, Plus, ShoppingCart, Store, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import '../styles/shopping.css';
 
 const INITIAL_LISTS = {
@@ -155,16 +156,17 @@ export default function Shopping() {
   return (
     <Layout>
       <div className="shopping-page">
-        <header className="shopping-header">
-          <div>
-            <h1>Lista de Compras</h1>
-            <p>Organiza por loja, ajusta quantidades e acompanha o total em tempo real.</p>
-          </div>
-          <div className="shopping-header-tag">
-            <ShoppingCart size={16} />
-            Lista do dia
-          </div>
-        </header>
+        <PageHeader
+          className="shopping-header"
+          title="Lista de Compras"
+          subtitle="Organiza por loja, ajusta quantidades e acompanha o total em tempo real."
+          tag={(
+            <div className="shopping-header-tag">
+              <ShoppingCart size={16} />
+              Lista do dia
+            </div>
+          )}
+        />
 
         <div className="shopping-grid">
           <section className="shopping-lists-panel">

@@ -148,12 +148,17 @@
 /* Links */
 .auth-forgot {
   display: block;
+  width: 100%;
   text-align: right;
   font-size: 13px;
   color: #34d399;
   font-weight: 600;
   text-decoration: none;
   margin-bottom: 22px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 .auth-forgot:hover { text-decoration: underline; }
 
