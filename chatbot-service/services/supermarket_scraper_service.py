@@ -85,17 +85,28 @@ class PricedRecipe:
 
     @classmethod
     def from_dto(cls, dto: dict[str, Any], cost_per_serving: float = 0.0) -> "PricedRecipe":
+        nutrition = dto.get("nutritionalInfo") or {}
+        ingredients_raw = dto.get("ingredients") or []
+        ingredients = []
+        for item in ingredients_raw:
+            if isinstance(item, dict):
+                name = item.get("ingredientName")
+                if name:
+                    ingredients.append(str(name))
+            elif isinstance(item, str):
+                ingredients.append(item)
+
         return cls(
             id=str(dto.get("id", "")),
-            title=str(dto.get("title", "")),
+            title=str(dto.get("title") or dto.get("name") or ""),
             url=str(dto.get("url", "")),
-            source=str(dto.get("source", "")),
-            calories_per_serving=_to_float(dto.get("calories_per_serving")),
-            protein_g=_to_float(dto.get("protein_g")),
-            fat_g=_to_float(dto.get("fat_g")),
-            carbs_g=_to_float(dto.get("carbs_g")),
-            ingredients=dto.get("ingredients") or [],
-            total_time_minutes=_to_int(dto.get("total_time_minutes")),
+            source=str(dto.get("source", "backend")),
+            calories_per_serving=_to_float(dto.get("calories_per_serving") or nutrition.get("calories")),
+            protein_g=_to_float(dto.get("protein_g") or nutrition.get("proteinG")),
+            fat_g=_to_float(dto.get("fat_g") or nutrition.get("fatG")),
+            carbs_g=_to_float(dto.get("carbs_g") or nutrition.get("carbsG")),
+            ingredients=ingredients,
+            total_time_minutes=_to_int(dto.get("total_time_minutes") or dto.get("totalTimeMin")),
             servings=_to_int(dto.get("servings")),
             cost_per_serving=cost_per_serving,
         )
@@ -127,18 +138,14 @@ class SupermarketScraperService:
 
     def fetch_priced_recipes(self) -> list[PricedRecipe]:
         """
-        Main entry point.  Returns a list of PricedRecipe objects with
-        cost_per_serving populated from live supermarket data.
+        Main entry point. Returns a list of PricedRecipe objects from Java.
 
-        Steps:
-          1. Fetch all recipe stubs from Java (id + basic metadata)
-          2. For each recipe, fetch its cost_per_serving from Java
-             (Java internally calls the supermarket scraper)
-          3. Assemble PricedRecipe objects
-
-        Falls back gracefully: if a cost cannot be fetched the recipe is
-        kept with cost_per_serving = DEFAULT_COST_FALLBACK so it still
-        participates in planning.
+        Contract aligned with backend RecipeResponse:
+          - name (not title)
+          - nutritionalInfo.{calories, proteinG, carbsG, fatG}
+          - totalTimeMin
+          - costPerServing
+          - ingredients: list[{ingredientName, ...}]
         """
         logger.info("Fetching recipe catalogue from Java service at %s", self._base)
         recipes_raw = self._get_json("/api/recipes")
@@ -148,11 +155,12 @@ class SupermarketScraperService:
 
         priced: list[PricedRecipe] = []
         for dto in recipes_raw:
-            if not isinstance(dto, dict) or not dto.get("id"):
+            if not isinstance(dto, dict) or dto.get("id") is None:
                 continue
 
-            recipe_id = str(dto["id"])
-            cost = self._fetch_cost_per_serving(recipe_id)
+            cost = _to_float(dto.get("costPerServing"))
+            if cost is None or cost <= 0:
+                cost = self.DEFAULT_COST_FALLBACK
             priced.append(PricedRecipe.from_dto(dto, cost_per_serving=cost))
 
         logger.info("Loaded %d priced recipes from Java service", len(priced))
@@ -181,14 +189,15 @@ class SupermarketScraperService:
     # ──────────────────────────────────────────────────────────────────────
 
     def _fetch_cost_per_serving(self, recipe_id: str) -> float:
+        # Kept for backward compatibility with older backends.
         try:
             data = self._get_json(f"/api/recipes/{recipe_id}/cost")
             if isinstance(data, dict):
                 cost = data.get("cost_per_serving")
                 if cost is not None:
                     return float(cost)
-        except Exception as exc:
-            logger.debug("Cost fetch failed for recipe %s: %s", recipe_id, exc)
+        except Exception:
+            pass
         return self.DEFAULT_COST_FALLBACK
 
     def _get_json(self, path: str) -> Any:

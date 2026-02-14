@@ -166,16 +166,17 @@ class GoalMealPlannerService:
     def _load_fallback_recipes(self) -> list[PricedRecipe]:
         """Wrap old RecipeRecord objects as PricedRecipes with a default cost."""
         try:
-            from recipe_scraper.scraper import RecipeScraper, flatten_scrape_result, load_recipes_from_json
-            from recipe_scraper.sources import default_sources
-            from recipe_scraper.storage import load_recipes
             import pathlib, sys
 
-            # Mirror the path logic in the old recipe_planner
+            # Ensure workspace root is importable before importing recipe_scraper
             chatbot_dir = pathlib.Path(__file__).resolve().parents[1]
             workspace = chatbot_dir.parent
             if str(workspace) not in sys.path:
                 sys.path.append(str(workspace))
+
+            from recipe_scraper.scraper import RecipeScraper, flatten_scrape_result, load_recipes_from_json
+            from recipe_scraper.sources import default_sources
+            from recipe_scraper.storage import load_recipes
 
             db = workspace / "recipes.db"
             js = workspace / "recipes_scraped.json"
