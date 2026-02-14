@@ -1,0 +1,13 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nutriGradient" x1="32" y1="32" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10B981"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="64" fill="url(#nutriGradient)"/>
+  <path d="M80 98C80 84.7452 90.7452 74 104 74H152C165.255 74 176 84.7452 176 98V126C176 139.255 165.255 150 152 150H129.5L109 170V150H104C90.7452 150 80 139.255 80 126V98Z" fill="white" fill-opacity="0.97"/>
+  <circle cx="112" cy="112" r="8" fill="#10B981"/>
+  <circle cx="144" cy="112" r="8" fill="#10B981"/>
+  <path d="M111 132C114.2 136.667 118.867 139 125 139C131.133 139 135.8 136.667 139 132" stroke="#10B981" stroke-width="6" stroke-linecap="round"/>
+</svg>

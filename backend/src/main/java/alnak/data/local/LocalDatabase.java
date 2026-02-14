@@ -111,6 +111,24 @@ public class LocalDatabase {
                 )
             """);
 
+            // ── Scraped ingredient prices by supermarket ─────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS ingredient_market_prices (
+                    ingredient_normalized TEXT NOT NULL,
+                    supermarket           TEXT NOT NULL,
+                    ingredient_name       TEXT,
+                    product_name          TEXT,
+                    product_url           TEXT,
+                    price                 REAL NOT NULL,
+                    currency              TEXT DEFAULT 'EUR',
+                    calories              REAL,
+                    source                TEXT,
+                    note                  TEXT,
+                    scraped_at            DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (ingredient_normalized, supermarket)
+                )
+            """);
+
             // ── Recipes ───────────────────────────────────────────
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS recipes (
@@ -192,6 +210,8 @@ public class LocalDatabase {
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_user_profiles_user    ON user_profiles(user_id)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_recipes_meal_type     ON recipes(meal_type)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ingredients_normalized ON ingredients(normalized_name)");
+            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_market_prices_supermarket ON ingredient_market_prices(supermarket)");
+            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_market_prices_price      ON ingredient_market_prices(price)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ri_recipe             ON recipe_ingredients(recipe_id)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_steps_recipe          ON recipe_steps(recipe_id, step_order)");
         }

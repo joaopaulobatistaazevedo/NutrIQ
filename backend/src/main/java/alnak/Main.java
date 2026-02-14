@@ -1,12 +1,15 @@
 package alnak;
 
 import alnak.controllers.AuthController;
+import alnak.controllers.PriceController;
 import alnak.controllers.UserController;
+import alnak.data.local.IngredientMarketPriceDAO;
 import alnak.data.global.UserDAO;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
 import alnak.dto.UpdateProfileRequest;
 import alnak.services.AuthService;
+import alnak.services.PriceImportService;
 import alnak.services.UserService;
 import alnak.utils.JWTUtil;
 import io.javalin.Javalin;
@@ -21,8 +24,11 @@ public class Main {
         JWTUtil jwtUtil = new JWTUtil();
         AuthService authService = new AuthService(userDAO, jwtUtil);
         UserService userService = new UserService(userDAO);
+        IngredientMarketPriceDAO ingredientMarketPriceDAO = new IngredientMarketPriceDAO();
+        PriceImportService priceImportService = new PriceImportService(ingredientMarketPriceDAO);
         AuthController authController = new AuthController(authService);
         UserController userController = new UserController(userService);
+        PriceController priceController = new PriceController(priceImportService);
 
         Javalin app = Javalin.create(config -> config.plugins.enableCors(cors -> cors.add(it -> it.anyHost())));
 
@@ -57,6 +63,23 @@ public class Main {
         app.get("/api/debug/users/{id}", ctx -> {
             Long userId = Long.parseLong(ctx.pathParam("id"));
             ctx.json(userController.getById(userId));
+        });
+
+        app.post("/api/prices/import", ctx -> {
+            var response = priceController.importReport(ctx.body());
+            ctx.status(201).json(response);
+        });
+
+        app.get("/api/prices", ctx -> ctx.json(priceController.listPrices()));
+
+        app.get("/api/prices/{ingredient}/cheapest", ctx -> {
+            String ingredient = ctx.pathParam("ingredient");
+            ctx.json(priceController.cheapestIngredientPrice(ingredient));
+        });
+
+        app.get("/api/prices/{ingredient}", ctx -> {
+            String ingredient = ctx.pathParam("ingredient");
+            ctx.json(priceController.listIngredientPrices(ingredient));
         });
 
         app.start(port);

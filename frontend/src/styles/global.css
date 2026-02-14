@@ -1,0 +1,82 @@
+/* Global styles */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', sans-serif;
+  background: #e8edf3;
+  color: #0f172a;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  animation: fade-in 240ms ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Loading fallback */
+.app-route-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #64748b;
+  font-weight: 600;
+  background: #e8edf3;
+}
+
+.app-route-loading-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #10B981;
+  animation: dot-pulse 1s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+/* Resets */
+img, svg, video, canvas { max-width: 100%; height: auto; }
+
+button, input, select, textarea { font: inherit; }
+
+button {
+  transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
