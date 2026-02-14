@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+.run-*
+__pycache__
+*.pyc
+
+backend/target
+frontend/node_modules
+frontend/dist
+
+*.db
+*.db-shm
+*.db-wal
+
+report.json

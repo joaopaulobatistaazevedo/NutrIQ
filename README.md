@@ -23,6 +23,75 @@ Scraper de supermercados orientado por meal planner.
 pip install -r requirements.txt
 ```
 
+## Docker (Microserviços)
+
+Stack dockerizada com containers separados:
+
+- `mysql`
+- `backend`
+- `chatbot`
+- `frontend`
+- `supermarket-scraper`
+- `orchestrator` (container que sincroniza/arranca seed inicial de forma consistente)
+
+### Arranque único (igual para toda a equipa)
+
+```bash
+cp .env.docker.example .env.docker
+# editar OPENAI_API_KEY no ficheiro .env.docker
+
+docker compose --env-file .env.docker up --build -d
+```
+
+Endpoints:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:7071`
+- Chatbot: `http://localhost:8000`
+- MySQL: `localhost:3307`
+
+Se já tiveres portas ocupadas, altera em `.env.docker`:
+`FRONTEND_HOST_PORT`, `BACKEND_HOST_PORT`, `CHATBOT_HOST_PORT`, `MYSQL_HOST_PORT`.
+
+Logs do orquestrador:
+
+```bash
+docker compose --env-file .env.docker logs -f orchestrator
+```
+
+Executar novamente apenas o scraper de supermercados:
+
+```bash
+docker compose --env-file .env.docker run --rm supermarket-scraper
+```
+
+`supermarket-scraper` escreve o relatório em `data/report.json` e o `orchestrator` importa-o para o backend quando disponível.
+
+Partilha da BD MySQL entre equipa:
+
+- coloca o dump partilhado em `data/mysql_seed.sql`
+- no arranque, o `orchestrator` importa automaticamente esse ficheiro quando a BD estiver vazia (`MYSQL_SEED_MODE=if_empty`)
+
+Gerar dump da tua BD docker atual:
+
+```bash
+docker compose --env-file .env.docker exec -T mysql \
+  sh -lc 'mysqldump --no-tablespaces -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+  > data/mysql_seed.sql
+```
+
+Para forçar reimport do seed na próxima subida:
+
+```bash
+MYSQL_SEED_FORCE=true docker compose --env-file .env.docker up -d orchestrator
+```
+
+Parar tudo:
+
+```bash
+docker compose --env-file .env.docker down
+```
+
 ## Como usar
 
 ```bash
