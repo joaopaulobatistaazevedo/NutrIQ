@@ -12,18 +12,24 @@ public class Database {
 
     private static final Path DB_DIR = Path.of("database");
     private static final String DB_FILE_NAME = "meal_planner.db";
+    private static final Path LEGACY_DB_PATH = Path.of(DB_FILE_NAME);
     private static Database instance;
     private Connection connection;
 
     private Database() {
         try {
-            Files.createDirectories(DB_DIR);
-            String dbPath = DB_DIR.resolve(DB_FILE_NAME).toString().replace("\\", "/");
+            Path dbPath = DB_DIR.resolve(DB_FILE_NAME).toAbsolutePath().normalize();
+            Path legacyPath = LEGACY_DB_PATH.toAbsolutePath().normalize();
+
+            Files.createDirectories(dbPath.getParent());
             String dbUrl = "jdbc:sqlite:" + dbPath + "?journal_mode=WAL";
             connection = DriverManager.getConnection(dbUrl);
             connection.createStatement().execute("PRAGMA foreign_keys = ON");
             initSchema();
             System.out.println("SQLite connected: " + dbPath);
+            if (!legacyPath.equals(dbPath) && Files.exists(legacyPath)) {
+                System.out.println("WARNING: legacy SQLite file found at " + legacyPath + ". Use " + dbPath + " as canonical DB.");
+            }
         } catch (SQLException | IOException e) {
             throw new RuntimeException("Failed to connect to SQLite: " + e.getMessage(), e);
         }

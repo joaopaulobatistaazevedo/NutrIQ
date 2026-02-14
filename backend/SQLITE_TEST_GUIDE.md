@@ -1,6 +1,7 @@
 # Bugsbyte Backend + SQLite (Guia de Execucao e Testes)
 
 Este backend agora usa persistencia real em SQLite para:
+
 - autenticacao (`users`)
 - perfil (`user_profiles`)
 - restricoes (`user_profile_restrictions`)
@@ -24,6 +25,7 @@ PORT=7071 mvn exec:java -Dexec.mainClass=alnak.Main
 ```
 
 Notas:
+
 - Se quiseres usar a porta default, omite `PORT=7071`.
 - Se der `Address already in use`, muda a porta (`PORT=7072`) ou termina o processo que esta a usar a porta atual.
 
@@ -40,7 +42,7 @@ curl -s -X POST http://localhost:7071/api/auth/register \
 Resposta esperada (exemplo):
 
 ```json
-{"userId":1,"token":"stub-token-1"}
+{ "userId": 1, "token": "stub-token-1" }
 ```
 
 ### 3.2 Login
