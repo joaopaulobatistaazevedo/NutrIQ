@@ -135,7 +135,17 @@ public class SocialController {
 
     public FriendListResponse getFriends(long authenticatedUserId) {
         List<Long> ids = socialService.getFriendIds(authenticatedUserId);
-        return new FriendListResponse(ids, ids.size());
+        List<FriendUserResponse> friends = socialService.getFriendSummaries(authenticatedUserId).stream()
+                .map(friend -> new FriendUserResponse(friend.id(), friend.name(), friend.email()))
+                .toList();
+        return new FriendListResponse(ids, friends, ids.size());
+    }
+
+    public List<UserSearchResponse> searchUsers(long authenticatedUserId, String query, Integer limitRaw) {
+        int limit = limitRaw == null ? 10 : limitRaw;
+        return socialService.searchUsersForFriendRequest(authenticatedUserId, query, limit).stream()
+                .map(item -> new UserSearchResponse(item.id(), item.name(), item.email(), item.relationStatus()))
+                .toList();
     }
 
     public List<FriendshipResponse> getPendingReceivedRequests(long authenticatedUserId) {

@@ -453,8 +453,7 @@ export default function Shopping() {
             lastGeneratedSignature: generatedSignature,
           }),
         );
-      } catch {
-      }
+      } catch { /* empty */ }
 
       if (generated.missingIngredients.length) {
         setGenerationStatus(
