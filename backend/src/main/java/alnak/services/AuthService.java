@@ -1,49 +1,78 @@
 package alnak.services;
 
+import alnak.business_logic.entities.User;
+import alnak.data.UserDAO;
 import alnak.dto.AuthResponse;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
-import alnak.business_logic.entities.User;
+import alnak.utils.JWTUtil;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Optional;
 
 public class AuthService {
-    private final AtomicLong idSequence = new AtomicLong(1);
-    private final Map<String, User> usersByEmail = new HashMap<>();
+
+    private final UserDAO userDAO;
+    private final JWTUtil jwtUtil;
+
+    public AuthService() {
+        this(new UserDAO(), new JWTUtil());
+    }
+
+    public AuthService(UserDAO userDAO, JWTUtil jwtUtil) {
+        this.userDAO = userDAO;
+        this.jwtUtil = jwtUtil;
+    }
 
     public AuthResponse register(RegisterRequest request) {
-        if (request.getEmail() == null || request.getPassword() == null) {
-            throw new IllegalArgumentException("Email e password são obrigatórios");
-        }
-        if (usersByEmail.containsKey(request.getEmail())) {
+        String email = normalizeEmail(request.getEmail());
+        String password = requirePassword(request.getPassword());
+
+        if (userDAO.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email já registado");
         }
 
-        User user = new User();
-        user.setId(idSequence.getAndIncrement());
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(request.getPassword());
-        usersByEmail.put(user.getEmail(), user);
-
-        return new AuthResponse(user.getId(), "stub-token-" + user.getId());
+        User user = userDAO.createUser(sanitizeName(request.getName()), email, password);
+        return new AuthResponse(user.getId(), jwtUtil.generateToken(user.getId()));
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = usersByEmail.get(request.getEmail());
-        if (user == null) {
-            throw new IllegalArgumentException("Credenciais inválidas");
-        }
-        if (!user.getPasswordHash().equals(request.getPassword())) {
+        String email = normalizeEmail(request.getEmail());
+        String password = requirePassword(request.getPassword());
+
+        Optional<User> maybeUser = userDAO.findByEmail(email);
+        if (maybeUser.isEmpty()) {
             throw new IllegalArgumentException("Credenciais inválidas");
         }
 
-        return new AuthResponse(user.getId(), "stub-token-" + user.getId());
+        User user = maybeUser.get();
+        if (!user.getPasswordHash().equals(password)) {
+            throw new IllegalArgumentException("Credenciais inválidas");
+        }
+
+        return new AuthResponse(user.getId(), jwtUtil.generateToken(user.getId()));
     }
 
     public User getUserByEmail(String email) {
-        return usersByEmail.get(email);
+        return userDAO.findByEmail(normalizeEmail(email)).orElse(null);
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email é obrigatório");
+        }
+        return email.trim().toLowerCase();
+    }
+
+    private String requirePassword(String password) {
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Password é obrigatória");
+        }
+        return password;
+    }
+
+    private String sanitizeName(String name) {
+        if (name == null) return null;
+        String trimmed = name.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

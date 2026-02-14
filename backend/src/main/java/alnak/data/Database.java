@@ -1,5 +1,8 @@
 package alnak.data;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -7,17 +10,21 @@ import java.sql.Statement;
 
 public class Database {
 
-    private static final String DB_URL = "jdbc:sqlite:meal_planner.db?journal_mode=WAL";
+    private static final Path DB_DIR = Path.of("database");
+    private static final String DB_FILE_NAME = "meal_planner.db";
     private static Database instance;
     private Connection connection;
 
     private Database() {
         try {
-            connection = DriverManager.getConnection(DB_URL);
+            Files.createDirectories(DB_DIR);
+            String dbPath = DB_DIR.resolve(DB_FILE_NAME).toString().replace("\\", "/");
+            String dbUrl = "jdbc:sqlite:" + dbPath + "?journal_mode=WAL";
+            connection = DriverManager.getConnection(dbUrl);
             connection.createStatement().execute("PRAGMA foreign_keys = ON");
             initSchema();
-            System.out.println("✅ SQLite connected: meal_planner.db");
-        } catch (SQLException e) {
+            System.out.println("SQLite connected: " + dbPath);
+        } catch (SQLException | IOException e) {
             throw new RuntimeException("Failed to connect to SQLite: " + e.getMessage(), e);
         }
     }
@@ -34,29 +41,46 @@ public class Database {
     private void initSchema() throws SQLException {
         try (Statement s = connection.createStatement()) {
 
-            // ── User (singleton) ──────────────────────────────────
+            // ── Users + profile (multi-user) ─────────────────────
             s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS user_profile (
-                    id             INTEGER PRIMARY KEY CHECK (id = 1),
+                CREATE TABLE IF NOT EXISTS users (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name          TEXT,
+                    email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    password_hash TEXT NOT NULL,
+                    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    user_id        INTEGER PRIMARY KEY,
                     age            INTEGER,
                     sex            TEXT,
                     height_cm      INTEGER,
                     weight_kg      REAL,
                     goal           TEXT,
                     daily_calories INTEGER,
-                    budget_weekly  REAL
+                    budget_weekly  REAL,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             """);
 
             s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS user_restrictions (
-                    restriction TEXT PRIMARY KEY
+                CREATE TABLE IF NOT EXISTS user_profile_restrictions (
+                    user_id     INTEGER NOT NULL,
+                    restriction TEXT    NOT NULL,
+                    PRIMARY KEY (user_id, restriction),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             """);
 
             s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS user_allergens (
-                    allergen TEXT PRIMARY KEY
+                CREATE TABLE IF NOT EXISTS user_profile_allergens (
+                    user_id   INTEGER NOT NULL,
+                    allergen  TEXT    NOT NULL,
+                    PRIMARY KEY (user_id, allergen),
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             """);
 
@@ -158,6 +182,8 @@ public class Database {
             """);
 
             // ── Indexes ───────────────────────────────────────────
+            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_users_email          ON users(email)");
+            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_user_profiles_user    ON user_profiles(user_id)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_recipes_meal_type     ON recipes(meal_type)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ingredients_normalized ON ingredients(normalized_name)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ri_recipe             ON recipe_ingredients(recipe_id)");

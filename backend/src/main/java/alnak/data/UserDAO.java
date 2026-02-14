@@ -4,36 +4,167 @@ import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.Goal;
 import alnak.business_logic.entities.Restriction;
 import alnak.business_logic.entities.Sex;
+import alnak.business_logic.entities.User;
 import alnak.business_logic.entities.UserProfile;
 
-import java.sql.*;
-import java.util.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
-/**
- * Manages the singleton user profile.
- * restrictions() and allergens() return live Set views backed by SQLite,
- * typed as Set<Restriction> and Set<Allergen> respectively.
- */
 public class UserDAO {
 
     private final Connection conn;
-    private final RestrictionSet restrictionSet;
-    private final AllergenSet allergenSet;
 
     public UserDAO() {
-        this.conn           = Database.getInstance().getConnection();
-        this.restrictionSet = new RestrictionSet();
-        this.allergenSet    = new AllergenSet();
+        this.conn = Database.getInstance().getConnection();
     }
 
-    // ── Profile ───────────────────────────────────────────────────
+    public User createUser(String name, String email, String passwordHash) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, name);
+            ps.setString(2, email);
+            ps.setString(3, passwordHash);
+            ps.executeUpdate();
 
-    public void saveProfile(UserProfile p) {
+            User user = new User();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) {
+                    user.setId(keys.getLong(1));
+                }
+            }
+            user.setName(name);
+            user.setEmail(email);
+            user.setPasswordHash(passwordHash);
+            return user;
+        } catch (SQLException e) {
+            if (isUniqueConstraintViolation(e)) {
+                throw new IllegalArgumentException("Email já registado");
+            }
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Optional<User> findByEmail(String email) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT id, name, email, password_hash FROM users WHERE email = ?")) {
+            ps.setString(1, email);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                User user = mapCoreUser(rs);
+                attachProfile(user);
+                return Optional.of(user);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Optional<User> findById(Long userId) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT id, name, email, password_hash FROM users WHERE id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                User user = mapCoreUser(rs);
+                attachProfile(user);
+                return Optional.of(user);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public List<User> listUsers() {
+        try {
+            List<User> users = new ArrayList<>();
+            try (Statement s = conn.createStatement();
+                 ResultSet rs = s.executeQuery("SELECT id, name, email, password_hash FROM users ORDER BY id")) {
+                while (rs.next()) {
+                    User user = mapCoreUser(rs);
+                    attachProfile(user);
+                    users.add(user);
+                }
+            }
+            return users;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void saveProfile(Long userId, UserProfile profile) {
+        try {
+            conn.setAutoCommit(false);
+            try {
+                upsertProfile(userId, profile);
+                replaceRestrictions(userId, profile.getRestrictions());
+                replaceAllergens(userId, profile.getAllergens());
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Optional<UserProfile> getProfile(Long userId) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly FROM user_profiles WHERE user_id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+
+                UserProfile p = new UserProfile();
+                if (rs.getObject("age") != null) p.setAge(rs.getInt("age"));
+                String sex = rs.getString("sex");
+                if (sex != null) p.setSex(Sex.from(sex));
+                if (rs.getObject("height_cm") != null) p.setHeightCm(rs.getInt("height_cm"));
+                if (rs.getObject("weight_kg") != null) p.setWeightKg(rs.getDouble("weight_kg"));
+                String goal = rs.getString("goal");
+                if (goal != null) p.setGoal(Goal.from(goal));
+                if (rs.getObject("daily_calories") != null) p.setDailyCalories(rs.getInt("daily_calories"));
+                if (rs.getObject("budget_weekly") != null) p.setBudgetWeekly(rs.getDouble("budget_weekly"));
+                p.setRestrictions(loadRestrictions(userId));
+                p.setAllergens(loadAllergens(userId));
+                return Optional.of(p);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private User mapCoreUser(ResultSet rs) throws SQLException {
+        User user = new User();
+        user.setId(rs.getLong("id"));
+        user.setName(rs.getString("name"));
+        user.setEmail(rs.getString("email"));
+        user.setPasswordHash(rs.getString("password_hash"));
+        return user;
+    }
+
+    private void attachProfile(User user) {
+        getProfile(user.getId()).ifPresent(user::setProfile);
+    }
+
+    private void upsertProfile(Long userId, UserProfile p) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("""
-            INSERT INTO user_profile
-              (id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
+            INSERT INTO user_profiles
+              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
                 age            = excluded.age,
                 sex            = excluded.sex,
                 height_cm      = excluded.height_cm,
@@ -42,173 +173,96 @@ public class UserDAO {
                 daily_calories = excluded.daily_calories,
                 budget_weekly  = excluded.budget_weekly
         """)) {
-            ps.setInt(1, p.getAge());
-            ps.setString(2, p.getSex() != null ? p.getSex().name() : null);
-            ps.setInt(3, p.getHeightCm());
-            ps.setDouble(4, p.getWeightKg());
-            ps.setString(5, p.getGoal() != null ? p.getGoal().name() : null);
-            ps.setInt(6, p.getDailyCalories());
-            ps.setDouble(7, p.getBudgetWeekly());
+            ps.setLong(1, userId);
+            ps.setInt(2, p.getAge());
+            setNullableString(ps, 3, p.getSex() != null ? p.getSex().name() : null);
+            ps.setInt(4, p.getHeightCm());
+            ps.setDouble(5, p.getWeightKg());
+            setNullableString(ps, 6, p.getGoal() != null ? p.getGoal().name() : null);
+            ps.setInt(7, p.getDailyCalories());
+            ps.setDouble(8, p.getBudgetWeekly());
             ps.executeUpdate();
-        } catch (SQLException e) { throw new RuntimeException(e); }
-
-        // Persist restrictions and allergens from the profile object
-        restrictionSet.clear();
-        restrictionSet.addAll(p.getRestrictions());
-        allergenSet.clear();
-        allergenSet.addAll(p.getAllergens());
+        }
     }
 
-    public Optional<UserProfile> getProfile() {
-        try (Statement s = conn.createStatement();
-             ResultSet rs = s.executeQuery("SELECT * FROM user_profile WHERE id = 1")) {
-            if (!rs.next()) return Optional.empty();
-            UserProfile p = new UserProfile();
-            p.setAge(rs.getInt("age"));
-            String sex = rs.getString("sex");
-            if (sex != null) p.setSex(Sex.from(sex));
-            p.setHeightCm(rs.getInt("height_cm"));
-            p.setWeightKg(rs.getDouble("weight_kg"));
-            String goal = rs.getString("goal");
-            if (goal != null) p.setGoal(Goal.from(goal));
-            p.setDailyCalories(rs.getInt("daily_calories"));
-            p.setBudgetWeekly(rs.getDouble("budget_weekly"));
-            // Load live sets into the profile
-            p.setRestrictions(new HashSet<>(restrictionSet));
-            p.setAllergens(new HashSet<>(allergenSet));
-            return Optional.of(p);
-        } catch (SQLException e) { throw new RuntimeException(e); }
-    }
-
-    // ── Collection views ──────────────────────────────────────────
-
-    /** Live Set<Restriction> view — mutations persist immediately to the DB. */
-    public Set<Restriction> restrictions() { return restrictionSet; }
-
-    /** Live Set<Allergen> view — mutations persist immediately to the DB. */
-    public Set<Allergen> allergens()       { return allergenSet; }
-
-    // ── Inner Set: Restrictions ───────────────────────────────────
-
-    private class RestrictionSet extends AbstractSet<Restriction> {
-
-        @Override
-        public int size() {
-            try (Statement s = conn.createStatement();
-                 ResultSet rs = s.executeQuery("SELECT COUNT(*) FROM user_restrictions")) {
-                return rs.next() ? rs.getInt(1) : 0;
-            } catch (SQLException e) { throw new RuntimeException(e); }
+    private void replaceRestrictions(Long userId, Set<Restriction> restrictions) throws SQLException {
+        try (PreparedStatement delete = conn.prepareStatement(
+                "DELETE FROM user_profile_restrictions WHERE user_id = ?")) {
+            delete.setLong(1, userId);
+            delete.executeUpdate();
         }
 
-        @Override
-        public Iterator<Restriction> iterator() {
-            try {
-                List<Restriction> snap = new ArrayList<>();
-                try (Statement s = conn.createStatement();
-                     ResultSet rs = s.executeQuery("SELECT restriction FROM user_restrictions")) {
-                    while (rs.next()) snap.add(Restriction.from(rs.getString(1)));
+        if (restrictions == null || restrictions.isEmpty()) return;
+
+        try (PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO user_profile_restrictions (user_id, restriction) VALUES (?, ?)")) {
+            for (Restriction restriction : restrictions) {
+                insert.setLong(1, userId);
+                insert.setString(2, restriction.name());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    private void replaceAllergens(Long userId, Set<Allergen> allergens) throws SQLException {
+        try (PreparedStatement delete = conn.prepareStatement(
+                "DELETE FROM user_profile_allergens WHERE user_id = ?")) {
+            delete.setLong(1, userId);
+            delete.executeUpdate();
+        }
+
+        if (allergens == null || allergens.isEmpty()) return;
+
+        try (PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO user_profile_allergens (user_id, allergen) VALUES (?, ?)")) {
+            for (Allergen allergen : allergens) {
+                insert.setLong(1, userId);
+                insert.setString(2, allergen.name());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    private Set<Restriction> loadRestrictions(Long userId) throws SQLException {
+        Set<Restriction> restrictions = EnumSet.noneOf(Restriction.class);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT restriction FROM user_profile_restrictions WHERE user_id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    restrictions.add(Restriction.from(rs.getString("restriction")));
                 }
-                return snap.iterator();
-            } catch (SQLException e) { throw new RuntimeException(e); }
+            }
         }
-
-        @Override
-        public boolean add(Restriction value) {
-            if (contains(value)) return false;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT OR IGNORE INTO user_restrictions (restriction) VALUES (?)")) {
-                ps.setString(1, value.name());
-                return ps.executeUpdate() > 0;
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
-
-        @Override
-        public boolean remove(Object o) {
-            if (!(o instanceof Restriction r)) return false;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM user_restrictions WHERE restriction = ?")) {
-                ps.setString(1, r.name());
-                return ps.executeUpdate() > 0;
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
-
-        @Override
-        public boolean contains(Object o) {
-            if (!(o instanceof Restriction r)) return false;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT 1 FROM user_restrictions WHERE restriction = ?")) {
-                ps.setString(1, r.name());
-                try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
-
-        @Override
-        public void clear() {
-            try (Statement s = conn.createStatement()) {
-                s.executeUpdate("DELETE FROM user_restrictions");
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
+        return restrictions;
     }
 
-    // ── Inner Set: Allergens ──────────────────────────────────────
-
-    private class AllergenSet extends AbstractSet<Allergen> {
-
-        @Override
-        public int size() {
-            try (Statement s = conn.createStatement();
-                 ResultSet rs = s.executeQuery("SELECT COUNT(*) FROM user_allergens")) {
-                return rs.next() ? rs.getInt(1) : 0;
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
-
-        @Override
-        public Iterator<Allergen> iterator() {
-            try {
-                List<Allergen> snap = new ArrayList<>();
-                try (Statement s = conn.createStatement();
-                     ResultSet rs = s.executeQuery("SELECT allergen FROM user_allergens")) {
-                    while (rs.next()) snap.add(Allergen.from(rs.getString(1)));
+    private Set<Allergen> loadAllergens(Long userId) throws SQLException {
+        Set<Allergen> allergens = EnumSet.noneOf(Allergen.class);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT allergen FROM user_profile_allergens WHERE user_id = ?")) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    allergens.add(Allergen.from(rs.getString("allergen")));
                 }
-                return snap.iterator();
-            } catch (SQLException e) { throw new RuntimeException(e); }
+            }
         }
+        return allergens;
+    }
 
-        @Override
-        public boolean add(Allergen value) {
-            if (contains(value)) return false;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT OR IGNORE INTO user_allergens (allergen) VALUES (?)")) {
-                ps.setString(1, value.name());
-                return ps.executeUpdate() > 0;
-            } catch (SQLException e) { throw new RuntimeException(e); }
+    private void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.VARCHAR);
+            return;
         }
+        ps.setString(index, value);
+    }
 
-        @Override
-        public boolean remove(Object o) {
-            if (!(o instanceof Allergen a)) return false;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM user_allergens WHERE allergen = ?")) {
-                ps.setString(1, a.name());
-                return ps.executeUpdate() > 0;
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
-
-        @Override
-        public boolean contains(Object o) {
-            if (!(o instanceof Allergen a)) return false;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT 1 FROM user_allergens WHERE allergen = ?")) {
-                ps.setString(1, a.name());
-                try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
-
-        @Override
-        public void clear() {
-            try (Statement s = conn.createStatement()) {
-                s.executeUpdate("DELETE FROM user_allergens");
-            } catch (SQLException e) { throw new RuntimeException(e); }
-        }
+    private boolean isUniqueConstraintViolation(SQLException e) {
+        String msg = e.getMessage();
+        return msg != null && msg.toLowerCase().contains("unique");
     }
 }

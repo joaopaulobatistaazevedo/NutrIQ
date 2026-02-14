@@ -1,26 +1,33 @@
 package alnak.services;
 
 import alnak.business_logic.entities.Allergen;
-import alnak.business_logic.entities.UserProfile;
-import alnak.dto.UpdateProfileRequest;
+import alnak.business_logic.entities.Goal;
+import alnak.business_logic.entities.Restriction;
+import alnak.business_logic.entities.Sex;
 import alnak.business_logic.entities.User;
+import alnak.business_logic.entities.UserProfile;
+import alnak.data.UserDAO;
+import alnak.dto.UpdateProfileRequest;
 
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class UserService {
-    private final Map<Long, User> usersById = new HashMap<>();
+
+    private final UserDAO userDAO;
+
+    public UserService() {
+        this(new UserDAO());
+    }
+
+    public UserService(UserDAO userDAO) {
+        this.userDAO = userDAO;
+    }
 
     public User getMe(Long userId) {
-        User user = usersById.get(userId);
-        if (user == null) {
-            throw new IllegalArgumentException("Utilizador não encontrado");
-        }
-        return user;
+        return userDAO.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilizador não encontrado"));
     }
 
     public User updateProfile(Long userId, UpdateProfileRequest request) {
@@ -29,7 +36,6 @@ public class UserService {
         UserProfile profile = user.getProfile();
         if (profile == null) {
             profile = new UserProfile();
-            user.setProfile(profile);
         }
 
         if (request.getAge() != null) {
@@ -57,15 +63,16 @@ public class UserService {
             profile.setMaxWeeklyBudget(request.getMaxWeeklyBudget());
         }
 
-        return user;
-    }
+        if (canCalculateCalories(profile)) {
+            profile.calculateDailyCalories();
+        }
 
-    public void putUser(User user) {
-        usersById.put(user.getId(), user);
+        userDAO.saveProfile(userId, profile);
+        return getMe(userId);
     }
 
     public List<User> listUsers() {
-        return new ArrayList<>(usersById.values());
+        return userDAO.listUsers();
     }
 
     public User getById(Long userId) {
@@ -75,12 +82,32 @@ public class UserService {
     private Set<Allergen> parseAllergens(Set<String> allergensRaw) {
         Set<Allergen> allergens = EnumSet.noneOf(Allergen.class);
         for (String allergenRaw : allergensRaw) {
+            String normalized = allergenRaw == null ? null : allergenRaw.trim();
+            if (normalized == null || normalized.isEmpty()) {
+                throw new IllegalArgumentException("Alergénio inválido: " + allergenRaw);
+            }
             try {
-                allergens.add(Allergen.from(allergenRaw));
+                allergens.add(Allergen.from(normalized));
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Alergénio inválido: " + allergenRaw);
             }
         }
         return allergens;
+    }
+
+    private boolean canCalculateCalories(UserProfile profile) {
+        return profile.getAge() > 0
+                && profile.getHeightCm() > 0
+                && profile.getWeightKg() > 0
+                && isDefined(profile.getSex())
+                && isDefined(profile.getGoal());
+    }
+
+    private boolean isDefined(Sex sex) {
+        return sex != null;
+    }
+
+    private boolean isDefined(Goal goal) {
+        return goal != null;
     }
 }

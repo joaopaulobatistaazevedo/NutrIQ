@@ -2,10 +2,10 @@ package alnak;
 
 import alnak.controllers.AuthController;
 import alnak.controllers.UserController;
+import alnak.data.UserDAO;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
 import alnak.dto.UpdateProfileRequest;
-import alnak.business_logic.entities.User;
 import alnak.services.AuthService;
 import alnak.services.UserService;
 import alnak.utils.JWTUtil;
@@ -17,11 +17,12 @@ public class Main {
     public static void main(String[] args) {
         int port = resolvePort();
 
-        AuthService authService = new AuthService();
-        UserService userService = new UserService();
+        UserDAO userDAO = new UserDAO();
+        JWTUtil jwtUtil = new JWTUtil();
+        AuthService authService = new AuthService(userDAO, jwtUtil);
+        UserService userService = new UserService(userDAO);
         AuthController authController = new AuthController(authService);
         UserController userController = new UserController(userService);
-        JWTUtil jwtUtil = new JWTUtil();
 
         Javalin app = Javalin.create(config -> config.plugins.enableCors(cors -> cors.add(it -> it.anyHost())));
 
@@ -31,8 +32,6 @@ public class Main {
         app.post("/api/auth/register", ctx -> {
             RegisterRequest request = ctx.bodyAsClass(RegisterRequest.class);
             var response = authController.register(request);
-            User createdUser = authService.getUserByEmail(request.getEmail());
-            userService.putUser(createdUser);
             ctx.status(201).json(response);
         });
 
