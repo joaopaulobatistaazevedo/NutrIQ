@@ -23,7 +23,7 @@ from utils.helpers import load_prompt, safe_json_loads
 class OpenAIService:
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.client = OpenAI(api_key=self.settings.openai_api_key)
+        self.client = OpenAI(api_key=self.settings.openai_api_key) if self.settings.openai_api_key else None
         self.goal_planner = GoalMealPlannerService()
 
     # ──────────────────────────────────────────────────────────────────────
@@ -150,6 +150,8 @@ class OpenAIService:
     # ──────────────────────────────────────────────────────────────────────
 
     def _chat(self, messages: List[Dict[str, Any]]) -> str:
+        if self.client is None:
+            raise RuntimeError("OPENAI_API_KEY não configurada no chatbot-service/.env")
         response = self.client.chat.completions.create(
             model=self.settings.model_name,
             messages=messages,

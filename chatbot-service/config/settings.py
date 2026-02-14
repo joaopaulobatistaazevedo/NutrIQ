@@ -10,6 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     openai_api_key: str = Field(
+        default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "GROQ_API_KEY")
     )
     model_name: str = "gpt-4o-mini"
