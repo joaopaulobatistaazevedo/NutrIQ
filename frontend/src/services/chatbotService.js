@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAuthSession } from '../utils/authSession';
 
 const API_BASE_URL = import.meta.env.VITE_CHATBOT_API_URL || 'http://localhost:8000';
 
@@ -14,6 +15,16 @@ const mapHistory = (messages = []) =>
   messages
     .filter((item) => item.role === 'user' || item.role === 'assistant')
     .map((item) => ({ role: item.role, content: item.content }));
+
+const buildAuthHeaders = () => {
+  const token = String(getAuthSession()?.token || '').trim();
+  if (!token) {
+    return {};
+  }
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+};
 
 const normalizeError = (error) => {
   if (error?.response?.data?.detail) {
@@ -33,6 +44,8 @@ export async function sendOnboardingMessage({ message, userId, conversationHisto
       message,
       user_id: userId,
       conversation_history: mapHistory(conversationHistory),
+    }, {
+      headers: buildAuthHeaders(),
     });
 
     return data;
@@ -53,6 +66,8 @@ export async function sendAssistantMessage({
       user_id: userId,
       conversation_history: mapHistory(conversationHistory),
       user_context: userContext,
+    }, {
+      headers: buildAuthHeaders(),
     });
 
     return data;

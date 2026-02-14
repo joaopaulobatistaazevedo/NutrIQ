@@ -75,7 +75,8 @@ class OpenAIService:
         history: Optional[List[Message]] = None,
         auth_token: Optional[str] = None,
     ) -> ChatResponse:
-        planning_request = self._looks_like_meal_plan_request(user_message)
+        pending_edit_request = bool((user_context or {}).get("pending_edit_request"))
+        planning_request = self._looks_like_meal_plan_request(user_message) or pending_edit_request
 
         system_prompt = load_prompt("prompts/assistant.txt")
         if user_context:
@@ -120,11 +121,18 @@ class OpenAIService:
                 status = meal_plan.get("status", "empty")
 
                 if status == "generated":
-                    bot_response = (
-                        f"Plano gerado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
-                        f"(custo estimado: €{cost:.2f}/semana). "
-                        f"As receitas estão disponíveis na aba de Planeamento Semanal."
-                    )
+                    if pending_edit_request:
+                        bot_response = (
+                            f"Plano atualizado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
+                            f"(custo estimado: €{cost:.2f}/semana). "
+                            "A alteração já foi aplicada na tua aba de Planeamento Semanal."
+                        )
+                    else:
+                        bot_response = (
+                            f"Plano gerado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
+                            f"(custo estimado: €{cost:.2f}/semana). "
+                            f"As receitas estão disponíveis na aba de Planeamento Semanal."
+                        )
                 else:
                     bot_response = (
                         "Não foi possível gerar o plano neste momento. "

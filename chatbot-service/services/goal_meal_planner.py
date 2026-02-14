@@ -242,6 +242,7 @@ def _build_days_payload(slots: list[MealSlot], planning_days: int) -> list[dict[
         meals = [
             {
                 "slot": ms.slot,
+                "recipe_id": ms.recipe.id,
                 "title": ms.recipe.title,
                 "url": ms.recipe.url,
                 "source": ms.recipe.source,

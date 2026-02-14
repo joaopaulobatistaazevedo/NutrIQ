@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
 import Layout from '../components/Layout';
+import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
 import '../styles/meal-plan.css';
 
@@ -155,27 +156,45 @@ export default function MealPlan() {
   }, [selectedDate, selectedIso, weeklyPlan]);
 
   useEffect(() => {
-    const refreshPlan = () => {
-      setWeeklyPlan(parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
+    let cancelled = false;
+
+    const storageKey = scopedKey(WEEKLY_PLAN_KEY, accountId);
+
+    const syncPlan = async () => {
+      const localPlan = parseStorage(storageKey, null);
+      if (!cancelled) {
+        setWeeklyPlan(localPlan);
+      }
+
+      try {
+        const backendPlan = await fetchActiveMealPlan();
+        if (!cancelled && backendPlan) {
+          localStorage.setItem(storageKey, JSON.stringify(backendPlan));
+          setWeeklyPlan(backendPlan);
+        }
+      } catch {
+      }
     };
 
     const onPlanUpdate = (event) => {
       const payloadAccountId = event?.detail?.accountId;
       if (!payloadAccountId || payloadAccountId === accountId) {
-        refreshPlan();
+        void syncPlan();
       }
     };
 
     const onStorageChange = (event) => {
-      if (event.key === scopedKey(WEEKLY_PLAN_KEY, accountId)) {
-        refreshPlan();
+      if (event.key === storageKey) {
+        void syncPlan();
       }
     };
 
+    void syncPlan();
     window.addEventListener('nutribot:weekly-plan-updated', onPlanUpdate);
     window.addEventListener('storage', onStorageChange);
 
     return () => {
+      cancelled = true;
       window.removeEventListener('nutribot:weekly-plan-updated', onPlanUpdate);
       window.removeEventListener('storage', onStorageChange);
     };

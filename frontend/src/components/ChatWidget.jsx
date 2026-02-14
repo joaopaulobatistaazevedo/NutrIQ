@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X, Send, HeartHandshake, Trash2 } from 'lucide-react';
 import { sendAssistantMessage, sendOnboardingMessage } from '../services/chatbotService';
+import { fetchActiveMealPlan } from '../services/mealPlanService';
 import {
   CHAT_CONTEXT_KEY,
   CHAT_HISTORY_KEY,
@@ -283,7 +284,17 @@ export default function ChatWidget() {
       }
 
       if (response?.meal_plan) {
-        localStorage.setItem(scopedKey(WEEKLY_PLAN_KEY, accountId), JSON.stringify(response.meal_plan));
+        let planToStore = response.meal_plan;
+
+        try {
+          const backendPlan = await fetchActiveMealPlan();
+          if (backendPlan) {
+            planToStore = backendPlan;
+          }
+        } catch {
+        }
+
+        localStorage.setItem(scopedKey(WEEKLY_PLAN_KEY, accountId), JSON.stringify(planToStore));
         window.dispatchEvent(
           new CustomEvent('nutribot:weekly-plan-updated', { detail: { accountId } })
         );

@@ -88,6 +88,9 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
     if constraints:
         backend_service.persist_user_chat_data(backend_token, constraints)
 
+    if response.meal_plan:
+        backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
+
     return response
 
 
