@@ -86,7 +86,7 @@ class BackendService:
                 if not meal_type:
                     continue
 
-                recipe_id = self._resolve_recipe_id(auth_token, meal)
+                recipe_id = self._resolve_or_create_recipe_id(auth_token, meal, meal_type)
                 if recipe_id is None:
                     continue
 
@@ -177,6 +177,17 @@ class BackendService:
         )
         return response if isinstance(response, dict) else None
 
+    def _resolve_or_create_recipe_id(
+        self,
+        auth_token: str,
+        meal: Dict[str, Any],
+        meal_type: str,
+    ) -> Optional[int]:
+        recipe_id = self._resolve_recipe_id(auth_token, meal)
+        if recipe_id is not None:
+            return recipe_id
+        return self._create_recipe_from_generated_meal(auth_token, meal, meal_type)
+
     def _resolve_recipe_id(self, auth_token: str, meal: Dict[str, Any]) -> Optional[int]:
         raw_id = meal.get("recipe_id")
         if isinstance(raw_id, int):
@@ -216,17 +227,89 @@ class BackendService:
             return first["id"]
         return None
 
+    def _create_recipe_from_generated_meal(
+        self,
+        auth_token: str,
+        meal: Dict[str, Any],
+        meal_type: str,
+    ) -> Optional[int]:
+        title = str(meal.get("title") or "").strip()
+        if not title:
+            return None
+
+        duration = self._safe_int(meal.get("duration_minutes"), default=0)
+        calories = self._safe_float(meal.get("calories_per_serving"), default=0.0)
+        protein = self._safe_float(meal.get("protein_g"), default=0.0)
+        carbs = self._safe_float(meal.get("carbs_g"), default=0.0)
+        fat = self._safe_float(meal.get("fat_g"), default=0.0)
+
+        source = str(meal.get("source") or "").strip()
+        url = str(meal.get("url") or "").strip()
+        description_bits = ["Receita gerada automaticamente pelo nutricionista virtual."]
+        if source:
+            description_bits.append(f"Fonte: {source}.")
+        if url:
+            description_bits.append(f"URL: {url}")
+
+        payload: Dict[str, Any] = {
+            "name": title,
+            "description": " ".join(description_bits).strip(),
+            "mealType": meal_type,
+            "prepTimeMin": max(duration, 0),
+            "cookTimeMin": 0,
+            "servings": 1,
+            "ingredients": [],
+            "steps": [
+                {
+                    "stepOrder": 1,
+                    "description": "Preparar e servir conforme instruções da receita.",
+                    "durationMinutes": max(duration, 0),
+                }
+            ],
+            "nutritionalInfo": {
+                "calories": max(calories, 0.0),
+                "proteinG": max(protein, 0.0),
+                "carbsG": max(carbs, 0.0),
+                "fatG": max(fat, 0.0),
+            },
+        }
+
+        created = self._request_json(
+            auth_token,
+            method="POST",
+            path="/api/recipes",
+            payload=payload,
+        )
+        if isinstance(created, dict) and isinstance(created.get("id"), int):
+            return created["id"]
+        return None
+
     def _slot_to_meal_type(self, slot: Any) -> Optional[str]:
         value = str(slot or "").strip().casefold()
         mapping = {
             "pequeno-almoço": "BREAKFAST",
             "pequeno almoço": "BREAKFAST",
+            "breakfast": "BREAKFAST",
             "almoço": "LUNCH",
             "almoco": "LUNCH",
+            "lunch": "LUNCH",
             "jantar": "DINNER",
+            "dinner": "DINNER",
             "snack": "SNACK",
         }
         return mapping.get(value)
+
+    def _safe_int(self, raw: Any, default: int = 0) -> int:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return default
+
+    def _safe_float(self, raw: Any, default: float = 0.0) -> float:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return default
 
     def _iso_date_to_day_of_week(self, raw_date: Any) -> Optional[str]:
         try:

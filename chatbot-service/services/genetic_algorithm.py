@@ -237,7 +237,7 @@ class MealPlanGA:
         elite_k: int = 4,
         mutation_rate: float = 0.15,
     ) -> None:
-        self.recipes = [r for r in recipes if r.title and r.url]
+        self.recipes = [r for r in recipes if r.title]
         self.profile = GOAL_PROFILES.get(goal, GOAL_PROFILES["maintain"])
         self.planning_days = max(1, min(planning_days, 7))
         self.liked = liked

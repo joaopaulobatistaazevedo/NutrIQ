@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     max_tokens: int = 600
     temperature: float = 0.7
     allowed_origins: str = "*"
-    backend_api_url: str = "http://localhost:7070"
+    backend_api_url: str = "http://localhost:7071"
     java_service_url: str = Field(
-        default="http://localhost:7070",
+        default="http://localhost:7071",
         validation_alias=AliasChoices("JAVA_SERVICE_URL", "BACKEND_API_URL"),
     )
     backend_timeout_seconds: float = 6.0
