@@ -43,7 +43,42 @@ const STEPS = [
     placeholder: 'Ex: 28',
     type: 'number',
   },
+  {
+    key: 'goal',
+    label: 'Qual é o teu objetivo principal neste momento?',
+    type: 'options',
+    options: ['Perder peso', 'Ganhar peso', 'Manter peso', 'Ganhar massa muscular'],
+  },
 ];
+
+function calculateBmi(weight, heightCm) {
+  const weightValue = Number.parseFloat(weight);
+  const heightValue = Number.parseFloat(heightCm);
+
+  if (!Number.isFinite(weightValue) || !Number.isFinite(heightValue) || heightValue <= 0) {
+    return null;
+  }
+
+  const heightM = heightValue / 100;
+  return weightValue / (heightM * heightM);
+}
+
+function getGoalGuidance(profile) {
+  const bmi = calculateBmi(profile.weight, profile.height);
+  if (!bmi || !profile.goal) {
+    return null;
+  }
+
+  if (bmi >= 30 && profile.goal === 'Ganhar peso') {
+    return 'Com base nos dados que partilhaste, talvez faça mais sentido focar manutenção, recomposição corporal ou perda gradual. Se quiseres, posso ajudar-te com um plano equilibrado.';
+  }
+
+  if (bmi < 18.5 && profile.goal === 'Perder peso') {
+    return 'Com base nos teus dados, perder peso pode não ser o foco mais adequado agora. Podemos priorizar ganho de força, energia e hábitos consistentes.';
+  }
+
+  return null;
+}
 
 export default function BotOnboarding() {
   const navigate = useNavigate();
@@ -64,6 +99,7 @@ export default function BotOnboarding() {
     weight: '',
     height: '',
     age: '',
+    goal: '',
   });
   const [stepIndex, setStepIndex] = useState(0);
   const [input, setInput] = useState('');
@@ -75,6 +111,7 @@ export default function BotOnboarding() {
 
   const currentStep = STEPS[stepIndex];
   const currentValue = profile[currentStep?.key] || '';
+  const goalGuidance = useMemo(() => getGoalGuidance(profile), [profile]);
 
   const advanceStep = (value) => {
     const cleanValue = String(value).trim();
@@ -190,6 +227,9 @@ export default function BotOnboarding() {
                 Está tudo pronto. A partir de agora eu vou acompanhar os teus próximos passos,
                 ajustar recomendações e manter-te motivado todos os dias.
               </p>
+              {goalGuidance ? (
+                <p className="bot-guidance-note" role="status" aria-live="polite">{goalGuidance}</p>
+              ) : null}
               <button type="button" className="bot-submit-btn" onClick={() => navigate('/dashboard')}>
                 Entrar no dashboard
               </button>
