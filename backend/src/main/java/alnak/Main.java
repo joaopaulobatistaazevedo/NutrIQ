@@ -2,7 +2,9 @@ package alnak;
 
 import alnak.controllers.AuthController;
 import alnak.controllers.PriceController;
+import alnak.controllers.RecipeController;
 import alnak.controllers.UserController;
+import alnak.data.global.GlobalRecipeDAO;
 import alnak.data.local.IngredientMarketPriceDAO;
 import alnak.data.global.UserDAO;
 import alnak.dto.LoginRequest;
@@ -10,6 +12,7 @@ import alnak.dto.RegisterRequest;
 import alnak.dto.UpdateProfileRequest;
 import alnak.services.AuthService;
 import alnak.services.PriceImportService;
+import alnak.services.RecipeService;
 import alnak.services.UserService;
 import alnak.utils.JWTUtil;
 import io.javalin.Javalin;
@@ -26,9 +29,12 @@ public class Main {
         UserService userService = new UserService(userDAO);
         IngredientMarketPriceDAO ingredientMarketPriceDAO = new IngredientMarketPriceDAO();
         PriceImportService priceImportService = new PriceImportService(ingredientMarketPriceDAO);
+        GlobalRecipeDAO globalRecipeDAO = new GlobalRecipeDAO();
+        RecipeService recipeService = new RecipeService(globalRecipeDAO);
         AuthController authController = new AuthController(authService);
         UserController userController = new UserController(userService);
         PriceController priceController = new PriceController(priceImportService);
+        RecipeController recipeController = new RecipeController(recipeService);
 
         Javalin app = Javalin.create(config -> config.plugins.enableCors(cors -> cors.add(it -> it.anyHost())));
 
@@ -82,6 +88,12 @@ public class Main {
             ctx.json(priceController.listIngredientPrices(ingredient));
         });
 
+        app.get("/api/recipes", ctx -> {
+            String mealType = ctx.queryParam("mealType");
+            Integer limit = parseOptionalPositiveInt(ctx.queryParam("limit"));
+            ctx.json(recipeController.listRecipes(limit, mealType));
+        });
+
         app.start(port);
         System.out.println("Server running on http://localhost:" + port);
     }
@@ -93,6 +105,21 @@ public class Main {
 
         String token = authorizationHeader.substring("Bearer ".length()).trim();
         return jwtUtil.parseUserId(token);
+    }
+
+    private static Integer parseOptionalPositiveInt(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            int parsed = Integer.parseInt(raw.trim());
+            if (parsed <= 0) {
+                throw new IllegalArgumentException("limit deve ser > 0");
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("limit invalido: " + raw);
+        }
     }
 
     private static int resolvePort() {
