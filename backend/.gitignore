@@ -38,4 +38,7 @@ build/
 ### Mac OS ###
 .DS_Store
 
-*.db\.
+*.db
+*.db-wal
+*.db-shm
+database/
