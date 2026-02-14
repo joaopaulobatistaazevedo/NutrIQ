@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon, Pencil } from 'lucide-react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
+import { PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
 import '../styles/meal-plan.css';
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
@@ -46,6 +47,39 @@ function capitalize(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function parseStorage(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function resolveAccountId(profile) {
+  const username = String(profile?.username || '').trim().toLowerCase();
+  if (!username) {
+    return 'anonymous';
+  }
+  return username.replace(/\s+/g, '_');
+}
+
+function scopedKey(base, accountId) {
+  return `${base}:${accountId}`;
+}
+
+function slotMeta(slot) {
+  if (slot === 'Pequeno-almoço') {
+    return { icon: Sunrise, time: '08:00' };
+  }
+  if (slot === 'Almoço') {
+    return { icon: Sun, time: '13:00' };
+  }
+  return { icon: Moon, time: '20:00' };
+}
+
 function getMealsByDate(date) {
   const breakfast = [
     'Overnight oats com banana e sementes',
@@ -65,18 +99,26 @@ function getMealsByDate(date) {
 
   const idx = date.getDate();
   return [
-    { slot: 'Pequeno-almoço', icon: Sunrise, time: '08:00', dish: breakfast[idx % breakfast.length], kcal: 380 },
-    { slot: 'Almoço', icon: Sun, time: '13:00', dish: lunch[(idx + 1) % lunch.length], kcal: 620 },
-    { slot: 'Jantar', icon: Moon, time: '20:00', dish: dinner[(idx + 2) % dinner.length], kcal: 540 },
+    { slot: 'Pequeno-almoço', icon: Sunrise, time: '08:00', dish: breakfast[idx % breakfast.length], source: null },
+    { slot: 'Almoço', icon: Sun, time: '13:00', dish: lunch[(idx + 1) % lunch.length], source: null },
+    { slot: 'Jantar', icon: Moon, time: '20:00', dish: dinner[(idx + 2) % dinner.length], source: null },
   ];
 }
 
 export default function MealPlan() {
+  const accountId = useMemo(() => {
+    const profile = parseStorage(PROFILE_KEY, null);
+    return resolveAccountId(profile);
+  }, []);
+
   const today = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
 
+  const [weeklyPlan, setWeeklyPlan] = useState(() =>
+    parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null)
+  );
   const [monthCursor, setMonthCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
 
@@ -90,8 +132,54 @@ export default function MealPlan() {
     return capitalize(formatter.format(selectedDate));
   }, [selectedDate]);
 
+  const selectedIso = useMemo(() => selectedDate.toISOString().slice(0, 10), [selectedDate]);
+
   const monthCells = useMemo(() => getMonthCells(monthCursor), [monthCursor]);
-  const meals = useMemo(() => getMealsByDate(selectedDate), [selectedDate]);
+  const meals = useMemo(() => {
+    const planDay = weeklyPlan?.days?.find((day) => day?.date === selectedIso);
+
+    if (!planDay?.meals?.length) {
+      return getMealsByDate(selectedDate);
+    }
+
+    return planDay.meals.map((meal) => {
+      const meta = slotMeta(meal.slot);
+      return {
+        slot: meal.slot,
+        icon: meta.icon,
+        time: meta.time,
+        dish: meal.title,
+        source: meal.source,
+      };
+    });
+  }, [selectedDate, selectedIso, weeklyPlan]);
+
+  useEffect(() => {
+    const refreshPlan = () => {
+      setWeeklyPlan(parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
+    };
+
+    const onPlanUpdate = (event) => {
+      const payloadAccountId = event?.detail?.accountId;
+      if (!payloadAccountId || payloadAccountId === accountId) {
+        refreshPlan();
+      }
+    };
+
+    const onStorageChange = (event) => {
+      if (event.key === scopedKey(WEEKLY_PLAN_KEY, accountId)) {
+        refreshPlan();
+      }
+    };
+
+    window.addEventListener('nutribot:weekly-plan-updated', onPlanUpdate);
+    window.addEventListener('storage', onStorageChange);
+
+    return () => {
+      window.removeEventListener('nutribot:weekly-plan-updated', onPlanUpdate);
+      window.removeEventListener('storage', onStorageChange);
+    };
+  }, [accountId]);
 
   const goToPreviousMonth = () => {
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -101,19 +189,33 @@ export default function MealPlan() {
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
+  const handleEditMeal = (meal) => {
+    window.dispatchEvent(
+      new CustomEvent('nutribot:meal-edit-request', {
+        detail: {
+          accountId,
+          date: selectedIso,
+          day_label: selectedLabel,
+          slot: meal.slot,
+          current_dish: meal.dish,
+        },
+      })
+    );
+  };
+
   return (
     <Layout>
       <div className="meal-plan">
         <PageHeader
           className="meal-plan-header"
-          title="Calendário de Refeições"
-          subtitle="Organiza e acompanha o plano nutricional dia a dia"
+          title="Plano Alimentar"
+          subtitle="Organiza, ajusta e acompanha o teu plano de refeições dia a dia"
           titleClassName="meal-plan-title"
           subtitleClassName="meal-plan-subtitle"
           actions={(
             <button className="btn-primary">
               <CalendarDays size={16} />
-              <span>Gerar Semana</span>
+              <span>Gerar Plano</span>
             </button>
           )}
         />
@@ -165,7 +267,7 @@ export default function MealPlan() {
 
           <article className="daily-plan-card">
             <h2 className="daily-plan-title">{selectedLabel}</h2>
-            <p className="daily-plan-subtitle">Plano diário recomendado</p>
+            <p className="daily-plan-subtitle">Plano alimentar do dia</p>
 
             <div className="daily-meals">
               {meals.map((meal) => {
@@ -184,7 +286,16 @@ export default function MealPlan() {
                     </div>
 
                     <h3>{meal.dish}</h3>
-                    <p>{meal.kcal} kcal</p>
+                    <p>{meal.source ? `Fonte: ${meal.source}` : 'Plano diário recomendado'}</p>
+
+                    <button
+                      type="button"
+                      className="daily-meal-edit"
+                      onClick={() => handleEditMeal(meal)}
+                    >
+                      <Pencil size={14} />
+                      <span>Editar</span>
+                    </button>
                   </article>
                 );
               })}

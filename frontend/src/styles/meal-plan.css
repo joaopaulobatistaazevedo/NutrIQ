@@ -205,6 +205,26 @@
   color: #64748b;
 }
 
+.daily-meal-edit {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 10px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.daily-meal-edit:hover {
+  background: #d1fae5;
+}
+
 /* ---- RESPONSIVE ---- */
 @media (max-width: 1024px) {
   .meal-plan-grid { grid-template-columns: 1fr; }
