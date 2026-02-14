@@ -394,6 +394,14 @@
   flex-shrink: 0;
 }
 
+.dash-insight-image {
+  width: 180px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 /* ==== MEALS ==== */
 .dash-meals {
   background: #e8edf3;
@@ -451,6 +459,14 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.dash-meal-image {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 2px;
 }
 .dash-meal-icon {
   width: 44px;

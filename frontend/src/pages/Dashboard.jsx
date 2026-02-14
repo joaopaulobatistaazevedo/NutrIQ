@@ -89,9 +89,9 @@ export default function Dashboard() {
   ];
 
   const meals = [
-    { period: 'Pequeno-almoço', icon: Sunrise, name: 'Aveia com Banana e Mel', time: '10 min', kcal: 320, cost: '€2.50' },
-    { period: 'Almoço', icon: Sun, name: 'Frango Grelhado com Arroz', time: '25 min', kcal: 580, cost: '€4.20' },
-    { period: 'Jantar', icon: Moon, name: 'Salmão com Legumes', time: '20 min', kcal: 520, cost: '€5.80' },
+    { period: 'Pequeno-almoço', icon: Sunrise, name: 'Aveia com Banana e Mel', time: '10 min', kcal: 320, cost: '€2.50', image: 'https://picsum.photos/seed/breakfast-nutriq/1200/800' },
+    { period: 'Almoço', icon: Sun, name: 'Frango Grelhado com Arroz', time: '25 min', kcal: 580, cost: '€4.20', image: 'https://picsum.photos/seed/lunch-nutriq/1200/800' },
+    { period: 'Jantar', icon: Moon, name: 'Salmão com Legumes', time: '20 min', kcal: 520, cost: '€5.80', image: 'https://picsum.photos/seed/dinner-nutriq/1200/800' },
   ];
 
   const activeMealData = meals[activeMeal];
@@ -255,7 +255,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="dash-insight-art">
-            <Utensils size={80} strokeWidth={1} />
+            <img src="https://picsum.photos/seed/summary-nutriq/520/360" alt="Prato saudável" loading="lazy" className="dash-insight-image" />
           </div>
         </motion.section>
 
@@ -291,6 +291,7 @@ export default function Dashboard() {
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.25 }}
             >
+              <img src={activeMealData.image} alt={activeMealData.name} loading="lazy" className="dash-meal-image" />
               <div className="dash-meal-icon"><MealIcon size={24} /></div>
               <h3>{activeMealData.name}</h3>
               <div className="dash-meal-meta">

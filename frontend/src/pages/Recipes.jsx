@@ -39,6 +39,11 @@ const RECIPE_CATEGORIES = [
   },
 ];
 
+function recipeImageFor(name) {
+  const seed = encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'));
+  return `https://picsum.photos/seed/${seed}/900/560`;
+}
+
 function CategoryCarousel({ category }) {
   const trackRef = useRef(null);
 
@@ -84,6 +89,12 @@ function CategoryCarousel({ category }) {
       <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
         {category.recipes.map((recipe) => (
           <article key={recipe.name} className="recipe-card">
+            <img
+              src={recipeImageFor(recipe.name)}
+              alt={recipe.name}
+              loading="lazy"
+              className="recipe-thumb"
+            />
             <p className="recipe-badge">
               <Layers size={13} />
               {category.title}

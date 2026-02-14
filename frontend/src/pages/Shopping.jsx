@@ -91,6 +91,11 @@ function getCardAccent(storeKey) {
   return 'is-lidl';
 }
 
+function itemImageFor(name) {
+  const seed = encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'));
+  return `https://picsum.photos/seed/${seed}/300/300`;
+}
+
 export default function Shopping() {
   const [lists, setLists] = useState(INITIAL_LISTS);
   const [activeListId, setActiveListId] = useState('pingo_doce');
@@ -209,7 +214,7 @@ export default function Shopping() {
               {activeItems.map((item) => (
                 <article key={item.id} className={`shopping-item ${getCardAccent(activeListId)}`}>
                   <div className="shopping-item-image" aria-hidden="true">
-                    <span>{item.name.charAt(0)}</span>
+                    <img src={itemImageFor(item.name)} alt={item.name} loading="lazy" />
                   </div>
 
                   <div className="shopping-item-content">
