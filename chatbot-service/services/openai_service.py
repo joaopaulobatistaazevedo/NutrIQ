@@ -4,6 +4,7 @@ from openai import OpenAI
 
 from config.settings import get_settings
 from models.schemas import ChatResponse, Message
+from services.recipe_planner import RecipePlannerService
 from utils.helpers import load_prompt, safe_json_loads
 
 
@@ -11,6 +12,7 @@ class OpenAIService:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.client = OpenAI(api_key=self.settings.openai_api_key)
+        self.recipe_planner = RecipePlannerService()
 
     async def onboarding_chat(self, user_message: str, history: List[Message]) -> ChatResponse:
         system_prompt = load_prompt("prompts/onboarding.txt")
@@ -51,6 +53,7 @@ class OpenAIService:
 
         bot_response = self._chat(messages)
         meal_plan_draft = None
+        meal_plan = None
 
         if planning_request:
             constraints = await self._extract_meal_plan_constraints(messages)
@@ -64,12 +67,10 @@ class OpenAIService:
                     + "."
                 )
             else:
-                bot_response = (
-                    "Perfeito. Vou usar as receitas do backend para montar o teu planeamento "
-                    "com os critérios definidos e sem inventar receitas."
-                )
+                meal_plan = self.recipe_planner.generate_weekly_plan(meal_plan_draft["constraints"])
+                bot_response = "Perfeito. As receitas já foram geradas e estão disponíveis na aba de Receitas."
 
-        return ChatResponse(response=bot_response, meal_plan_draft=meal_plan_draft)
+        return ChatResponse(response=bot_response, meal_plan_draft=meal_plan_draft, meal_plan=meal_plan)
 
     def _chat(self, messages: List[Dict[str, Any]]) -> str:
         response = self.client.chat.completions.create(
@@ -153,8 +154,8 @@ class OpenAIService:
             missing_required.append("número de dias a planear")
 
         return {
-            "status": "pending_backend_integration",
-            "backend_source": "scraped_recipes_api",
+            "status": "ready_for_generation",
+            "backend_source": "recipe_scraper",
             "constraints": {
                 "max_weekly_budget": max_budget,
                 "planning_days": planning_days,
@@ -167,5 +168,5 @@ class OpenAIService:
             },
             "missing_required": missing_required,
             "recipe_candidates": [],
-            "notes": "TODO: Integrar com backend de receitas scraped e motor de otimização.",
+            "notes": "Critérios prontos para gerar plano com receitas scraped.",
         }
