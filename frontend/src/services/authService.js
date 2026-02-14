@@ -59,3 +59,18 @@ export async function registerUser({ name, email, password }) {
     throw new Error(normalizeError(error));
   }
 }
+
+
+export async function requestPasswordReset({ email }) {
+  try {
+    const { data } = await client.post('/api/auth/forgot-password', { email });
+    return {
+      message:
+        typeof data?.message === 'string' && data.message.trim()
+          ? data.message.trim()
+          : 'Se o email existir, enviámos instruções para recuperar a password.',
+    };
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}

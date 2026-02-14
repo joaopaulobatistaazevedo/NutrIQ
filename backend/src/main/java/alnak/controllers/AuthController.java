@@ -5,6 +5,8 @@ import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
 import alnak.services.AuthService;
 
+import java.util.Map;
+
 public class AuthController {
     private final AuthService authService;
 
@@ -18,5 +20,10 @@ public class AuthController {
 
     public AuthResponse login(LoginRequest request) {
         return authService.login(request);
+    }
+
+    public Map<String, String> forgotPassword(String email) {
+        authService.requestPasswordReset(email);
+        return Map.of("message", "Se o email existir, enviámos instruções para recuperar a password.");
     }
 }

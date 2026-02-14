@@ -56,6 +56,10 @@ public class AuthService {
         return userDAO.findByEmail(normalizeEmail(email)).orElse(null);
     }
 
+    public void requestPasswordReset(String email) {
+        normalizeEmail(email);
+    }
+
     private String normalizeEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("Email é obrigatório");

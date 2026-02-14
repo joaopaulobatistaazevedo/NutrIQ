@@ -43,10 +43,13 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  const [isForgotMode, setIsForgotMode] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setInfoMessage('');
     setIsSubmitting(true);
 
     try {
@@ -91,6 +94,32 @@ export default function Login() {
     }
   };
 
+  const handleForgotSubmit = (e) => {
+    e.preventDefault();
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setInfoMessage('');
+      setErrorMessage('Introduz o teu email para recuperar a password.');
+      return;
+    }
+
+    setErrorMessage('');
+    setInfoMessage('Email enviado para redefinir a password.');
+  };
+
+  const switchToForgotMode = () => {
+    setErrorMessage('');
+    setInfoMessage('');
+    setIsForgotMode(true);
+  };
+
+  const switchToLoginMode = () => {
+    setErrorMessage('');
+    setInfoMessage('');
+    setIsForgotMode(false);
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-blob ab-1" />
@@ -101,26 +130,47 @@ export default function Login() {
       <div className="auth-card">
         <div className="auth-card-inner">
           <span className="auth-logo">NutrIQ</span>
-          <h1>Bem-vindo de volta</h1>
-          <p className="auth-sub">Entra na tua conta para continuar</p>
+          <h1>{isForgotMode ? 'Recuperar password' : 'Bem-vindo de volta'}</h1>
+          <p className="auth-sub">
+            {isForgotMode
+              ? 'Introduz o email para receberes o link de recuperação'
+              : 'Entra na tua conta para continuar'}
+          </p>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={isForgotMode ? handleForgotSubmit : handleSubmit}>
             <div className="auth-field">
               <label>Email</label>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="o.teu@email.com" required />
             </div>
-            <div className="auth-field">
-              <label>Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-            </div>
+
+            {!isForgotMode && (
+              <div className="auth-field">
+                <label>Password</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+              </div>
+            )}
+
             {errorMessage && <p className="auth-error">{errorMessage}</p>}
-            <button type="button" className="auth-forgot">Esqueceste-te da password?</button>
-            <button type="submit" className="auth-submit" disabled={isSubmitting}>
-              {isSubmitting ? 'A entrar...' : 'Entrar'}
-            </button>
+            {infoMessage && <p className="auth-success">{infoMessage}</p>}
+
+            {isForgotMode ? (
+              <>
+                <button type="submit" className="auth-submit">Enviar email de reset</button>
+                <button type="button" className="auth-forgot" onClick={switchToLoginMode}>Voltar ao login</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="auth-forgot" onClick={switchToForgotMode}>Esqueceste-te da password?</button>
+                <button type="submit" className="auth-submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'A entrar...' : 'Entrar'}
+                </button>
+              </>
+            )}
           </form>
 
-          <p className="auth-footer">Ainda não tens conta? <Link to="/register">Criar conta</Link></p>
+          {!isForgotMode && (
+            <p className="auth-footer">Ainda não tens conta? <Link to="/register">Criar conta</Link></p>
+          )}
         </div>
 
         <div className="auth-visual">

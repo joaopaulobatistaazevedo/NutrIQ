@@ -173,6 +173,18 @@
   font-weight: 600;
 }
 
+
+.auth-success {
+  margin: 2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.12);
+  color: #a7f3d0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Submit */
 .auth-submit {
   width: 100%;

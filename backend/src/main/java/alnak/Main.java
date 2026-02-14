@@ -88,6 +88,14 @@ public class Main {
             ctx.json(authController.login(request));
         });
 
+
+        app.post("/api/auth/forgot-password", ctx -> {
+            Map<String, Object> payload = ctx.bodyAsClass(Map.class);
+            Object emailValue = payload.get("email");
+            String email = emailValue == null ? null : emailValue.toString();
+            ctx.json(authController.forgotPassword(email));
+        });
+
         // ── User routes ───────────────────────────────────────────
         app.get("/api/users/me", ctx -> {
             Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
