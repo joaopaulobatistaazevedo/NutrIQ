@@ -7,7 +7,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,15 +32,13 @@ public class FriendshipDAO {
         try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT INTO friendships (requester_id, addressee_id, status)
                 VALUES (?, ?, 'PENDING')
-                """, Statement.RETURN_GENERATED_KEYS)) {
+                """)) {
             ps.setLong(1, requesterId);
             ps.setLong(2, addresseeId);
             ps.executeUpdate();
 
             Friendship f = new Friendship();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) f.setId(keys.getLong(1));
-            }
+            f.setId(encodeFriendshipId(requesterId, addresseeId));
             f.setRequesterId(requesterId);
             f.setAddresseeId(addresseeId);
             f.setStatus(FriendStatus.PENDING);
@@ -103,9 +100,12 @@ public class FriendshipDAO {
             throw new SecurityException(
                     "User " + requestingUserId + " is not part of this friendship.");
 
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM friendships WHERE id = ?")) {
-            ps.setLong(1, friendshipId);
+        try (PreparedStatement ps = conn.prepareStatement("""
+                DELETE FROM friendships
+                WHERE requester_id = ? AND addressee_id = ?
+                """)) {
+            ps.setLong(1, f.getRequesterId());
+            ps.setLong(2, f.getAddresseeId());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -115,9 +115,40 @@ public class FriendshipDAO {
     // ── Read ──────────────────────────────────────────────────────
 
     public Optional<Friendship> findById(long friendshipId) {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT * FROM friendships WHERE id = ?")) {
-            ps.setLong(1, friendshipId);
+        UserPair pair = decodeFriendshipId(friendshipId);
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT *
+                FROM friendships
+                WHERE requester_id = ? AND addressee_id = ?
+                LIMIT 1
+                """)) {
+            ps.setLong(1, pair.requesterId());
+            ps.setLong(2, pair.addresseeId());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                return Optional.of(mapFriendship(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Finds the latest relationship row between two users, in any direction.
+     */
+    public Optional<Friendship> findBetween(long userA, long userB) {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT *
+                FROM friendships
+                WHERE (requester_id = ? AND addressee_id = ?)
+                   OR (requester_id = ? AND addressee_id = ?)
+                ORDER BY created_at DESC
+                LIMIT 1
+                """)) {
+            ps.setLong(1, userA);
+            ps.setLong(2, userB);
+            ps.setLong(3, userB);
+            ps.setLong(4, userA);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
                 return Optional.of(mapFriendship(rs));
@@ -195,10 +226,15 @@ public class FriendshipDAO {
     // ── Private helpers ───────────────────────────────────────────
 
     private void updateStatus(long friendshipId, FriendStatus status) {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE friendships SET status = ? WHERE id = ?")) {
+        UserPair pair = decodeFriendshipId(friendshipId);
+        try (PreparedStatement ps = conn.prepareStatement("""
+                UPDATE friendships
+                SET status = ?
+                WHERE requester_id = ? AND addressee_id = ?
+                """)) {
             ps.setString(1, status.name());
-            ps.setLong(2, friendshipId);
+            ps.setLong(2, pair.requesterId());
+            ps.setLong(3, pair.addresseeId());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -220,14 +256,31 @@ public class FriendshipDAO {
 
     private Friendship mapFriendship(ResultSet rs) throws SQLException {
         Friendship f = new Friendship();
-        f.setId(rs.getLong("id"));
-        f.setRequesterId(rs.getLong("requester_id"));
-        f.setAddresseeId(rs.getLong("addressee_id"));
+        long requesterId = rs.getLong("requester_id");
+        long addresseeId = rs.getLong("addressee_id");
+        f.setId(encodeFriendshipId(requesterId, addresseeId));
+        f.setRequesterId(requesterId);
+        f.setAddresseeId(addresseeId);
         f.setStatus(FriendStatus.valueOf(rs.getString("status")));
         Timestamp ts = rs.getTimestamp("created_at");
         if (ts != null) f.setCreatedAt(ts.toLocalDateTime());
         return f;
     }
+
+    private long encodeFriendshipId(long requesterId, long addresseeId) {
+        return ((requesterId & 0xffffffffL) << 32) | (addresseeId & 0xffffffffL);
+    }
+
+    private UserPair decodeFriendshipId(long friendshipId) {
+        long requesterId = (friendshipId >>> 32) & 0xffffffffL;
+        long addresseeId = friendshipId & 0xffffffffL;
+        if (requesterId <= 0 || addresseeId <= 0) {
+            throw new IllegalArgumentException("Friendship not found: " + friendshipId);
+        }
+        return new UserPair(requesterId, addresseeId);
+    }
+
+    private record UserPair(long requesterId, long addresseeId) {}
 
     private boolean isDuplicateEntry(SQLException e) {
         return e.getErrorCode() == 1062 ||

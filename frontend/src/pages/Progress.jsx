@@ -158,7 +158,7 @@ export default function Progress() {
       }
 
       try {
-        const [apiUser, prices, recipeList, activePlan] = await Promise.all([
+        const [apiUserResult, pricesResult, recipeListResult, activePlanResult] = await Promise.allSettled([
           fetchMyProfile(token),
           listLatestPrices(),
           fetchRecipes({ limit: 300 }),
@@ -168,6 +168,11 @@ export default function Progress() {
         if (!isMounted) {
           return;
         }
+
+        const apiUser = apiUserResult.status === 'fulfilled' ? apiUserResult.value : null;
+        const prices = pricesResult.status === 'fulfilled' ? pricesResult.value : [];
+        const recipeList = recipeListResult.status === 'fulfilled' ? recipeListResult.value : [];
+        const activePlan = activePlanResult.status === 'fulfilled' ? activePlanResult.value : null;
 
         const profile = apiUser?.profile || {};
         const dailyGoal = Math.max(1200, Math.round(toNumberOr(2100, profile?.dailyCalories)));
@@ -200,11 +205,30 @@ export default function Progress() {
         const recipeById = new Map(recipeEntries);
 
         const weeklySeries = buildWeeklySeries(activePlan, recipeById, dailyCostBase, dailyGoal);
+        const recipesFromPlan = recipeEntries
+          .map(([, recipe]) => recipe)
+          .filter((recipe) => recipe && Number.isInteger(Number(recipe?.id)) && Number(recipe.id) > 0);
+        const recipeMap = new Map();
+        [...recipeList, ...recipesFromPlan].forEach((recipe) => {
+          const id = Number(recipe?.id);
+          if (!Number.isInteger(id) || id <= 0) {
+            return;
+          }
+          if (!recipeMap.has(id)) {
+            recipeMap.set(id, recipe);
+          }
+        });
 
         setCalories(weeklySeries.calories);
         setBudget(weeklySeries.costs);
         setStreakCount(Math.max(0, Number(profile?.streakCount || 0)));
-        setRecipes(Array.isArray(recipeList) ? recipeList : []);
+        setRecipes(Array.from(recipeMap.values()));
+
+        if (apiUserResult.status === 'rejected') {
+          setLoadError(apiUserResult.reason?.message || 'Não foi possível carregar o perfil completo.');
+        } else if (recipeListResult.status === 'rejected') {
+          setLoadError(recipeListResult.reason?.message || 'Não foi possível carregar a lista completa de receitas.');
+        }
       } catch (error) {
         if (isMounted) {
           setLoadError(error.message || 'Não foi possível carregar o progresso.');

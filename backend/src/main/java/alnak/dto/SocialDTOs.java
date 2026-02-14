@@ -95,9 +95,23 @@ public class SocialDTOs {
         }
     }
 
+    public record FriendUserResponse(
+            long id,
+            String name,
+            String email
+    ) {}
+
     public record FriendListResponse(
             List<Long> friendIds,
+            List<FriendUserResponse> friends,
             int count
+    ) {}
+
+    public record UserSearchResponse(
+            long id,
+            String name,
+            String email,
+            String relationStatus
     ) {}
 
     // ── Feed ──────────────────────────────────────────────────────

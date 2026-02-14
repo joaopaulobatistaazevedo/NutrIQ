@@ -41,21 +41,26 @@ public class UserController {
             throw new IllegalArgumentException("picturePath é obrigatório.");
         }
 
-        User updatedUser = userService.recordMealPhoto(userId);
-
         boolean shouldShare = request.shareOnNutriSocial();
+        Integer recipeId = null;
+        Integer rating = null;
         Post createdPost = null;
 
         if (shouldShare) {
-            Integer recipeId = request.recipeId();
-            Integer rating = request.rating();
+            recipeId = request.recipeId();
+            rating = request.rating();
             if (recipeId == null || recipeId <= 0) {
                 throw new IllegalArgumentException("recipeId é obrigatório para partilhar no NutriSocial.");
             }
             if (rating == null || rating < 1 || rating > 5) {
                 throw new IllegalArgumentException("rating deve estar entre 1 e 5 para partilhar no NutriSocial.");
             }
+            socialService.ensureRecipeExists(recipeId);
+        }
 
+        User updatedUser = userService.recordMealPhoto(userId);
+
+        if (shouldShare) {
             createdPost = socialService.createPost(
                     userId,
                     recipeId,
