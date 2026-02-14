@@ -8,7 +8,7 @@ import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -152,15 +152,25 @@ class SupermarketScraper:
             soup = BeautifulSoup(response.text, "html.parser")
 
             candidates = self._collect_search_candidates(soup=soup, market=market)
-            if len(candidates) < 3:
+            needs_product_page_enrichment = (
+                len(candidates) < 3
+                or not any(item.get("calories") is not None for item in candidates)
+            )
+            if needs_product_page_enrichment:
                 candidates.extend(
                     self._extract_from_product_pages(
                         soup=soup,
                         html_text=response.text,
                         market=market,
                         headers=headers,
+                        seed_urls=[
+                            str(item.get("url")).strip()
+                            for item in candidates
+                            if item.get("url")
+                        ],
                     )
                 )
+                candidates = _dedupe_candidates(candidates)
             extracted = self._select_best_candidate(ingredient=ingredient, candidates=candidates)
 
             if extracted is None:
@@ -181,6 +191,7 @@ class SupermarketScraper:
                 calories=extracted.get("calories"),
                 currency=extracted.get("currency", market.currency) or market.currency,
                 product_url=extracted.get("url"),
+                image_url=extracted.get("image_url"),
                 source=extracted.get("source"),
                 note=extracted.get("selection_note"),
             )
@@ -257,13 +268,29 @@ class SupermarketScraper:
         html_text: str,
         market: MarketConfig,
         headers: dict[str, str],
+        seed_urls: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        candidates = extract_product_url_candidates(
+        discovered_urls = extract_product_url_candidates(
             soup=soup,
             html_text=html_text,
             base_url=market.base_url,
             url_patterns=market.product_url_patterns,
         )
+        candidates: list[str] = []
+        seen_urls: set[str] = set()
+        for url in (seed_urls or []):
+            token = str(url or "").strip()
+            if not token or token in seen_urls:
+                continue
+            seen_urls.add(token)
+            candidates.append(token)
+        for url in discovered_urls:
+            token = str(url or "").strip()
+            if not token or token in seen_urls:
+                continue
+            seen_urls.add(token)
+            candidates.append(token)
+
         if not candidates:
             return []
 
@@ -303,14 +330,34 @@ class SupermarketScraper:
             if any(item.get("calories") is not None for item in extracted_items[start_index:]):
                 pass
             else:
-                fallback_calories = self._extract_calories_from_nutritional_tab(
-                    soup=candidate_soup,
-                    headers=headers,
-                )
+                # First try calories already visible in product page (e.g. table "Energia (kcal)").
+                fallback_calories = parse_calories_value(candidate_soup.get_text(" ", strip=True))
+                if fallback_calories is None:
+                    fallback_calories = self._extract_calories_from_nutritional_tab(
+                        soup=candidate_soup,
+                        headers=headers,
+                        page_url=candidate_url,
+                    )
                 if fallback_calories is not None:
+                    applied_to_existing = False
                     for item in extracted_items[start_index:]:
                         if item.get("calories") is None:
                             item["calories"] = fallback_calories
+                            applied_to_existing = True
+
+                    # If page extractors didn't yield priced items, still return a lightweight
+                    # calories-only candidate keyed by URL so dedupe can enrich search results.
+                    if not applied_to_existing:
+                        extracted_items.append(
+                            {
+                                "name": None,
+                                "price": None,
+                                "calories": fallback_calories,
+                                "currency": market.currency,
+                                "url": candidate_url,
+                                "source": "nutrition-page",
+                            }
+                        )
 
             if len(extracted_items) >= 24:
                 break
@@ -321,6 +368,7 @@ class SupermarketScraper:
         self,
         soup: BeautifulSoup,
         headers: dict[str, str],
+        page_url: str | None = None,
     ) -> float | None:
         anchor = soup.select_one(".js-nutritional-tab-anchor[data-url]")
         if anchor is None:
@@ -329,6 +377,7 @@ class SupermarketScraper:
         tab_url = str(anchor.attrs.get("data-url") or "").strip()
         if not tab_url:
             return None
+        tab_url = urljoin(page_url or "", tab_url)
 
         try:
             response = requests.get(tab_url, headers=headers, timeout=self.timeout_seconds)
@@ -409,6 +458,8 @@ def _dedupe_candidates(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 existing = deduped[existing_index]
                 if existing.get("calories") is None and item.get("calories") is not None:
                     existing["calories"] = item.get("calories")
+                if not existing.get("image_url") and item.get("image_url"):
+                    existing["image_url"] = item.get("image_url")
                 continue
 
         key = (name, price, url)
@@ -417,6 +468,8 @@ def _dedupe_candidates(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             existing = deduped[existing_index]
             if existing.get("calories") is None and item.get("calories") is not None:
                 existing["calories"] = item.get("calories")
+            if not existing.get("image_url") and item.get("image_url"):
+                existing["image_url"] = item.get("image_url")
             if not existing.get("source") and item.get("source"):
                 existing["source"] = item.get("source")
             continue

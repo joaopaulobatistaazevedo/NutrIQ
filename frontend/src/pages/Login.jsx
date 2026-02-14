@@ -1,19 +1,90 @@
 // src/pages/Login.jsx
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
-import { setAuthenticated } from '../utils/authSession';
+import { setAuthSession } from '../utils/authSession';
+import { loginUser } from '../services/authService';
+import { fetchMyProfile } from '../services/userService';
+import { PROFILE_KEY } from '../constants/storageKeys';
 import '../styles/auth.css';
+
+function mapSexToUi(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'M') return 'Masculino';
+  if (normalized === 'F') return 'Feminino';
+  if (normalized === 'OTHER') return 'Outro';
+  return '';
+}
+
+function buildLocalProfileFromApi(apiUser) {
+  const remoteProfile = apiUser?.profile || {};
+  return {
+    username: String(apiUser?.name || '').trim(),
+    location: '',
+    sex: mapSexToUi(remoteProfile?.sex),
+    weight:
+      remoteProfile?.weightKg !== undefined && remoteProfile?.weightKg !== null
+        ? String(remoteProfile.weightKg)
+        : '',
+    height:
+      remoteProfile?.heightCm !== undefined && remoteProfile?.heightCm !== null
+        ? String(remoteProfile.heightCm)
+        : '',
+    age:
+      remoteProfile?.age !== undefined && remoteProfile?.age !== null
+        ? String(remoteProfile.age)
+        : '',
+  };
+}
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setAuthenticated(true);
-    navigate('/dashboard');
+    setErrorMessage('');
+    setIsSubmitting(true);
+
+    try {
+      const auth = await loginUser({
+        email: email.trim(),
+        password,
+      });
+
+      setAuthSession({
+        userId: auth.userId,
+        token: auth.token,
+        email: email.trim(),
+      });
+
+      try {
+        const apiUser = await fetchMyProfile(auth.token);
+        const existingRaw = localStorage.getItem(PROFILE_KEY);
+        const existingProfile = existingRaw ? JSON.parse(existingRaw) : null;
+        const mappedProfile = buildLocalProfileFromApi(apiUser);
+        localStorage.setItem(
+          PROFILE_KEY,
+          JSON.stringify({
+            ...mappedProfile,
+            location: existingProfile?.location || mappedProfile.location,
+          }),
+        );
+      } catch {
+        // Keep login successful even if profile sync fails.
+      }
+
+      const redirectTo = location.state?.from || '/dashboard';
+      navigate(redirectTo, { replace: true });
+    } catch (error) {
+      setErrorMessage(error.message || 'Não foi possível fazer login.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -39,8 +110,11 @@ export default function Login() {
               <label>Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
             </div>
+            {errorMessage && <p className="auth-error">{errorMessage}</p>}
             <button type="button" className="auth-forgot">Esqueceste-te da password?</button>
-            <button type="submit" className="auth-submit">Entrar</button>
+            <button type="submit" className="auth-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'A entrar...' : 'Entrar'}
+            </button>
           </form>
 
           <p className="auth-footer">Ainda não tens conta? <Link to="/register">Criar conta</Link></p>
