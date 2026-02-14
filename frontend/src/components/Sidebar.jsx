@@ -1,11 +1,12 @@
-// src/components/Sidebar.jsx
+import { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LogOut,
   ChevronRight,
 } from 'lucide-react';
-import { MAIN_NAV_ITEMS } from '../config/navigation';
+import { getMainNavItems } from '../config/navigation';
 import { AUTH_KEY, PROFILE_KEY } from '../constants/storageKeys';
+import { getUserRole } from '../utils/authSession';
 import '../styles/sidebar.css';
 
 const clearNutribotSessionData = () => {
@@ -28,6 +29,8 @@ const clearNutribotSessionData = () => {
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const role = getUserRole();
+  const navItems = useMemo(() => getMainNavItems(role), [role]);
 
   const isActive = (path) => location.pathname === path;
 
@@ -38,14 +41,12 @@ export default function Sidebar() {
 
   return (
     <div className="sidebar">
-      {/* Logo */}
       <div className="sidebar-logo">
         <span className="sidebar-logo-text">NutrIQ</span>
       </div>
 
-      {/* Menu */}
       <nav className="sidebar-nav">
-        {MAIN_NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isNutriSocial = item.path === '/nutrisocial';
           return (
@@ -65,7 +66,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer - Logout */}
       <div className="sidebar-footer">
         <button className="sidebar-logout" onClick={handleLogout}>
           <LogOut className="sidebar-item-icon" />

@@ -58,3 +58,12 @@ export async function fetchRecipeById(recipeId) {
     throw new Error(normalizeError(error));
   }
 }
+
+export async function createRecipe(payload) {
+  try {
+    const { data } = await client.post('/api/recipes', payload);
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}

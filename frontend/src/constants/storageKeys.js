@@ -1,5 +1,7 @@
 export const PROFILE_KEY = 'nutribot_profile';
 export const AUTH_KEY = 'nutribot_auth';
+export const USER_ROLES_KEY = 'nutribot_user_roles';
+export const NUTRITIONIST_RECIPES_KEY = 'nutribot_nutritionist_recipes';
 export const CHAT_MESSAGES_KEY = 'nutribot_chat_messages';
 export const CHAT_HISTORY_KEY = 'nutribot_chat_history';
 export const CHAT_CONTEXT_KEY = 'nutribot_chat_context';

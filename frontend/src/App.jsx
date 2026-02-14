@@ -16,6 +16,7 @@ const Shopping = lazy(() => import('./pages/Shopping'));
 const Progress = lazy(() => import('./pages/Progress'));
 const Profile = lazy(() => import('./pages/Profile'));
 const NutriSocial = lazy(() => import('./pages/NutriSocial'));
+const Nutritionist = lazy(() => import('./pages/Nutritionist'));
 
 function App() {
   const privateElements = {
@@ -26,6 +27,7 @@ function App() {
     '/progress': <Progress />,
     '/profile': <Profile />,
     '/nutrisocial': <NutriSocial />,
+    '/nutritionist': <Nutritionist />,
   };
 
   return (
@@ -48,7 +50,11 @@ function App() {
             <Route
               key={path}
               path={path}
-              element={<ProtectedRoute>{privateElements[path]}</ProtectedRoute>}
+              element={(
+                <ProtectedRoute requiredRole={path === '/nutritionist' ? 'nutritionist' : undefined}>
+                  {privateElements[path]}
+                </ProtectedRoute>
+              )}
             />
           ))}
 
