@@ -3,15 +3,42 @@
 .layout {
   display: flex;
   min-height: 100vh;
-  background: linear-gradient(180deg, #F0FDF4 0%, #F8FAFC 100%);
+  background: #dfe7f0;
 }
 
 .layout-content {
   flex: 1;
-  margin-left: 280px;
-  padding: clamp(16px, 2vw, 32px);
+  margin-left: 260px;
+  padding: clamp(20px, 3vw, 40px);
   overflow-y: auto;
   min-width: 0;
+  position: relative;
+  isolation: isolate;
+  background: #dfe7f0 !important;
+}
+
+.layout-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #dfe7f0;
+  background-image:
+    radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.52), transparent 38%),
+    radial-gradient(circle at 86% 84%, rgba(148, 163, 184, 0.22), transparent 36%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: auto, auto, 26px 26px, 26px 26px;
+  background-position: center, center, 0 0, 13px 13px;
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .layout-content {
+    margin-left: 220px;
+    padding: 20px;
+  }
 }
 
 /* Mobile */
@@ -19,14 +46,6 @@
   .layout-content {
     margin-left: 0;
     padding: 16px;
-  }
-}
-
-/* Tablet */
-@media (max-width: 1024px) {
-  .layout-content {
-    margin-left: 240px;
-    padding: 20px;
   }
 }
 

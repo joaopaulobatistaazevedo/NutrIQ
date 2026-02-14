@@ -8,6 +8,9 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const BotOnboarding = lazy(() => import('./pages/BotOnboarding'));
 const MealPlan = lazy(() => import('./pages/MealPlan'));
+const Recipes = lazy(() => import('./pages/Recipes'));
+const Shopping = lazy(() => import('./pages/Shopping'));
+const Progress = lazy(() => import('./pages/Progress'));
 const Profile = lazy(() => import('./pages/Profile'));
 
 function App() {
@@ -28,7 +31,11 @@ function App() {
           <Route path="/welcome-bot" element={<BotOnboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/meal-plan" element={<MealPlan />} />
+          <Route path="/recipes" element={<Recipes />} />
+          <Route path="/shopping" element={<Shopping />} />
+          <Route path="/progress" element={<Progress />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
       </Suspense>
       <ChatWidget />

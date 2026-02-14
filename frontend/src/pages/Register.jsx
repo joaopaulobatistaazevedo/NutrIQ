@@ -16,91 +16,58 @@ export default function Register() {
   };
 
   return (
-    <div className="auth-container">
-      {/* Lado esquerdo - Form */}
-      <div className="auth-form-side">
-        <div className="auth-form">
-          <div className="logo">
-            <span className="logo-text">NutrIQ</span>
-          </div>
+    <div className="auth-page">
+      {/* Animated blobs */}
+      <div className="auth-blob ab-1" />
+      <div className="auth-blob ab-2" />
+      <div className="auth-blob ab-3" />
+      <div className="auth-noise" />
 
+      <div className="auth-card">
+        <div className="auth-card-inner">
+          <span className="auth-logo">NutrIQ</span>
           <h1>Cria a tua conta</h1>
-          <p className="subtitle">Começa a planear as tuas refeições hoje</p>
+          <p className="auth-sub">Começa a planear as tuas refeições hoje</p>
 
           <form onSubmit={handleSubmit}>
-            <div className="form-group">
+            <div className="auth-field">
               <label>Nome completo</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="João Silva"
-                required
-              />
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="João Silva" required />
             </div>
-
-            <div className="form-group">
+            <div className="auth-field">
               <label>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="o.teu@email.com"
-                required
-              />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="o.teu@email.com" required />
             </div>
-
-            <div className="form-group">
+            <div className="auth-field">
               <label>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
-                required
-              />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required />
             </div>
-
-            <div className="form-group">
+            <div className="auth-field">
               <label>Confirmar password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" required />
             </div>
-
-            <button type="submit" className="btn-primary">
-              Criar conta
-            </button>
+            <button type="submit" className="auth-submit">Criar conta</button>
           </form>
 
-          <p className="auth-footer">
-            Já tens conta? <a href="/login">Entrar</a>
-          </p>
+          <p className="auth-footer">Já tens conta? <a href="/login">Entrar</a></p>
         </div>
-      </div>
 
-      {/* Lado direito - Imagem/Branding */}
-      <div className="auth-visual-side">
-        <div className="visual-content">
-          <h2>Junta-te a milhares de utilizadores</h2>
-          <p>Que já poupam tempo e dinheiro nas suas refeições</p>
-          
-          <div className="stats">
-            <div className="stat">
-              <h3>10k+</h3>
-              <p>Utilizadores ativos</p>
-            </div>
-            <div className="stat">
-              <h3>50k+</h3>
-              <p>Receitas criadas</p>
-            </div>
-            <div className="stat">
-              <h3>€200+</h3>
-              <p>Poupança média/mês</p>
+        {/* Side visual */}
+        <div className="auth-visual">
+          <div className="auth-visual-inner">
+            <h2>Junta-te a milhares de utilizadores</h2>
+            <p>Que já poupam tempo e dinheiro nas suas refeições</p>
+            <div className="auth-stats-grid">
+              {[
+                { num: '10k+', label: 'Utilizadores ativos' },
+                { num: '50k+', label: 'Receitas criadas' },
+                { num: '€200+', label: 'Poupança média/mês' },
+              ].map((s) => (
+                <div className="auth-stat" key={s.num}>
+                  <strong>{s.num}</strong>
+                  <span>{s.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
