@@ -1,6 +1,6 @@
 // src/pages/Register.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../styles/auth.css';
 
 export default function Register() {
@@ -49,7 +49,7 @@ export default function Register() {
             <button type="submit" className="auth-submit">Criar conta</button>
           </form>
 
-          <p className="auth-footer">Já tens conta? <a href="/login">Entrar</a></p>
+          <p className="auth-footer">Já tens conta? <Link to="/login">Entrar</Link></p>
         </div>
 
         {/* Side visual */}

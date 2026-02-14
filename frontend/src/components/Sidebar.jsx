@@ -1,19 +1,12 @@
 // src/components/Sidebar.jsx
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  CalendarDays,
-  BookOpen,
-  ShoppingCart,
-  BarChart3,
-  User,
   LogOut,
   ChevronRight,
 } from 'lucide-react';
+import { MAIN_NAV_ITEMS } from '../config/navigation';
+import { AUTH_KEY, PROFILE_KEY } from '../constants/storageKeys';
 import '../styles/sidebar.css';
-
-const PROFILE_KEY = 'nutribot_profile';
-const AUTH_KEY = 'nutribot_auth';
 
 const clearNutribotSessionData = () => {
   const keysToRemove = [];
@@ -36,15 +29,6 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const menuItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/meal-plan', icon: CalendarDays, label: 'Plano Semanal' },
-    { path: '/recipes', icon: BookOpen, label: 'Receitas' },
-    { path: '/shopping', icon: ShoppingCart, label: 'Lista de Compras' },
-    { path: '/progress', icon: BarChart3, label: 'Progresso' },
-    { path: '/profile', icon: User, label: 'Perfil' },
-  ];
-
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
@@ -61,16 +45,19 @@ export default function Sidebar() {
 
       {/* Menu */}
       <nav className="sidebar-nav">
-        {menuItems.map((item) => {
+        {MAIN_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
           <button
             key={item.path}
             className={`sidebar-item ${isActive(item.path) ? 'active' : ''}`}
             onClick={() => navigate(item.path)}
+            title={`${item.label} (${item.shortcut})`}
+            aria-keyshortcuts={item.shortcut}
           >
             <Icon className="sidebar-item-icon" />
             <span className="sidebar-item-label">{item.label}</span>
+            <span className="sidebar-item-kbd" aria-hidden="true">{item.shortcut}</span>
             <ChevronRight className="sidebar-item-arrow" />
           </button>
           );

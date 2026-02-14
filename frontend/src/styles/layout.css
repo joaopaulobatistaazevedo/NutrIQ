@@ -6,6 +6,25 @@
   background: #dfe7f0;
 }
 
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 16px;
+  z-index: 200;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
 .layout-content {
   flex: 1;
   margin-left: 260px;

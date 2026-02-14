@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import '../styles/meal-plan.css';
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
@@ -103,16 +104,19 @@ export default function MealPlan() {
   return (
     <Layout>
       <div className="meal-plan">
-        <header className="meal-plan-header">
-          <div>
-            <h1 className="meal-plan-title">Calendário de Refeições</h1>
-            <p className="meal-plan-subtitle">Organiza e acompanha o plano nutricional dia a dia</p>
-          </div>
-          <button className="btn-primary">
-            <CalendarDays size={16} />
-            <span>Gerar Semana</span>
-          </button>
-        </header>
+        <PageHeader
+          className="meal-plan-header"
+          title="Calendário de Refeições"
+          subtitle="Organiza e acompanha o plano nutricional dia a dia"
+          titleClassName="meal-plan-title"
+          subtitleClassName="meal-plan-subtitle"
+          actions={(
+            <button className="btn-primary">
+              <CalendarDays size={16} />
+              <span>Gerar Semana</span>
+            </button>
+          )}
+        />
 
         <section className="meal-plan-grid">
           <article className="calendar-card">
