@@ -42,6 +42,7 @@ Fluxo implementado:
 2. Extração de título, ingredientes, passos, tempo e porções.
 3. Import/upsert em SQLite.
 4. Matching por ingredientes para sugerir refeições possíveis (print no terminal).
+5. Cada sugestão mostra o link da receita e, quando disponível, o link da foto principal.
 
 ### 1) Scrape + import em SQLite
 

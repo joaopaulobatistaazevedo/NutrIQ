@@ -330,6 +330,8 @@ def _print_suggestions(
             missing_preview = ", ".join(match.missing_ingredients[:4])
             print(f"   faltam: {missing_preview}")
         print(f"   link: {match.url}")
+        if match.image_url:
+            print(f"   foto: {match.image_url}")
 
 
 if __name__ == "__main__":

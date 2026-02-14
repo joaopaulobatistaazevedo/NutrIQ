@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-02-14T01:55:51.379725+00:00",
-  "count": 55,
+  "generated_at": "2026-02-14T03:24:27.239741+00:00",
+  "count": 54,
   "recipes": [
     {
       "source": "TeleCulinaria",
@@ -25,6 +25,7 @@
       "cook_time_minutes": 55,
       "total_time_minutes": 110,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/yhipbtcv3kke.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -68,6 +69,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 45,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/11/mhes547pprua.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -111,6 +113,7 @@
       "cook_time_minutes": 80,
       "total_time_minutes": 160,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/qn4119stqwy9.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -153,6 +156,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 90,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/w8nchfn4dnwf.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -191,6 +195,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 60,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/npn0nfzwz17z.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -226,6 +231,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 50,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/5bbzlnf1mi8f.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -269,6 +275,7 @@
       "cook_time_minutes": 35,
       "total_time_minutes": 70,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/dticeeb0muay.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -303,6 +310,7 @@
       "cook_time_minutes": 15,
       "total_time_minutes": 30,
       "servings": "['2']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/l1hjycw7g3sj.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -341,6 +349,7 @@
       "cook_time_minutes": 25,
       "total_time_minutes": 50,
       "servings": "['2']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/5fuafyu2qeke.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -382,6 +391,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 90,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2022/02/dxu3ozfx7enn.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -417,6 +427,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": null,
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/rhuz7ji7gtxl-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -461,6 +472,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": null,
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/11/dlhxqto9hjc6.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -521,6 +533,7 @@
       "cook_time_minutes": 75,
       "total_time_minutes": 75,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/6t72l4obsptl.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -554,6 +567,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 15,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/10qlqz28gfan.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -591,6 +605,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 30,
       "servings": "['2']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/l7anqjvgzkvl.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -631,6 +646,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 40,
       "servings": "['3']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/zaukxklqsmsf-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -664,6 +680,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/9njueppkocdd.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -707,6 +724,7 @@
       "cook_time_minutes": 30,
       "total_time_minutes": 30,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/lbndrl00pvn0.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -743,6 +761,7 @@
       "cook_time_minutes": 30,
       "total_time_minutes": 60,
       "servings": "['11']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/qjykcj2tg9iy.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -788,6 +807,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": null,
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/xzjqmm21mk0c-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -824,6 +844,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 35,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/01/lfsqxy9r80ol.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -856,6 +877,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 45,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2020/06/p4jwkonsmqpl.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -894,6 +916,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 45,
       "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/10/7yuhow0s4myx.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -940,6 +963,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 60,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/10/ea1twfufhhrf.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -980,6 +1004,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/hckabnguf504.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1014,6 +1039,7 @@
       "cook_time_minutes": 30,
       "total_time_minutes": 60,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2018/11/9fmzraaekrdm.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1053,6 +1079,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 60,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/3osl7pv9sfa6.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1092,6 +1119,7 @@
       "cook_time_minutes": 50,
       "total_time_minutes": 100,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/bwxwpeaxvekp.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1132,6 +1160,7 @@
       "cook_time_minutes": 120,
       "total_time_minutes": 240,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/11/ukuibvjpdxbi.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1174,6 +1203,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2019/03/21ib6zsl7nwb.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1209,6 +1239,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/11/uurl3x1cm6ml-1.png",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1247,6 +1278,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 40,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/02/jdluwsamkg8z.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1289,6 +1321,7 @@
       "cook_time_minutes": 70,
       "total_time_minutes": 140,
       "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2021/01/oqchcd0jxoqd-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1322,6 +1355,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['9']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/09/pnzyanrsp3hi.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1354,6 +1388,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/io28lbufdkge-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1391,6 +1426,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2016/03/llh1minjqzik-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1421,6 +1457,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/glspdejt0gxm.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1449,6 +1486,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/mqmculsue6pp-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1483,6 +1521,7 @@
       "cook_time_minutes": 35,
       "total_time_minutes": 70,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/tq4rkselnddj-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1519,6 +1558,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/lbju9hgul3rn-1.png",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1552,6 +1592,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/ag7hjxsvb9ec-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1592,6 +1633,7 @@
       "cook_time_minutes": 90,
       "total_time_minutes": 180,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/yugexfabp389-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1636,6 +1678,7 @@
       "cook_time_minutes": 80,
       "total_time_minutes": 160,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2021/02/dc7umrijcvj7-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1675,6 +1718,7 @@
       "cook_time_minutes": 75,
       "total_time_minutes": 150,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/aa0qzqxjinqx.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1716,6 +1760,7 @@
       "cook_time_minutes": 50,
       "total_time_minutes": 50,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/cybrbs3wvlys-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1757,6 +1802,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 90,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zznoylpap0qv-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1810,6 +1856,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/jeudi31nirg1-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1852,6 +1899,7 @@
       "cook_time_minutes": 110,
       "total_time_minutes": 220,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/lmfyeoiad3df-1.png",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1885,6 +1933,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2021/04/9nc6im0jokbe-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1930,6 +1979,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['24']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zq9y1tllmbgh-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1972,6 +2022,7 @@
       "cook_time_minutes": 50,
       "total_time_minutes": 100,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zh0edjdqggys-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2006,6 +2057,7 @@
       "cook_time_minutes": 80,
       "total_time_minutes": 160,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/lt2m1ckvq23f-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2045,6 +2097,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/pgdkb1chzg2c-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2078,6 +2131,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['16']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/q4zhu1unjijl-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2090,45 +2144,6 @@
         "receitas faceis",
         "receitas rápidas",
         "sobremesas"
-      ]
-    },
-    {
-      "source": "TeleCulinaria",
-      "source_tag": "pt",
-      "url": "https://teleculinaria.pt/receitas/bolo-caseiro-2/",
-      "title": "Bolo caseiro",
-      "ingredients": [
-        "200 g  farinha",
-        "200 g  açúcar",
-        "100 g  margarina",
-        "100 g  leite",
-        "6  Ovos",
-        "1 colher (chá)  fermento em pó",
-        "1 casquinha  limão",
-        "Erva-doce q.b.",
-        "Margarina para untar",
-        "Farinha para polvilhar",
-        "Papel vegetal"
-      ],
-      "steps": [
-        "Unte uma forma com margarina, forre-a com papel vegetal, unte novamente e polvilhe com farinha. Encaixe o acessório misturador no copo do robot, junte as claras e ligue durante 6 minutos na velocidade 4 (velocidade 5 na Mycook). Deite uma tigela.",
-        "Retire o acessório misturador do copo, deite-lhe a casca de limão e o açúcar e ligue 30 segundos na velocidade máxima. Adicione depois o leite, as gemas e a margarina e ligue 30 segundos na velocidade 6 (velocidade 7 na Mycook). Passe a espátula, junte um pouco de erva-doce, o fermento e a farinha e ligue mais 1 minuto novamente na velocidade 6 (velocidade 7 na Mycook), passando com a espátula a meio.",
-        "Junte o preparado anterior à tigela com as claras, envolva, verta para a forma e leve ao forno pré-aquecido a 180°C durante 40 minutos. Verifique se está bem cozido, retire do forno, desenforme, deixe arrefecer e sirva decorado a gosto ou como vê na foto."
-      ],
-      "prep_time_minutes": 70,
-      "cook_time_minutes": 70,
-      "total_time_minutes": 140,
-      "servings": "['6']",
-      "tags": [
-        "pt",
-        "teleculinaria",
-        "bimby",
-        "doces",
-        "my cook",
-        "receitas para robot de cozinha",
-        "Robot de Cozinha",
-        "sobremesas",
-        "yammi"
       ]
     }
   ]

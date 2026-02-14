@@ -25,11 +25,13 @@ def ensure_schema(db_path: str) -> None:
                 cook_time_minutes INTEGER,
                 total_time_minutes INTEGER,
                 servings TEXT,
+                image_url TEXT,
                 tags_json TEXT NOT NULL,
                 fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        _ensure_column(conn, "recipes", "image_url", "TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_recipes_source ON recipes(source)")
         conn.commit()
     finally:
@@ -55,9 +57,10 @@ def upsert_recipes(db_path: str, recipes: list[RecipeRecord]) -> int:
                     cook_time_minutes,
                     total_time_minutes,
                     servings,
+                    image_url,
                     tags_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     source=excluded.source,
                     source_tag=excluded.source_tag,
@@ -68,6 +71,7 @@ def upsert_recipes(db_path: str, recipes: list[RecipeRecord]) -> int:
                     cook_time_minutes=excluded.cook_time_minutes,
                     total_time_minutes=excluded.total_time_minutes,
                     servings=excluded.servings,
+                    image_url=excluded.image_url,
                     tags_json=excluded.tags_json,
                     fetched_at=CURRENT_TIMESTAMP
                 """,
@@ -82,6 +86,7 @@ def upsert_recipes(db_path: str, recipes: list[RecipeRecord]) -> int:
                     recipe.cook_time_minutes,
                     recipe.total_time_minutes,
                     recipe.servings,
+                    recipe.image_url,
                     json.dumps(recipe.tags, ensure_ascii=False),
                 ),
             )
@@ -109,6 +114,7 @@ def load_recipes(db_path: str) -> list[RecipeRecord]:
                 cook_time_minutes,
                 total_time_minutes,
                 servings,
+                image_url,
                 tags_json
             FROM recipes
             """
@@ -130,10 +136,18 @@ def load_recipes(db_path: str) -> list[RecipeRecord]:
                 cook_time_minutes=row["cook_time_minutes"],
                 total_time_minutes=row["total_time_minutes"],
                 servings=row["servings"],
+                image_url=row["image_url"],
                 tags=_json_list(row["tags_json"]),
             )
         )
     return recipes
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, type_sql: str) -> None:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    existing = {str(row[1]).lower() for row in rows if len(row) > 1}
+    if column.lower() not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {type_sql}")
 
 
 def _json_list(value: str | None) -> list[str]:

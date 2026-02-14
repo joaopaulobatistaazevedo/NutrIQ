@@ -15,6 +15,7 @@ class RecipeRecord:
     cook_time_minutes: int | None = None
     total_time_minutes: int | None = None
     servings: str | None = None
+    image_url: str | None = None
     tags: list[str] = field(default_factory=list)
 
 
@@ -23,6 +24,7 @@ class MatchedRecipe:
     title: str
     source: str
     url: str
+    image_url: str | None
     match_ratio: float
     matched_ingredients: list[str]
     missing_ingredients: list[str]
