@@ -50,6 +50,7 @@ function normalizePriceItem(entry, index) {
     checked: false,
     currency: String(entry?.currency || 'EUR').trim() || 'EUR',
     productUrl: String(entry?.productUrl || '').trim(),
+    imageUrl: String(entry?.imageUrl || entry?.image_url || '').trim(),
   };
 }
 
@@ -104,12 +105,17 @@ function normalizeCheapestResult(entry) {
     checked: false,
     currency: String(entry?.currency || 'EUR').trim() || 'EUR',
     productUrl: String(entry?.productUrl || '').trim(),
+    imageUrl: String(entry?.imageUrl || entry?.image_url || '').trim(),
     supermarket: market,
   };
 }
 
-function itemImageFor(name) {
-  const seed = encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'));
+function itemImageFor(item) {
+  const imageUrl = String(item?.imageUrl || '').trim();
+  if (imageUrl) {
+    return imageUrl;
+  }
+  const seed = encodeURIComponent(String(item?.name || '').toLowerCase().replace(/\s+/g, '-'));
   return `https://picsum.photos/seed/${seed}/300/300`;
 }
 
@@ -419,7 +425,7 @@ export default function Shopping() {
               {activeItems.map((item) => (
                 <article key={item.id} className={`shopping-item ${activeList.accentClass}`}>
                   <div className="shopping-item-image" aria-hidden="true">
-                    <img src={itemImageFor(item.name)} alt={item.name} loading="lazy" />
+                    <img src={itemImageFor(item)} alt={item.name} loading="lazy" />
                   </div>
 
                   <div className="shopping-item-content">
