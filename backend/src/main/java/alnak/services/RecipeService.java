@@ -1,48 +1,128 @@
 package alnak.services;
 
+import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.MealType;
 import alnak.business_logic.entities.Recipe;
-import alnak.data.global.GlobalRecipeDAO;
+import alnak.data.local.RecipeDAO;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class RecipeService {
-    private final GlobalRecipeDAO recipeDAO;
 
-    public RecipeService() {
-        this(new GlobalRecipeDAO());
-    }
+    private final RecipeDAO recipeDAO;
 
-    public RecipeService(GlobalRecipeDAO recipeDAO) {
+    public RecipeService(RecipeDAO recipeDAO) {
         this.recipeDAO = recipeDAO;
     }
 
-    public List<Recipe> listRecipes(Integer limit, String mealTypeRaw) {
-        MealType mealType = parseMealType(mealTypeRaw);
-        Integer sanitizedLimit = sanitizeLimit(limit);
-        return recipeDAO.listRecipes(sanitizedLimit, mealType);
+    // ── Read ──────────────────────────────────────────────────────
+
+    public List<Recipe> listAll() {
+        return List.copyOf(recipeDAO.values());
     }
 
-    private MealType parseMealType(String mealTypeRaw) {
-        if (mealTypeRaw == null || mealTypeRaw.isBlank()) {
-            return null;
+    public Recipe getById(int id) {
+        Recipe recipe = recipeDAO.get(id);
+        if (recipe == null) {
+            throw new IllegalArgumentException("Receita não encontrada: " + id);
+        }
+        return recipe;
+    }
+
+    public List<Recipe> search(String query) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("Parâmetro de pesquisa inválido.");
+        }
+        return recipeDAO.search(query.trim());
+    }
+
+    public List<Recipe> listByMealType(String mealTypeRaw) {
+        MealType type = parseMealType(mealTypeRaw);
+        return recipeDAO.byMealType(type);
+    }
+
+    /**
+     * Meal-planning filter: meal type + calorie window + allergen safety + tag exclusions.
+     *
+     * @param mealTypeRaw  meal type string (case-insensitive)
+     * @param minCal       minimum calories (inclusive)
+     * @param maxCal       maximum calories (inclusive)
+     * @param allergens    allergens the result must be free of (may be empty)
+     * @param excludeTags  tags that disqualify a recipe (may be empty)
+     */
+    public List<Recipe> filter(String mealTypeRaw, int minCal, int maxCal,
+                               Set<Allergen> allergens, Set<String> excludeTags) {
+        if (minCal < 0 || maxCal < minCal) {
+            throw new IllegalArgumentException(
+                    "Intervalo de calorias inválido: minCal=" + minCal + ", maxCal=" + maxCal);
+        }
+        MealType type = parseMealType(mealTypeRaw);
+        return recipeDAO.filtered(type, minCal, maxCal,
+                allergens  != null ? allergens   : Set.of(),
+                excludeTags != null ? excludeTags : Set.of());
+    }
+
+    // ── Write ─────────────────────────────────────────────────────
+
+    public Recipe create(Recipe recipe) {
+        validateRecipe(recipe);
+        recipeDAO.put(recipe);   // sets recipe.id via RETURN_GENERATED_KEYS
+        return recipe;
+    }
+
+    public Recipe update(int id, Recipe recipe) {
+        if (!recipeDAO.containsKey(id)) {
+            throw new IllegalArgumentException("Receita não encontrada: " + id);
+        }
+        validateRecipe(recipe);
+        recipe.setId(id);
+        recipeDAO.put(id, recipe);
+        return recipe;
+    }
+
+    public void delete(int id) {
+        Recipe removed = recipeDAO.remove(id);
+        if (removed == null) {
+            throw new IllegalArgumentException("Receita não encontrada: " + id);
+        }
+    }
+
+    /** Batch import — delegates to the DAO transaction. */
+    public Map<String, Integer> importBatch(List<Recipe> recipes) {
+        if (recipes == null || recipes.isEmpty()) {
+            throw new IllegalArgumentException("Lista de receitas vazia.");
+        }
+        recipeDAO.putAll(recipes);
+        return Map.of("imported", recipes.size());
+    }
+
+    // ── Private helpers ───────────────────────────────────────────
+
+    private MealType parseMealType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Tipo de refeição inválido.");
         }
         try {
-            return MealType.from(mealTypeRaw.trim());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                    "mealType invalido. Usa: BREAKFAST, LUNCH, DINNER ou SNACK."
-            );
+            return MealType.from(raw.trim());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Tipo de refeição desconhecido: " + raw);
         }
     }
 
-    private Integer sanitizeLimit(Integer limit) {
-        if (limit == null) {
-            return 200;
+    private void validateRecipe(Recipe recipe) {
+        if (recipe == null) {
+            throw new IllegalArgumentException("Receita inválida.");
         }
-        if (limit <= 0) {
-            throw new IllegalArgumentException("limit deve ser > 0");
+        if (recipe.getName() == null || recipe.getName().isBlank()) {
+            throw new IllegalArgumentException("O nome da receita é obrigatório.");
         }
-        return Math.min(limit, 500);
+        if (recipe.getMealType() == null) {
+            throw new IllegalArgumentException("O tipo de refeição é obrigatório.");
+        }
+        if (recipe.getServings() <= 0) {
+            throw new IllegalArgumentException("O número de porções deve ser positivo.");
+        }
     }
 }
