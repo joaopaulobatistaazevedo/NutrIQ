@@ -41,67 +41,67 @@ public class MealPlanController {
 
     // ── Plans ─────────────────────────────────────────────────────
 
-    public MealPlanResponse createPlan(String body) throws Exception {
+    public MealPlanResponse createPlan(Long userId, String body) throws Exception {
         CreatePlanRequest req = mapper.readValue(body, CreatePlanRequest.class);
-        MealPlan plan = mealPlanService.createPlan(req.weekStart());
+        MealPlan plan = mealPlanService.createPlan(userId, req.weekStart());
         return MealPlanResponse.from(plan);
     }
 
-    public List<MealPlanResponse> listPlans() {
-        return MealPlanResponse.fromList(mealPlanService.listAll());
+    public List<MealPlanResponse> listPlans(Long userId) {
+        return MealPlanResponse.fromList(mealPlanService.listAll(userId));
     }
 
-    public MealPlanResponse getActivePlan() {
-        MealPlan plan = mealPlanService.getActivePlan()
+    public MealPlanResponse getActivePlan(Long userId) {
+        MealPlan plan = mealPlanService.getActivePlan(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Nenhum plano ativo encontrado."));
         return MealPlanResponse.from(plan);
     }
 
-    public MealPlanResponse getPlan(int planId) {
-        return MealPlanResponse.from(mealPlanService.getPlanById(planId));
+    public MealPlanResponse getPlan(Long userId, int planId) {
+        return MealPlanResponse.from(mealPlanService.getPlanById(userId, planId));
     }
 
-    public MealPlanResponse updateStatus(int planId, String body) throws Exception {
+    public MealPlanResponse updateStatus(Long userId, int planId, String body) throws Exception {
         UpdateStatusRequest req = mapper.readValue(body, UpdateStatusRequest.class);
-        MealPlan plan = mealPlanService.updateStatus(planId, req.status());
+        MealPlan plan = mealPlanService.updateStatus(userId, planId, req.status());
         return MealPlanResponse.from(plan);
     }
 
-    public void deletePlan(int planId) {
-        mealPlanService.deletePlan(planId);
+    public void deletePlan(Long userId, int planId) {
+        mealPlanService.deletePlan(userId, planId);
     }
 
     // ── Meals ─────────────────────────────────────────────────────
 
-    public MealResponse addMeal(int planId, String body) throws Exception {
+    public MealResponse addMeal(Long userId, int planId, String body) throws Exception {
         AddMealRequest req = mapper.readValue(body, AddMealRequest.class);
         MealPlan.MealPlanMeal meal = mealPlanService.addMeal(
-                planId, req.recipeId(), req.dayOfWeek(), req.mealType());
+                userId, planId, req.recipeId(), req.dayOfWeek(), req.mealType());
         return MealResponse.from(meal);
     }
 
-    public void removeMeal(int planId, int mealId) {
-        mealPlanService.removeMeal(planId, mealId);
+    public void removeMeal(Long userId, int planId, int mealId) {
+        mealPlanService.removeMeal(userId, planId, mealId);
     }
 
-    public MealResponse swapMeal(int planId, int mealId, String body) throws Exception {
+    public MealResponse swapMeal(Long userId, int planId, int mealId, String body) throws Exception {
         SwapMealRequest req = mapper.readValue(body, SwapMealRequest.class);
-        MealPlan.MealPlanMeal meal = mealPlanService.swapRecipe(planId, mealId, req.newRecipeId());
+        MealPlan.MealPlanMeal meal = mealPlanService.swapRecipe(userId, planId, mealId, req.newRecipeId());
         return MealResponse.from(meal);
     }
 
-    public MealResponse completeMeal(int planId, int mealId, String body) throws Exception {
+    public MealResponse completeMeal(Long userId, int planId, int mealId, String body) throws Exception {
         CompleteMealRequest req = mapper.readValue(body, CompleteMealRequest.class);
         MealPlan.MealPlanMeal meal = mealPlanService.completeMeal(
-                planId, mealId, req.photoPath());
+                userId, planId, mealId, req.photoPath());
         return MealResponse.from(meal);
     }
 
-    public List<MealResponse> getMealsForDay(int planId, String day) {
-        return MealResponse.fromList(mealPlanService.getMealsForDay(planId, day));
+    public List<MealResponse> getMealsForDay(Long userId, int planId, String day) {
+        return MealResponse.fromList(mealPlanService.getMealsForDay(userId, planId, day));
     }
 
-    public List<MealResponse> getMealsByType(int planId, String type) {
-        return MealResponse.fromList(mealPlanService.getMealsByType(planId, type));
+    public List<MealResponse> getMealsByType(Long userId, int planId, String type) {
+        return MealResponse.fromList(mealPlanService.getMealsByType(userId, planId, type));
     }
 }

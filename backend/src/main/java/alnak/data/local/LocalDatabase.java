@@ -3,11 +3,15 @@ package alnak.data.local;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LocalDatabase {
 
@@ -15,17 +19,54 @@ public class LocalDatabase {
     private static final String DB_FILE_NAME = "meal_planner.db";
     private static final Path LEGACY_DB_PATH = Path.of(DB_FILE_NAME);
     private static LocalDatabase instance;
-    private Connection connection;
+    private final Connection connection;
+    private final ThreadLocal<Connection> threadConnection;
+    private final String dbUrl;
+    private final Path dbPath;
+    private final Set<Connection> openedConnections;
 
     private LocalDatabase() {
         try {
-            Path dbPath = DB_DIR.resolve(DB_FILE_NAME).toAbsolutePath().normalize();
+            this.dbPath = DB_DIR.resolve(DB_FILE_NAME).toAbsolutePath().normalize();
             Path legacyPath = LEGACY_DB_PATH.toAbsolutePath().normalize();
 
             Files.createDirectories(dbPath.getParent());
-            String dbUrl = "jdbc:sqlite:" + dbPath + "?journal_mode=WAL";
-            connection = DriverManager.getConnection(dbUrl);
-            connection.createStatement().execute("PRAGMA foreign_keys = ON");
+
+            this.dbUrl = "jdbc:sqlite:" + dbPath + "?journal_mode=WAL";
+            this.threadConnection = new ThreadLocal<>();
+            this.openedConnections = ConcurrentHashMap.newKeySet();
+            this.connection = (Connection) Proxy.newProxyInstance(
+                    Connection.class.getClassLoader(),
+                    new Class[]{Connection.class},
+                    (proxy, method, args) -> {
+                        String name = method.getName();
+
+                        if ("close".equals(name)) {
+                            Connection c = threadConnection.get();
+                            if (c != null) {
+                                try {
+                                    if (!c.isClosed()) {
+                                        c.close();
+                                    }
+                                } finally {
+                                    openedConnections.remove(c);
+                                    threadConnection.remove();
+                                }
+                            }
+                            return null;
+                        }
+
+                        Connection c = currentConnection();
+                        try {
+                            return method.invoke(c, args);
+                        } catch (InvocationTargetException e) {
+                            throw e.getCause();
+                        }
+                    }
+            );
+
+            Runtime.getRuntime().addShutdownHook(new Thread(this::closeAllOpenedConnections));
+
             initSchema();
             System.out.println("SQLite connected: " + dbPath);
             if (!legacyPath.equals(dbPath) && Files.exists(legacyPath)) {
@@ -43,6 +84,32 @@ public class LocalDatabase {
 
     public Connection getConnection() {
         return connection;
+    }
+
+    private Connection currentConnection() throws SQLException {
+        Connection c = threadConnection.get();
+        if (c == null || c.isClosed()) {
+            c = DriverManager.getConnection(dbUrl);
+            try (Statement s = c.createStatement()) {
+                s.execute("PRAGMA foreign_keys = ON");
+                s.execute("PRAGMA busy_timeout = 5000");
+            }
+            threadConnection.set(c);
+            openedConnections.add(c);
+        }
+        return c;
+    }
+
+    private void closeAllOpenedConnections() {
+        for (Connection c : openedConnections) {
+            try {
+                if (c != null && !c.isClosed()) {
+                    c.close();
+                }
+            } catch (SQLException ignored) {
+            }
+        }
+        openedConnections.clear();
     }
 
     private void initSchema() throws SQLException {
