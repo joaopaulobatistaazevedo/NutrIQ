@@ -232,9 +232,10 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="dash">
+      <div className="page dash">
+        <div className="container-xl">
         {/* === DARK HERO === */}
-        <motion.section className="dash-hero" {...fade}>
+        <motion.section className="dash-hero card" {...fade}>
           <div className="dash-hero-noise" />
           <div className="dash-hero-blob blob-1" />
           <div className="dash-hero-blob blob-2" />
@@ -461,6 +462,7 @@ export default function Dashboard() {
           </motion.section>
         </div>
 
+        </div>
       </div>
     </Layout>
   );

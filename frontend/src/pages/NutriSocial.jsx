@@ -264,248 +264,293 @@ export default function NutriSocial() {
 
   const currentUserId = Number(authSession?.userId || 0);
 
+  const storyIds = useMemo(() => {
+    const unique = [currentUserId, ...friendIds].filter((value, index, array) => value && array.indexOf(value) === index);
+    return unique.slice(0, 10);
+  }, [currentUserId, friendIds]);
+
   const togglePanel = (panelName) => {
     setActivePanel((previous) => (previous === panelName ? '' : panelName));
   };
 
   return (
     <Layout>
-      <div className="nutri-social-page">
-        <header className="nutri-social-header">
-          <h1>NutriSocial</h1>
-          <p>Feed saudável da tua rede, com ações rápidas para publicar e gerir amizades.</p>
-          <div className="nutri-social-streak">
-            <Flame size={18} />
-            <span>Streak atual: {streakCount} dias</span>
-          </div>
-        </header>
-
-        {activePanel === 'post' ? (
-          <section className="nutri-social-sheet">
-            <div className="nutri-social-sheet-head">
-              <h2>Nova publicação</h2>
-              <button type="button" className="nutri-social-icon-btn" onClick={() => setActivePanel('')}>
-                <X size={16} />
-              </button>
-            </div>
-            <form className="nutri-social-form" onSubmit={handleSubmit}>
-              <label className="nutri-social-field file-input">
-                <span><Camera size={16} /> Tirar foto da refeição</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={onPhotoChange}
-                />
-              </label>
-
-              {photoPreview ? (
-                <img src={photoPreview} alt="Pré-visualização da refeição" className="nutri-social-preview" />
-              ) : null}
-
-              <label className="nutri-social-field">
-                <span>Descrição (opcional)</span>
-                <textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Ex: Prato com proteína e legumes."
-                  rows={3}
-                />
-              </label>
-
-              <label className="nutri-social-share-toggle">
-                <input
-                  type="checkbox"
-                  checked={shareOnNutriSocial}
-                  onChange={(event) => setShareOnNutriSocial(event.target.checked)}
-                />
-                <span><Share2 size={16} /> Partilhar no NutriSocial</span>
-              </label>
-
-              {shareOnNutriSocial ? (
-                <>
-                  <label className="nutri-social-field">
-                    <span>Receita associada</span>
-                    <select
-                      value={selectedRecipeId}
-                      onChange={(event) => setSelectedRecipeId(event.target.value)}
-                      required
-                    >
-                      <option value="">Seleciona uma receita</option>
-                      {sortedRecipes.map((recipe) => (
-                        <option key={recipe?.id} value={recipe?.id}>{recipe?.name || `Receita #${recipe?.id}`}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="nutri-social-field">
-                    <span>Avaliação (1-5)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={rating}
-                      onChange={(event) => setRating(event.target.value)}
-                      required
-                    />
-                  </label>
-                </>
-              ) : null}
-
-              <button type="submit" className="nutri-social-submit" disabled={isSubmitting}>
-                <Send size={16} />
-                {isSubmitting ? 'A registar...' : 'Publicar'}
-              </button>
-
-              {submitStatus ? <p className="nutri-social-status">{submitStatus}</p> : null}
-            </form>
-          </section>
-        ) : null}
-
-        {activePanel === 'friends' ? (
-          <section className="nutri-social-sheet">
-            <div className="nutri-social-sheet-head">
-              <h2>Rede de amigos</h2>
-              <button type="button" className="nutri-social-icon-btn" onClick={() => setActivePanel('')}>
-                <X size={16} />
-              </button>
-            </div>
-
-            <form className="nutri-social-inline-form" onSubmit={handleSendFriendRequest}>
-              <label className="nutri-social-field">
-                <span>ID do utilizador</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={newFriendId}
-                  onChange={(event) => setNewFriendId(event.target.value)}
-                  placeholder="Ex: 2"
-                />
-              </label>
-              <button
-                type="submit"
-                className="nutri-social-submit"
-                disabled={friendActionLoadingId === 'send'}
-              >
-                <Send size={16} />
-                {friendActionLoadingId === 'send' ? 'A enviar...' : 'Enviar'}
-              </button>
-            </form>
-
-            {friendStatus ? <p className="nutri-social-feedback">{friendStatus}</p> : null}
-            {friendError ? <p className="nutri-social-feedback error">{friendError}</p> : null}
-
-            {friendsLoading ? <p className="nutri-social-feedback">A carregar amizades...</p> : null}
-            {!friendsLoading ? (
-              <div className="nutri-social-friends-grid">
-                <div className="nutri-social-friend-list">
-                  <h3>Amigos ({friendIds.length})</h3>
-                  {friendIds.length === 0 ? <p className="nutri-social-feedback">Ainda sem amizades ativas.</p> : null}
-                  {friendIds.length > 0 ? (
-                    <div className="nutri-social-id-cloud">
-                      {friendIds.map((friendId) => (
-                        <span key={`friend-id-${friendId}`}>#{friendId}</span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="nutri-social-friend-list">
-                  <h3>Pedidos recebidos ({pendingReceived.length})</h3>
-                  {pendingReceived.length === 0 ? <p className="nutri-social-feedback">Sem pedidos recebidos.</p> : null}
-                  {pendingReceived.map((request) => (
-                    <div className="nutri-social-friend-item" key={`request-received-${request.id}`}>
-                      <span>De utilizador #{request.requesterId}</span>
-                      <div className="nutri-social-actions">
-                        <button
-                          type="button"
-                          className="nutri-social-secondary-btn"
-                          onClick={() => handleAcceptRequest(request.id)}
-                          disabled={friendActionLoadingId === `accept-${request.id}`}
-                        >
-                          {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
-                        </button>
-                        <button
-                          type="button"
-                          className="nutri-social-secondary-btn danger"
-                          onClick={() => handleDeclineRequest(request.id)}
-                          disabled={friendActionLoadingId === `decline-${request.id}`}
-                        >
-                          {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="nutri-social-friend-list">
-                  <h3>Pedidos enviados ({pendingSent.length})</h3>
-                  {pendingSent.length === 0 ? <p className="nutri-social-feedback">Sem pedidos enviados pendentes.</p> : null}
-                  {pendingSent.map((request) => (
-                    <div className="nutri-social-friend-item" key={`request-sent-${request.id}`}>
-                      <span>Para utilizador #{request.addresseeId}</span>
-                      <button
-                        type="button"
-                        className="nutri-social-secondary-btn danger"
-                        onClick={() => handleDeclineRequest(request.id)}
-                        disabled={friendActionLoadingId === `decline-${request.id}`}
-                      >
-                        {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+      <div className="page nutri-social-page">
+        <div className="container-xl">
+          <div className="page-header d-print-none mb-3">
+            <div className="row align-items-center w-100 g-2">
+              <div className="col">
+                <h2 className="page-title mb-1">NutriSocial</h2>
+                <div className="text-secondary">Feed saudável da tua rede com ações rápidas.</div>
               </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        <section className="nutri-social-card">
-          <div className="nutri-social-feed-head">
-            <h2>Feed NutriSocial</h2>
-            <span className="nutri-social-feed-user">Utilizador #{currentUserId || '—'}</span>
+              <div className="col-auto">
+                <span className="badge bg-orange-lt text-orange d-inline-flex align-items-center gap-2 py-2 px-3">
+                  <Flame size={14} /> Streak {streakCount} dias
+                </span>
+              </div>
+            </div>
           </div>
-          {feedLoading ? <p className="nutri-social-feedback">A carregar feed...</p> : null}
-          {!feedLoading && feedError ? <p className="nutri-social-feedback error">{feedError}</p> : null}
-          {!feedLoading && !feedError && feedPosts.length === 0 ? (
-            <p className="nutri-social-feedback">Ainda não existem partilhas no teu feed.</p>
+
+          <div className="card mb-3">
+            <div className="card-body py-3">
+              <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
+                {storyIds.map((id, index) => (
+                  <button key={`story-${id}`} type="button" className="nutri-social-story-item">
+                    <span className="nutri-social-story-avatar">{String(id).slice(-2)}</span>
+                    <span className="nutri-social-story-label">{index === 0 ? 'Tu' : `#${id}`}</span>
+                  </button>
+                ))}
+                {storyIds.length === 0 ? (
+                  <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {activePanel === 'post' ? (
+            <section className="card mb-3">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h3 className="card-title m-0">Nova publicação</h3>
+                <button type="button" className="btn btn-icon" onClick={() => setActivePanel('')}>
+                  <X size={16} />
+                </button>
+            </div>
+              <div className="card-body">
+                <form className="nutri-social-form" onSubmit={handleSubmit}>
+                  <label className="form-label d-flex align-items-center gap-2"><Camera size={16} /> Tirar foto da refeição</label>
+                  <input
+                    className="form-control mb-3"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={onPhotoChange}
+                  />
+
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="Pré-visualização da refeição" className="nutri-social-preview mb-3" />
+                  ) : null}
+
+                  <label className="form-label">Descrição (opcional)</label>
+                  <textarea
+                    className="form-control mb-3"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Ex: Prato com proteína e legumes."
+                    rows={3}
+                  />
+
+                  <label className="form-check mb-3 d-inline-flex align-items-center gap-2">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={shareOnNutriSocial}
+                      onChange={(event) => setShareOnNutriSocial(event.target.checked)}
+                    />
+                    <span className="form-check-label d-inline-flex align-items-center gap-2"><Share2 size={16} /> Partilhar no NutriSocial</span>
+                  </label>
+
+                  {shareOnNutriSocial ? (
+                    <>
+                      <label className="form-label">Receita associada</label>
+                      <select
+                        className="form-select mb-3"
+                        value={selectedRecipeId}
+                        onChange={(event) => setSelectedRecipeId(event.target.value)}
+                        required
+                      >
+                        <option value="">Seleciona uma receita</option>
+                        {sortedRecipes.map((recipe) => (
+                          <option key={recipe?.id} value={recipe?.id}>{recipe?.name || `Receita #${recipe?.id}`}</option>
+                        ))}
+                      </select>
+
+                      <label className="form-label">Avaliação (1-5)</label>
+                      <input
+                        className="form-control mb-3"
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={rating}
+                        onChange={(event) => setRating(event.target.value)}
+                        required
+                      />
+                    </>
+                  ) : null}
+
+                  <button type="submit" className="btn btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-2" disabled={isSubmitting}>
+                    <Send size={16} />
+                    {isSubmitting ? 'A registar...' : 'Publicar'}
+                  </button>
+
+                  {submitStatus ? <p className="text-secondary mt-2 mb-0">{submitStatus}</p> : null}
+                </form>
+              </div>
+            </section>
           ) : null}
 
-          <div className="nutri-social-feed">
-            {feedPosts.map((post) => (
-              <article className="nutri-social-post" key={post.id}>
-                <img src={normalizePostImage(post)} alt={post.description || post.recipeName || 'Refeição partilhada'} />
-                <div className="nutri-social-post-body">
-                  <h3>{post.recipeName || `Receita #${post.recipeId}`}</h3>
-                  <p>{post.description || 'Sem descrição.'}</p>
-                  <div className="nutri-social-post-meta">
-                    <span>👤 #{post.userId}</span>
-                    <span>⭐ {post.rating}/5</span>
-                    <span>{prettyDate(post.createdAt)}</span>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+          {activePanel === 'friends' ? (
+            <section className="card mb-3">
+              <div className="card-header d-flex justify-content-between align-items-center">
+                <h3 className="card-title m-0">Rede de amigos</h3>
+                <button type="button" className="btn btn-icon" onClick={() => setActivePanel('')}>
+                  <X size={16} />
+                </button>
+              </div>
 
-        <div className="nutri-social-fab-stack" aria-label="Ações rápidas NutriSocial">
-          <button
-            type="button"
-            className={`nutri-social-fab nutri-social-fab-main ${activePanel === 'post' ? 'active' : ''}`}
-            onClick={() => togglePanel('post')}
-            aria-label="Nova publicação"
-          >
-            <Plus size={22} />
-          </button>
-          <button
-            type="button"
-            className={`nutri-social-fab nutri-social-fab-friends ${activePanel === 'friends' ? 'active' : ''}`}
-            onClick={() => togglePanel('friends')}
-            aria-label="Gerir amigos"
-          >
-            <Users size={18} />
-          </button>
+              <div className="card-body">
+                <form className="row g-2 mb-3" onSubmit={handleSendFriendRequest}>
+                  <div className="col">
+                    <label className="form-label">ID do utilizador</label>
+                    <input
+                      className="form-control"
+                      type="number"
+                      min={1}
+                      value={newFriendId}
+                      onChange={(event) => setNewFriendId(event.target.value)}
+                      placeholder="Ex: 2"
+                    />
+                  </div>
+                  <div className="col-auto d-flex align-items-end">
+                    <button
+                      type="submit"
+                      className="btn btn-primary d-inline-flex align-items-center gap-2"
+                      disabled={friendActionLoadingId === 'send'}
+                    >
+                      <Send size={16} />
+                      {friendActionLoadingId === 'send' ? 'A enviar...' : 'Enviar'}
+                    </button>
+                  </div>
+                </form>
+
+                {friendStatus ? <p className="text-secondary mb-2">{friendStatus}</p> : null}
+                {friendError ? <p className="text-danger mb-2">{friendError}</p> : null}
+
+                {friendsLoading ? <p className="text-secondary mb-0">A carregar amizades...</p> : null}
+                {!friendsLoading ? (
+                  <div className="row g-3">
+                    <div className="col-12 col-lg-4">
+                      <div className="border rounded-3 p-3 h-100">
+                        <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
+                        {friendIds.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
+                        {friendIds.length > 0 ? (
+                          <div className="d-flex flex-wrap gap-2">
+                            {friendIds.map((friendId) => (
+                              <span className="badge" key={`friend-id-${friendId}`}>#{friendId}</span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="col-12 col-lg-4">
+                      <div className="border rounded-3 p-3 h-100">
+                        <h4 className="h6 mb-2">Pedidos recebidos ({pendingReceived.length})</h4>
+                        {pendingReceived.length === 0 ? <p className="text-secondary mb-0">Sem pedidos recebidos.</p> : null}
+                        {pendingReceived.map((request) => (
+                          <div className="d-flex justify-content-between align-items-center gap-2 mb-2" key={`request-received-${request.id}`}>
+                            <span className="small text-secondary">De #{request.requesterId}</span>
+                            <div className="d-flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => handleAcceptRequest(request.id)}
+                                disabled={friendActionLoadingId === `accept-${request.id}`}
+                              >
+                                {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => handleDeclineRequest(request.id)}
+                                disabled={friendActionLoadingId === `decline-${request.id}`}
+                              >
+                                {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="col-12 col-lg-4">
+                      <div className="border rounded-3 p-3 h-100">
+                        <h4 className="h6 mb-2">Pedidos enviados ({pendingSent.length})</h4>
+                        {pendingSent.length === 0 ? <p className="text-secondary mb-0">Sem pedidos enviados pendentes.</p> : null}
+                        {pendingSent.map((request) => (
+                          <div className="d-flex justify-content-between align-items-center gap-2 mb-2" key={`request-sent-${request.id}`}>
+                            <span className="small text-secondary">Para #{request.addresseeId}</span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDeclineRequest(request.id)}
+                              disabled={friendActionLoadingId === `decline-${request.id}`}
+                            >
+                              {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="card">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h3 className="card-title m-0">Feed NutriSocial</h3>
+              <span className="badge">Utilizador #{currentUserId || '—'}</span>
+            </div>
+            <div className="card-body">
+              {feedLoading ? <p className="text-secondary mb-2">A carregar feed...</p> : null}
+              {!feedLoading && feedError ? <p className="text-danger mb-2">{feedError}</p> : null}
+              {!feedLoading && !feedError && feedPosts.length === 0 ? (
+                <p className="text-secondary mb-0">Ainda não existem partilhas no teu feed.</p>
+              ) : null}
+
+              <div className="d-grid gap-3">
+                {feedPosts.map((post) => (
+                  <article className="card" key={post.id}>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="avatar avatar-sm">{String(post.userId || '').slice(-2)}</span>
+                        <span className="fw-semibold">Utilizador #{post.userId}</span>
+                      </div>
+                      <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
+                    </div>
+                    <img src={normalizePostImage(post)} alt={post.description || post.recipeName || 'Refeição partilhada'} className="nutri-social-feed-image" />
+                    <div className="card-body">
+                      <h4 className="h5 mb-1">{post.recipeName || `Receita #${post.recipeId}`}</h4>
+                      <p className="text-secondary mb-2">{post.description || 'Sem descrição.'}</p>
+                      <div className="d-flex flex-wrap gap-2">
+                        <span className="badge bg-secondary-lt">🕒 {prettyDate(post.createdAt)}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <div className="nutri-social-fab-stack" aria-label="Ações rápidas NutriSocial">
+            <button
+              type="button"
+              className={`nutri-social-fab nutri-social-fab-main ${activePanel === 'post' ? 'active' : ''}`}
+              onClick={() => togglePanel('post')}
+              aria-label="Nova publicação"
+            >
+              <Plus size={22} />
+            </button>
+            <button
+              type="button"
+              className={`nutri-social-fab nutri-social-fab-friends ${activePanel === 'friends' ? 'active' : ''}`}
+              onClick={() => togglePanel('friends')}
+              aria-label="Gerir amigos"
+            >
+              <Users size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </Layout>

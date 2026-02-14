@@ -47,10 +47,11 @@ export default function Sidebar() {
       <nav className="sidebar-nav">
         {MAIN_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
+          const isNutriSocial = item.path === '/nutrisocial';
           return (
           <button
             key={item.path}
-            className={`sidebar-item ${isActive(item.path) ? 'active' : ''}`}
+            className={`sidebar-item ${isActive(item.path) ? 'active' : ''} ${isNutriSocial ? 'sidebar-item-nutrisocial' : ''}`}
             onClick={() => navigate(item.path)}
             title={`${item.label} (${item.shortcut})`}
             aria-keyshortcuts={item.shortcut}

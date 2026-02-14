@@ -7,14 +7,14 @@
 }
 
 :root {
-  --bg-app: #f3f6fb;
-  --bg-surface: #ffffff;
-  --bg-surface-soft: #f8fafd;
-  --border-soft: #e2e8f0;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --brand: #0ea5e9;
-  --brand-strong: #0284c7;
+  --bg-app: var(--tblr-bg-surface, #f3f6fb);
+  --bg-surface: var(--tblr-bg-surface, #ffffff);
+  --bg-surface-soft: var(--tblr-bg-surface-secondary, #f8fafd);
+  --border-soft: var(--tblr-border-color, #e2e8f0);
+  --text-primary: var(--tblr-body-color, #0f172a);
+  --text-secondary: var(--tblr-secondary-color, #64748b);
+  --brand: var(--tblr-primary, #0ea5e9);
+  --brand-strong: var(--tblr-primary, #0284c7);
   --shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 

@@ -45,6 +45,55 @@
   padding: 6px 12px;
 }
 
+.nutri-social-stories {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.nutri-social-stories::-webkit-scrollbar {
+  display: none;
+}
+
+.nutri-social-story-item {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 58px;
+  cursor: pointer;
+}
+
+.nutri-social-feed-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+
+.nutri-social-story-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6, #0ea5e9);
+  box-shadow: 0 8px 18px rgba(139, 92, 246, 0.28);
+}
+
+.nutri-social-story-label {
+  font-size: 11px;
+  color: #475569;
+  font-weight: 700;
+}
+
 .nutri-social-card,
 .nutri-social-sheet {
   background: #ffffff;
@@ -360,7 +409,7 @@
   transform: translateX(-50%);
   width: 58px;
   height: 58px;
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
 }
 
 .nutri-social-fab-friends {
@@ -368,8 +417,8 @@
   bottom: 22px;
   width: 46px;
   height: 46px;
-  background: #0f172a;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.3);
+  background: #334155;
+  box-shadow: 0 10px 20px rgba(51, 65, 85, 0.34);
 }
 
 .nutri-social-fab.active {
