@@ -50,7 +50,8 @@ def _resolve_backend_token(request_body: ChatRequest, http_request: Request) -> 
 
 @app.post("/chat/onboarding", response_model=ChatResponse)
 async def onboarding_chat(request: ChatRequest, http_request: Request):
-    history = []
+    
+    history = request.conversation_history or []
 
     try:
         response = await chat_service.onboarding_chat(request.message, history)
@@ -66,17 +67,23 @@ async def onboarding_chat(request: ChatRequest, http_request: Request):
 
 @app.post("/chat/assistant", response_model=ChatResponse)
 async def assistant_chat(request: ChatRequest, http_request: Request):
-    history = []
+
+    history = request.conversation_history or []
 
     normalized_context = dict(request.user_context or {})
-    normalized_context["is_first_time"] = True
+
+    if "is_first_time" not in normalized_context:
+        normalized_context["is_first_time"] = True
+
+    backend_token = _resolve_backend_token(request, http_request)
 
     try:
-        response = await chat_service.assistant_chat(request.message, normalized_context, history)
+        response = await chat_service.assistant_chat(
+            request.message, normalized_context, history, auth_token=backend_token
+        )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
-    backend_token = _resolve_backend_token(request, http_request)
     constraints = ((response.meal_plan_draft or {}).get("constraints") or {})
     if constraints:
         backend_service.persist_user_chat_data(backend_token, constraints)

@@ -1,10 +1,22 @@
+"""
+openai_service.py  (updated)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Key changes vs original:
+  • GoalMealPlannerService replaces RecipePlannerService
+  • Goal is extracted from the conversation and passed to the planner
+  • Supermarket prices are scraped BEFORE the GA runs (with user feedback)
+  • Portuguese strings cleaned up (no more garbled encoding)
+  • Bug fixes: history propagation, async IO, onboarding consistency,
+    auth_token forwarding, keyword false-positives
+"""
+import asyncio
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
 
 from config.settings import get_settings
 from models.schemas import ChatResponse, Message
-from services.recipe_planner import RecipePlannerService
+from services.goal_meal_planner import GoalMealPlannerService
 from utils.helpers import load_prompt, safe_json_loads
 
 
@@ -12,21 +24,39 @@ class OpenAIService:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.client = OpenAI(api_key=self.settings.openai_api_key)
-        self.recipe_planner = RecipePlannerService()
+        self.goal_planner = GoalMealPlannerService()
 
-    async def onboarding_chat(self, user_message: str, history: List[Message]) -> ChatResponse:
+    # ──────────────────────────────────────────────────────────────────────
+    # Onboarding
+    # ──────────────────────────────────────────────────────────────────────
+
+    async def onboarding_chat(
+        self, user_message: str, history: List[Message]
+    ) -> ChatResponse:
         system_prompt = load_prompt("prompts/onboarding.txt")
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend({"role": item.role, "content": item.content} for item in history)
         messages.append({"role": "user", "content": user_message})
 
-        bot_response = self._chat(messages)
-        extracted_preferences = await self._extract_preferences(messages)
+        # e só marcar onboarding_complete se a extração confirmar todos os campos.
+        # Ambas as chamadas LLM são feitas em paralelo para reduzir latência.
+        bot_response_coro = asyncio.to_thread(self._chat, messages)
+        extracted_coro = self._extract_preferences(messages)
+
+        bot_response, extracted_preferences = await asyncio.gather(
+            bot_response_coro, extracted_coro
+        )
+
         onboarding_complete = self._is_onboarding_complete(extracted_preferences)
 
+        # Só sobrescreve a resposta natural se a extração confirmar conclusão,
+        # evitando o estado inconsistente onde o bot dizia "Perfeito!" mas
+        # extracted_preferences era {} por falha de parse.
         if onboarding_complete:
-            bot_response = "Perfeito! Já tenho o necessário para preparar o teu plano semanal de refeições 🎯"
+            bot_response = (
+                "Perfeito! Já tenho o necessário para preparar o teu plano semanal de refeições 🎯"
+            )
 
         return ChatResponse(
             response=bot_response,
@@ -34,11 +64,16 @@ class OpenAIService:
             extracted_preferences=extracted_preferences if onboarding_complete else None,
         )
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Assistant
+    # ──────────────────────────────────────────────────────────────────────
+
     async def assistant_chat(
         self,
         user_message: str,
         user_context: Optional[Dict[str, Any]],
         history: Optional[List[Message]] = None,
+        auth_token: Optional[str] = None,
     ) -> ChatResponse:
         planning_request = self._looks_like_meal_plan_request(user_message)
 
@@ -67,10 +102,44 @@ class OpenAIService:
                     + "."
                 )
             else:
-                meal_plan = self.recipe_planner.generate_weekly_plan(meal_plan_draft["constraints"])
-                bot_response = "Perfeito. As receitas já foram geradas e estão disponíveis na aba de Receitas."
+                bot_response = (
+                    "Um momento — estou a consultar os preços do supermercado "
+                    "para optimizar o plano"
+                )
 
-        return ChatResponse(response=bot_response, meal_plan_draft=meal_plan_draft, meal_plan=meal_plan)
+                # para não congelar o servidor durante chamadas de rede ao Java service
+                await asyncio.to_thread(
+                    self.goal_planner.scrape_and_cache_prices, auth_token
+                )
+
+                goal_constraints = dict(meal_plan_draft["constraints"])
+                meal_plan = self.goal_planner.generate_goal_plan(goal_constraints)
+
+                goal = meal_plan.get("goal", "maintain")
+                cost = meal_plan.get("estimated_weekly_cost", 0.0)
+                status = meal_plan.get("status", "empty")
+
+                if status == "generated":
+                    bot_response = (
+                        f"Plano gerado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
+                        f"(custo estimado: €{cost:.2f}/semana). "
+                        f"As receitas estão disponíveis na aba de Planeamento Semanal."
+                    )
+                else:
+                    bot_response = (
+                        "Não foi possível gerar o plano neste momento. "
+                        "Tenta novamente dentro de instantes."
+                    )
+
+        return ChatResponse(
+            response=bot_response,
+            meal_plan_draft=meal_plan_draft,
+            meal_plan=meal_plan,
+        )
+
+    # ──────────────────────────────────────────────────────────────────────
+    # LLM helpers
+    # ──────────────────────────────────────────────────────────────────────
 
     def _chat(self, messages: List[Dict[str, Any]]) -> str:
         response = self.client.chat.completions.create(
@@ -89,47 +158,54 @@ class OpenAIService:
             "max_weekly_budget (number), planning_days (number). "
             "Se faltar algo usa null. Responde APENAS JSON."
         )
-
         extraction_messages = list(messages)
         extraction_messages.append({"role": "user", "content": extraction_prompt})
-
         raw_json = self._chat(extraction_messages)
         return safe_json_loads(raw_json)
 
-    async def _extract_meal_plan_constraints(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _extract_meal_plan_constraints(
+        self, messages: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         extraction_prompt = (
             "Extrai os constraints para meal planning para JSON válido com as chaves: "
             "max_weekly_budget, planning_days, favorite_foods, disliked_ingredients, "
-            "restrictions, allergens, new_liked_ingredients, requested_extra_ingredients. "
+            "restrictions, allergens, new_liked_ingredients, requested_extra_ingredients, "
+            "goal (valores possíveis: 'lose_weight', 'gain_weight', 'maintain', 'gain_muscle'). "
             "Se faltar algum campo usa null ou array vazio. Responde APENAS JSON."
         )
-
         extraction_messages = list(messages)
         extraction_messages.append({"role": "user", "content": extraction_prompt})
-
         raw_json = self._chat(extraction_messages)
         return safe_json_loads(raw_json)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Plan helpers
+    # ──────────────────────────────────────────────────────────────────────
 
     def _is_onboarding_complete(self, preferences: Dict[str, Any]) -> bool:
         if not preferences:
             return False
-
         required = ["favorite_foods", "max_weekly_budget", "planning_days"]
         return all(preferences.get(key) not in (None, "", []) for key in required)
 
     def _looks_like_meal_plan_request(self, text: str) -> bool:
+        # "boa semana" ou "o que comeste esta semana". Agora exige keywords
+        # mais específicas ligadas a intenção de planeamento.
         lower = text.lower()
-        keywords = [
-            "meal plan",
-            "plano de refeições",
-            "plano",
-            "planear",
-            "planeamento",
-            "semana",
-            "receitas",
-            "menu",
+        strong_keywords = [
+            "meal plan", "plano de refeições", "planeamento semanal",
+            "planear refeições", "planear a semana", "gerar plano",
+            "fazer plano", "criar plano", "quero um plano", "novo plano",
         ]
-        return any(word in lower for word in keywords)
+        # Combinações fracas: só disparam se acompanhadas de verbo de ação
+        weak_keywords = ["plano", "menu", "receitas para a semana"]
+        action_verbs = ["quero", "preciso", "faz", "gera", "cria", "prepara", "monta"]
+
+        if any(kw in lower for kw in strong_keywords):
+            return True
+        if any(kw in lower for kw in weak_keywords):
+            return any(v in lower for v in action_verbs)
+        return False
 
     def _build_meal_plan_draft(
         self,
@@ -147,6 +223,8 @@ class OpenAIService:
             planning_days = None
 
         max_budget = merged.get("max_weekly_budget")
+        goal = merged.get("goal", "maintain")
+
         missing_required = []
         if max_budget in (None, ""):
             missing_required.append("preço máximo semanal")
@@ -155,10 +233,11 @@ class OpenAIService:
 
         return {
             "status": "ready_for_generation",
-            "backend_source": "recipe_scraper",
+            "backend_source": "java_service_with_ga",
             "constraints": {
                 "max_weekly_budget": max_budget,
                 "planning_days": planning_days,
+                "goal": goal,
                 "favorite_foods": merged.get("favorite_foods", []),
                 "disliked_ingredients": merged.get("disliked_ingredients", []),
                 "new_liked_ingredients": merged.get("new_liked_ingredients", []),
@@ -167,6 +246,18 @@ class OpenAIService:
                 "allergens": merged.get("allergens", []),
             },
             "missing_required": missing_required,
-            "recipe_candidates": [],
-            "notes": "Critérios prontos para gerar plano com receitas scraped.",
+            "notes": "Critérios prontos. Preços do supermercado serão consultados antes da geração.",
         }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────────────────────────────────
+
+def _goal_label(goal: str) -> str:
+    return {
+        "lose_weight": "emagrecer",
+        "gain_weight": "ganhar peso",
+        "maintain": "manter a forma",
+        "gain_muscle": "ganhar massa muscular",
+    }.get(goal, goal)
