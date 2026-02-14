@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071';
+const INTERACTIONS_STORAGE_KEY = 'nutri_social_interactions_v1';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -144,4 +145,117 @@ export async function removeFriend(token, friendshipId) {
   } catch (error) {
     throw new Error(normalizeError(error));
   }
+}
+
+
+function canUseStorage() {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function readInteractionsStore() {
+  if (!canUseStorage()) {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(INTERACTIONS_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeInteractionsStore(store) {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(INTERACTIONS_STORAGE_KEY, JSON.stringify(store));
+}
+
+function normalizePostKey(postId) {
+  return String(postId || '').trim();
+}
+
+function buildPostState(source) {
+  const entry = source && typeof source === 'object' ? source : {};
+  const kudosByUser = entry.kudosByUser && typeof entry.kudosByUser === 'object' ? entry.kudosByUser : {};
+  const comments = Array.isArray(entry.comments) ? entry.comments : [];
+
+  return {
+    kudosByUser,
+    comments,
+  };
+}
+
+export function getPostInteractions(postIds = []) {
+  const store = readInteractionsStore();
+  const map = {};
+
+  postIds.forEach((postId) => {
+    const key = normalizePostKey(postId);
+    if (!key) return;
+    map[key] = buildPostState(store[key]);
+  });
+
+  return map;
+}
+
+export function togglePostKudo(postId, userId) {
+  const key = normalizePostKey(postId);
+  const actor = Number(userId);
+
+  if (!key || !Number.isFinite(actor) || actor <= 0) {
+    throw new Error('Não foi possível atualizar o kudo.');
+  }
+
+  const store = readInteractionsStore();
+  const current = buildPostState(store[key]);
+  const nextKudos = { ...current.kudosByUser };
+
+  if (nextKudos[String(actor)]) {
+    delete nextKudos[String(actor)];
+  } else {
+    nextKudos[String(actor)] = new Date().toISOString();
+  }
+
+  store[key] = {
+    ...current,
+    kudosByUser: nextKudos,
+  };
+
+  writeInteractionsStore(store);
+  return buildPostState(store[key]);
+}
+
+export function addPostComment(postId, userId, text) {
+  const key = normalizePostKey(postId);
+  const actor = Number(userId);
+  const cleanText = String(text || '').trim();
+
+  if (!key || !Number.isFinite(actor) || actor <= 0 || !cleanText) {
+    throw new Error('Comentário inválido.');
+  }
+
+  const store = readInteractionsStore();
+  const current = buildPostState(store[key]);
+  const nextComment = {
+    id: `${Date.now()}-${Math.round(Math.random() * 10_000)}`,
+    userId: actor,
+    text: cleanText,
+    createdAt: new Date().toISOString(),
+  };
+
+  store[key] = {
+    ...current,
+    comments: [nextComment, ...current.comments].slice(0, 30),
+  };
+
+  writeInteractionsStore(store);
+  return buildPostState(store[key]);
 }

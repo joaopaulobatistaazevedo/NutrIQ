@@ -27,7 +27,7 @@
 
 .nutri-social-header p {
   margin: 4px 0 0;
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 13px;
 }
 
@@ -97,7 +97,7 @@
 .nutri-social-card,
 .nutri-social-sheet {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
   border-radius: 18px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
@@ -129,8 +129,8 @@
 
 .nutri-social-feed-user {
   border: 1px solid #dbeafe;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--app-surface-2);
+  color: var(--app-text-main);
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -140,10 +140,10 @@
 .nutri-social-icon-btn {
   width: 30px;
   height: 30px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
   border-radius: 9px;
   background: #ffffff;
-  color: #64748b;
+  color: var(--app-text-muted);
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -181,7 +181,7 @@
 .nutri-social-field textarea,
 .nutri-social-field select,
 .nutri-social-field input[type='number'] {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
   border-radius: 12px;
   padding: 10px 12px;
   font-size: 14px;
@@ -201,7 +201,7 @@
   border: 1px dashed #cbd5e1;
   border-radius: 12px;
   padding: 10px;
-  background: #f8fafc;
+  background: var(--app-surface-2);
 }
 
 .nutri-social-preview {
@@ -209,7 +209,7 @@
   border-radius: 14px;
   width: 100%;
   object-fit: cover;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
 }
 
 .nutri-social-share-toggle {
@@ -217,7 +217,7 @@
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  color: #334155;
+  color: var(--app-text-main);
 }
 
 .nutri-social-share-toggle span {
@@ -252,9 +252,9 @@
 }
 
 .nutri-social-secondary-btn {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
   background: #ffffff;
-  color: #334155;
+  color: var(--app-text-main);
 }
 
 .nutri-social-secondary-btn.danger {
@@ -280,7 +280,7 @@
 }
 
 .nutri-social-post {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
   border-radius: 16px;
   overflow: hidden;
   background: #ffffff;
@@ -313,14 +313,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  color: #64748b;
+  color: var(--app-text-muted);
   font-size: 12px;
   font-weight: 600;
 }
 
 .nutri-social-post-meta span {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--app-surface-2);
+  border: 1px solid var(--app-border-1);
   border-radius: 999px;
   padding: 4px 8px;
 }
@@ -332,9 +332,9 @@
 }
 
 .nutri-social-friend-list {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--app-border-1);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--app-surface-2);
   padding: 10px;
 }
 
@@ -456,4 +456,48 @@
     width: 42px;
     height: 42px;
   }
+}
+
+.nutri-social-post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-social-comment-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.nutri-social-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutri-social-comment-item {
+  background: var(--app-surface-2);
+  border: 1px solid var(--app-border-1);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nutri-social-comment-item strong {
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.nutri-social-comment-item span {
+  font-size: 13px;
+  color: var(--app-text-main);
+}
+
+.nutri-social-comment-item small {
+  font-size: 11px;
+  color: var(--app-text-muted);
 }
