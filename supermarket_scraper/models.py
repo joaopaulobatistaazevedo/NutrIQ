@@ -21,6 +21,7 @@ class MarketConfig:
     title_selector: str | None = None
     price_selector: str | None = None
     link_selector: str | None = None
+    image_selector: str | None = None
     currency: str = "EUR"
     headers: dict[str, str] = field(default_factory=dict)
     min_delay_seconds: float = 0.0
@@ -50,6 +51,7 @@ class MarketConfig:
             title_selector=payload.get("title_selector"),
             price_selector=payload.get("price_selector"),
             link_selector=payload.get("link_selector"),
+            image_selector=payload.get("image_selector"),
             currency=str(payload.get("currency", "EUR")),
             headers={str(k): str(v) for k, v in headers.items()},
             min_delay_seconds=float(payload.get("min_delay_seconds", 0.0)),
@@ -75,5 +77,6 @@ class PriceMatch:
     calories: float | None = None
     currency: str = "EUR"
     product_url: str | None = None
+    image_url: str | None = None
     source: str | None = None
     note: str | None = None

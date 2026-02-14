@@ -87,6 +87,7 @@ public class PriceImportService {
                 entry.setSupermarket(supermarket);
                 entry.setProductName(normalizeBlankToNull(item.path("product_name").asText(null)));
                 entry.setProductUrl(normalizeBlankToNull(item.path("product_url").asText(null)));
+                entry.setImageUrl(resolveImageUrl(item));
                 entry.setPrice(price);
                 entry.setCurrency(resolveCurrency(item));
                 entry.setCalories(asNullableDouble(item.get("calories")));
@@ -148,6 +149,14 @@ public class PriceImportService {
     private String resolveCurrency(JsonNode item) {
         String value = normalizeBlankToNull(item.path("currency").asText(null));
         return value != null ? value : "EUR";
+    }
+
+    private String resolveImageUrl(JsonNode item) {
+        String snake = normalizeBlankToNull(item.path("image_url").asText(null));
+        if (snake != null) {
+            return snake;
+        }
+        return normalizeBlankToNull(item.path("imageUrl").asText(null));
     }
 
     private Double asNullableDouble(JsonNode node) {
