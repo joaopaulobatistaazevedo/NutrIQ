@@ -61,29 +61,21 @@ services:
       - "${CHATBOT_HOST_PORT:-8000}:8000"
 
   frontend:
-    image: node:20-alpine
-    working_dir: /app
+    image: bugsbyte-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_BACKEND_API_URL: ${VITE_BACKEND_API_URL:-http://localhost:7071}
+        VITE_CHATBOT_API_URL: ${VITE_CHATBOT_API_URL:-http://localhost:8000}
     restart: unless-stopped
-    environment:
-      VITE_BACKEND_API_URL: ${VITE_BACKEND_API_URL:-http://localhost:7071}
-      VITE_CHATBOT_API_URL: ${VITE_CHATBOT_API_URL:-http://localhost:8000}
-      CHOKIDAR_USEPOLLING: "true"
-    command:
-      [
-        "sh",
-        "-lc",
-        "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port 5173"
-      ]
     depends_on:
       backend:
         condition: service_started
       chatbot:
         condition: service_started
     ports:
-      - "${FRONTEND_HOST_PORT:-5173}:5173"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+      - "${FRONTEND_HOST_PORT:-5173}:80"
 
   supermarket-scraper:
     build:
@@ -123,7 +115,7 @@ services:
     environment:
       BACKEND_URL: http://backend:7071
       CHATBOT_HEALTH_URL: http://chatbot:8000/health
-      FRONTEND_URL: http://frontend:5173
+      FRONTEND_URL: http://frontend
       RECIPE_SEED_JSON: /app/data/recipes_scraped.json
       RECIPES_DB_PATH: /app/data/recipes.db
       PRICE_REPORT_JSON: /app/data/report.json
@@ -144,4 +136,3 @@ services:
 volumes:
   mysql_data:
   backend_sqlite_data:
-  frontend_node_modules:
