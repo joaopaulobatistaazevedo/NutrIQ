@@ -46,6 +46,26 @@ No arranque, o `orchestrator` importa automaticamente este ficheiro se a base es
 docker compose --env-file .env.docker up --build -d
 ```
 
+Após o primeiro build, para desenvolvimento normal (frontend reativo/hot-reload), usa:
+
+```bash
+docker compose --env-file .env.docker up -d
+```
+
+Qualquer alteração em `frontend/src` reflete no browser sem rebuild da imagem.
+
+Modo compilado normal (sem frontend em dev):
+
+```bash
+./scripts/docker/up_prod.sh .env.docker
+```
+
+Equivalente:
+
+```bash
+docker compose --env-file .env.docker -f docker-compose.prod.yml up --build -d
+```
+
 ## 6) Validar
 
 ```bash

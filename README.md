@@ -43,6 +43,26 @@ cp .env.docker.example .env.docker
 docker compose --env-file .env.docker up --build -d
 ```
 
+Depois do primeiro arranque, para desenvolvimento diário do frontend (hot-reload), podes usar:
+
+```bash
+docker compose --env-file .env.docker up -d
+```
+
+O serviço `frontend` corre Vite em modo dev dentro do container e recarrega automaticamente quando alteras ficheiros em `frontend/src`.
+
+Para correr em modo compilado normal (sem frontend dev/hot-reload):
+
+```bash
+./scripts/docker/up_prod.sh .env.docker
+```
+
+Comando equivalente direto:
+
+```bash
+docker compose --env-file .env.docker -f docker-compose.prod.yml up --build -d
+```
+
 Endpoints:
 
 - Frontend: `http://localhost:5173`
