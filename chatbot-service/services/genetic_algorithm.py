@@ -3,30 +3,21 @@ genetic_algorithm.py
 ━━━━━━━━━━━━━━━━━━━
 Goal-aware genetic algorithm for weekly meal plan optimisation.
 
-Fitness formula (per meal slot):
-    S = (1 / |Cal_target - Cal_recipe|) × (Preference_Score / Cost_per_dose)
+Implements a weighted multi-criteria fitness:
+  0.30 × objective nutrition
+  0.25 × food preferences
+  0.20 × budget
+  0.15 × professional source validation
+  0.10 × nutritional quality
+  + practicality bonus (max +50)
 
-    where:
-      • Cal_target      = daily calorie target for the slot (derived from goal)
-      • Cal_recipe      = calories per serving of the candidate recipe
-      • Preference_Score = composite score [0, 1] based on liked ingredients,
-                           macro alignment (protein/fat/carbs ratios) and goal
-      • Cost_per_dose   = cost per serving in €  (min-clamped to 0.01 to avoid ÷0)
-
-    When |Cal_target - Cal_recipe| == 0, the term collapses to a large reward
-    (capped at MAX_CAL_SCORE) so perfect-calorie matches are strongly preferred.
-
-    The overall plan fitness is the mean slot fitness across the week.
-
-Goal → calorie & macro targets
-────────────────────────────────
-  lose_weight    : moderate deficit,  high protein, low fat
-  gain_weight    : moderate surplus,  balanced macros
-  maintain       : TDEE match,        balanced macros
-  gain_muscle    : moderate surplus,  very high protein, low fat
-
-These targets are scaled to a single meal slot (breakfast/lunch/dinner)
-using the SLOT_CALORIE_SPLIT dictionary.
+Hard constraints (invalid plan => -1000):
+  - daily calories within ±15% of target
+  - weekly cost <= budget (if budget provided)
+  - no excluded ingredients
+  - at least 3 and at most 6 meals/day
+  - daily protein >= 0.8 × protein target
+  - each main meal >= 400 kcal and >= 12g protein
 """
 
 from __future__ import annotations
@@ -39,50 +30,49 @@ from typing import Any
 from services.supermarket_scraper_service import PricedRecipe
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Goal profiles
-# ═══════════════════════════════════════════════════════════════════════════
-
 GOAL_PROFILES: dict[str, dict[str, Any]] = {
     "lose_weight": {
-        "daily_calories": 1700,
-        "protein_ratio": 0.35,   # of total calories
-        "fat_ratio": 0.25,
-        "carb_ratio": 0.40,
-        "cal_weight": 1.8,       # how much calorie precision matters in fitness
-        "pref_weight": 1.0,
-        "cost_weight": 1.2,
+        "calorie_delta": -400,
+        "protein_g_per_kg": 1.8,
+        "macro_ranges": {
+            "protein": (0.30, 0.35),
+            "fat": (0.20, 0.25),
+            "carb": (0.40, 0.50),
+        },
+        "slot_protein_min": 20,
     },
     "gain_weight": {
-        "daily_calories": 2800,
-        "protein_ratio": 0.25,
-        "fat_ratio": 0.30,
-        "carb_ratio": 0.45,
-        "cal_weight": 1.4,
-        "pref_weight": 1.1,
-        "cost_weight": 1.0,
+        "calorie_delta": 400,
+        "protein_g_per_kg": 1.6,
+        "macro_ranges": {
+            "protein": (0.20, 0.25),
+            "fat": (0.25, 0.30),
+            "carb": (0.50, 0.55),
+        },
+        "slot_protein_min": 20,
     },
     "maintain": {
-        "daily_calories": 2200,
-        "protein_ratio": 0.25,
-        "fat_ratio": 0.30,
-        "carb_ratio": 0.45,
-        "cal_weight": 1.2,
-        "pref_weight": 1.2,
-        "cost_weight": 1.0,
+        "calorie_delta": 0,
+        "protein_g_per_kg": 1.4,
+        "macro_ranges": {
+            "protein": (0.25, 0.30),
+            "fat": (0.25, 0.30),
+            "carb": (0.45, 0.50),
+        },
+        "slot_protein_min": 20,
     },
     "gain_muscle": {
-        "daily_calories": 2600,
-        "protein_ratio": 0.40,
-        "fat_ratio": 0.20,
-        "carb_ratio": 0.40,
-        "cal_weight": 1.5,
-        "pref_weight": 1.3,
-        "cost_weight": 0.9,
+        "calorie_delta": 300,
+        "protein_g_per_kg": 2.0,
+        "macro_ranges": {
+            "protein": (0.30, 0.35),
+            "fat": (0.20, 0.25),
+            "carb": (0.45, 0.50),
+        },
+        "slot_protein_min": 25,
     },
 }
 
-# How daily calories are split across meal slots
 SLOT_CALORIE_SPLIT: dict[str, float] = {
     "Pequeno-almoço": 0.25,
     "Almoço": 0.40,
@@ -91,78 +81,41 @@ SLOT_CALORIE_SPLIT: dict[str, float] = {
 
 SLOTS = list(SLOT_CALORIE_SPLIT.keys())
 
-MAX_CAL_SCORE = 200.0   # cap when calorie diff == 0
-MIN_COST = 0.01         # floor to avoid division by zero
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Data structures
-# ═══════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class MealSlot:
-    day: int           # 0-based
-    slot: str          # "Pequeno-almoço" | "Almoço" | "Jantar"
+    day: int
+    slot: str
     recipe: PricedRecipe
 
 
 @dataclass
 class Individual:
-    """A complete weekly meal plan (genome = list of MealSlots)."""
     slots: list[MealSlot]
     fitness: float = field(default=0.0, compare=False)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Fitness helpers
-# ═══════════════════════════════════════════════════════════════════════════
+def _safe_float(value: Any) -> float:
+    try:
+        if value is None:
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
-def _macro_preference_score(
-    recipe: PricedRecipe,
-    profile: dict[str, Any],
-    liked: list[str],
-    disliked: list[str],
-) -> float:
-    """
-    Preference_Score ∈ [0, 1] composed of:
-      40% macro alignment with goal
-      40% ingredient match (liked / disliked)
-      20% time efficiency (faster = slightly better)
-    """
-    score = 0.0
 
-    # ── Macro alignment (0–0.4) ──────────────────────────────────────────
-    cal = recipe.calories_per_serving or 0.0
-    macro_sub = 0.0
-    if cal > 0:
-        p_ratio = ((recipe.protein_g or 0.0) * 4) / cal
-        f_ratio = ((recipe.fat_g or 0.0) * 9) / cal
-        c_ratio = ((recipe.carbs_g or 0.0) * 4) / cal
+def _normalise_text_list(items: list[str] | None) -> list[str]:
+    if not items:
+        return []
+    return [str(item).lower().strip() for item in items if str(item).strip()]
 
-        p_err = abs(p_ratio - profile["protein_ratio"])
-        f_err = abs(f_ratio - profile["fat_ratio"])
-        c_err = abs(c_ratio - profile["carb_ratio"])
 
-        # max possible error per macro ≈ 1.0; average and invert
-        macro_sub = max(0.0, 1.0 - (p_err + f_err + c_err) / 3.0)
-    score += 0.40 * macro_sub
-
-    # ── Ingredient preference (0–0.4) ────────────────────────────────────
-    ingredient_text = " ".join(recipe.ingredients).lower()
-    liked_hits = sum(1 for w in liked if w and w in ingredient_text)
-    disliked_hits = sum(1 for w in disliked if w and w in ingredient_text)
-    total_liked = max(len(liked), 1)
-    pref_sub = max(0.0, (liked_hits / total_liked) - (disliked_hits * 0.3))
-    pref_sub = min(pref_sub, 1.0)
-    score += 0.40 * pref_sub
-
-    # ── Time efficiency (0–0.2) ──────────────────────────────────────────
-    minutes = recipe.total_time_minutes or 60
-    # 15 min → 1.0, 90 min → 0.0
-    time_sub = max(0.0, min(1.0, 1.0 - (minutes - 15) / 75.0))
-    score += 0.20 * time_sub
-
-    return min(score, 1.0)
+def _macro_ratio(recipe: PricedRecipe) -> tuple[float, float, float]:
+    calories = max(_safe_float(recipe.calories_per_serving), 1.0)
+    protein_ratio = (_safe_float(recipe.protein_g) * 4.0) / calories
+    fat_ratio = (_safe_float(recipe.fat_g) * 9.0) / calories
+    carb_ratio = (_safe_float(recipe.carbs_g) * 4.0) / calories
+    return protein_ratio, fat_ratio, carb_ratio
 
 
 def slot_fitness(
@@ -172,58 +125,42 @@ def slot_fitness(
     liked: list[str],
     disliked: list[str],
 ) -> float:
-    """
-    S = (1 / |Cal_target - Cal_recipe|) × (Preference_Score / Cost_per_dose)
+    """Compatibility helper retained for external callers/tests."""
+    liked_norm = _normalise_text_list(liked)
+    disliked_norm = _normalise_text_list(disliked)
 
-    Goal weights are applied as multiplicative factors on each component.
-    """
-    cal_split = SLOT_CALORIE_SPLIT.get(slot, 1 / 3)
-    cal_target = profile["daily_calories"] * cal_split
-    cal_recipe = recipe.calories_per_serving or 0.0
+    calories = _safe_float(recipe.calories_per_serving)
+    protein = _safe_float(recipe.protein_g)
+    cost = max(_safe_float(recipe.cost_per_serving), 0.01)
 
-    cal_diff = abs(cal_target - cal_recipe)
-    if cal_diff < 1.0:
-        calorie_term = MAX_CAL_SCORE
+    target_daily = profile.get("daily_calories", 2200)
+    target_slot = target_daily * SLOT_CALORIE_SPLIT.get(slot, 1 / 3)
+    diff = abs(target_slot - calories)
+
+    if target_slot <= 0:
+        cal_score = 0.0
     else:
-        calorie_term = 1.0 / cal_diff
+        pct = diff / target_slot
+        if pct <= 0.05:
+            cal_score = 100.0
+        elif pct <= 0.10:
+            cal_score = 80.0
+        elif pct <= 0.15:
+            cal_score = 50.0
+        else:
+            cal_score = 0.0
 
-    preference_score = _macro_preference_score(recipe, profile, liked, disliked)
-    cost = max(recipe.cost_per_serving, MIN_COST)
+    ingredient_text = " ".join(recipe.ingredients).lower()
+    liked_hits = sum(1 for token in liked_norm if token and token in ingredient_text)
+    disliked_hits = sum(1 for token in disliked_norm if token and token in ingredient_text)
 
-    raw = calorie_term * (preference_score / cost)
+    pref_score = min(30.0, liked_hits * 12.0) - (100.0 if disliked_hits else 0.0)
+    protein_density = protein / max(calories, 1.0)
+    score = (0.6 * cal_score + 0.4 * max(0.0, pref_score) + protein_density * 100.0) / cost
+    return max(0.0, score)
 
-    # Apply goal-specific weights
-    cal_w = profile.get("cal_weight", 1.0)
-    pref_w = profile.get("pref_weight", 1.0)
-    cost_w = profile.get("cost_weight", 1.0)
-
-    # Decompose and re-weight
-    weighted = (calorie_term * cal_w) * ((preference_score * pref_w) / (cost * cost_w))
-    return weighted
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Genetic Algorithm
-# ═══════════════════════════════════════════════════════════════════════════
 
 class MealPlanGA:
-    """
-    Genetic algorithm that evolves a weekly meal plan.
-
-    Parameters
-    ──────────
-    recipes         : all candidate PricedRecipe objects
-    goal            : one of GOAL_PROFILES keys
-    planning_days   : 1–7
-    liked           : normalised liked ingredient tokens
-    disliked        : normalised disliked ingredient tokens
-    max_weekly_budget : budget cap in €; plans exceeding it are penalised
-    population_size : GA population (default 80)
-    generations     : GA iterations (default 120)
-    elite_k         : elites copied verbatim per generation (default 4)
-    mutation_rate   : probability of a single slot mutating (default 0.15)
-    """
-
     def __init__(
         self,
         recipes: list[PricedRecipe],
@@ -232,72 +169,133 @@ class MealPlanGA:
         liked: list[str],
         disliked: list[str],
         max_weekly_budget: float = 0.0,
-        population_size: int = 80,
-        generations: int = 120,
-        elite_k: int = 4,
-        mutation_rate: float = 0.15,
+        population_size: int = 120,
+        generations: int = 180,
+        elite_k: int = 12,
+        mutation_rate: float = 0.22,
+        tdee: float | None = None,
+        body_weight_kg: float | None = None,
     ) -> None:
         self.recipes = [r for r in recipes if r.title]
-        self.profile = GOAL_PROFILES.get(goal, GOAL_PROFILES["maintain"])
-        self.planning_days = max(1, min(planning_days, 7))
-        self.liked = liked
-        self.disliked = disliked
-        self.budget = max_weekly_budget
-        self.pop_size = population_size
-        self.generations = generations
-        self.elite_k = elite_k
-        self.mutation_rate = mutation_rate
-        self._n_slots = self.planning_days * len(SLOTS)
-
         if not self.recipes:
             raise ValueError("No valid recipes supplied to MealPlanGA.")
 
-    # ── Public ─────────────────────────────────────────────────────────────
+        self.goal = goal if goal in GOAL_PROFILES else "maintain"
+        self.profile = GOAL_PROFILES[self.goal]
+        self.planning_days = max(1, min(planning_days, 7))
+
+        self.liked = _normalise_text_list(liked)
+        self.disliked = _normalise_text_list(disliked)
+
+        self.budget = max(_safe_float(max_weekly_budget), 0.0)
+        self.pop_size = max(population_size, 20)
+        self.generations = max(generations, 30)
+        self.elite_k = max(1, min(elite_k, self.pop_size // 2))
+        self.mutation_rate = min(max(mutation_rate, 0.0), 1.0)
+
+        base_tdee = _safe_float(tdee)
+        if base_tdee <= 0:
+            base_tdee = 2200.0
+
+        base_weight = _safe_float(body_weight_kg)
+        if base_weight <= 0:
+            base_weight = 70.0
+
+        self.daily_calorie_target = max(1200.0, base_tdee + float(self.profile["calorie_delta"]))
+        self.daily_protein_target = max(60.0, base_weight * float(self.profile["protein_g_per_kg"]))
+
+        self.profile = {
+            **self.profile,
+            "daily_calories": self.daily_calorie_target,
+            "daily_protein_target": self.daily_protein_target,
+        }
+
+        self._recipe_by_id = {r.id: r for r in self.recipes}
 
     def run(self) -> list[MealSlot]:
-        """Run the GA and return the best individual's slot list."""
         population = self._seed_population()
         self._evaluate_all(population)
 
-        for _ in range(self.generations):
-            population.sort(key=lambda ind: ind.fitness, reverse=True)
-            elites = [deepcopy(population[i]) for i in range(min(self.elite_k, len(population)))]
+        best = max(population, key=lambda x: x.fitness)
+        stagnant = 0
 
+        for _ in range(self.generations):
+            population.sort(key=lambda x: x.fitness, reverse=True)
+            current_best = population[0]
+
+            if best.fitness <= 0:
+                improved = current_best.fitness > best.fitness
+            else:
+                improved = ((current_best.fitness - best.fitness) / abs(best.fitness)) > 0.005
+
+            if improved:
+                best = deepcopy(current_best)
+                stagnant = 0
+            else:
+                stagnant += 1
+
+            if best.fitness >= 950.0 or stagnant >= 20:
+                break
+
+            elites = [deepcopy(ind) for ind in population[: self.elite_k]]
             offspring: list[Individual] = []
-            while len(offspring) < self.pop_size - len(elites):
-                p1, p2 = self._tournament(population), self._tournament(population)
-                child = self._crossover(p1, p2)
+
+            while len(offspring) < (self.pop_size - len(elites)):
+                parent_a = self._tournament(population)
+                parent_b = self._tournament(population)
+                child = self._crossover(parent_a, parent_b)
                 child = self._mutate(child)
+                child = self._repair(child)
                 offspring.append(child)
 
             population = elites + offspring
             self._evaluate_all(population)
 
-        population.sort(key=lambda ind: ind.fitness, reverse=True)
+        population.sort(key=lambda x: x.fitness, reverse=True)
         return population[0].slots
 
-    # ── Initialisation ─────────────────────────────────────────────────────
-
     def _seed_population(self) -> list[Individual]:
-        return [self._random_individual() for _ in range(self.pop_size)]
+        heuristic_count = max(1, int(self.pop_size * 0.30))
+        random_count = self.pop_size - heuristic_count
+
+        population = [self._random_individual() for _ in range(random_count)]
+        population.extend(self._heuristic_individual() for _ in range(heuristic_count))
+        return population
 
     def _random_individual(self) -> Individual:
         slots: list[MealSlot] = []
-        used_urls: set[str] = set()
         for day in range(self.planning_days):
-            for slot_name in SLOTS:
-                recipe = self._pick_unique(used_urls)
-                used_urls.add(recipe.url)
-                slots.append(MealSlot(day=day, slot=slot_name, recipe=recipe))
+            for slot in SLOTS:
+                slots.append(MealSlot(day=day, slot=slot, recipe=random.choice(self.recipes)))
         return Individual(slots=slots)
 
-    def _pick_unique(self, used: set[str]) -> PricedRecipe:
-        pool = [r for r in self.recipes if r.url not in used]
-        if not pool:
-            pool = self.recipes  # allow repeats if pool exhausted
-        return random.choice(pool)
+    def _heuristic_individual(self) -> Individual:
+        def individual_recipe_score(recipe: PricedRecipe) -> float:
+            calories = _safe_float(recipe.calories_per_serving)
+            protein = _safe_float(recipe.protein_g)
+            cost = max(_safe_float(recipe.cost_per_serving), 0.01)
+            p_ratio, f_ratio, c_ratio = _macro_ratio(recipe)
 
-    # ── Evaluation ─────────────────────────────────────────────────────────
+            ranges = self.profile["macro_ranges"]
+            macro_fit = (
+                self._range_score(p_ratio, *ranges["protein"])
+                + self._range_score(f_ratio, *ranges["fat"])
+                + self._range_score(c_ratio, *ranges["carb"])
+            ) / 3.0
+
+            target_slot = self.daily_calorie_target / len(SLOTS)
+            cal_fit = max(0.0, 1.0 - abs(calories - target_slot) / max(target_slot, 1.0))
+            protein_density = protein / max(calories, 1.0)
+            return (macro_fit * 0.4 + cal_fit * 0.4 + protein_density * 2.0) / cost
+
+        top = sorted(self.recipes, key=individual_recipe_score, reverse=True)
+        pool = top[: max(10, len(top) // 3)] if top else self.recipes
+
+        slots: list[MealSlot] = []
+        for day in range(self.planning_days):
+            for slot in SLOTS:
+                slots.append(MealSlot(day=day, slot=slot, recipe=random.choice(pool)))
+        return Individual(slots=slots)
 
     def _evaluate_all(self, population: list[Individual]) -> None:
         for ind in population:
@@ -305,51 +303,440 @@ class MealPlanGA:
 
     def _fitness(self, ind: Individual) -> float:
         if not ind.slots:
+            return -1000.0
+
+        if self._violates_hard_constraints(ind):
+            return -1000.0
+
+        score_obj = self._score_objective_nutrition(ind)
+        score_pref = self._score_preferences(ind)
+        score_budget = self._score_budget(ind)
+        score_validation = self._score_source_validation(ind)
+        score_quality = self._score_nutritional_quality(ind)
+        bonus_practicality = self._score_practicality_bonus(ind)
+
+        weighted_100 = (
+            0.30 * score_obj
+            + 0.25 * score_pref
+            + 0.20 * score_budget
+            + 0.15 * score_validation
+            + 0.10 * score_quality
+        )
+
+        return (weighted_100 * 10.0) + bonus_practicality
+
+    def _violates_hard_constraints(self, ind: Individual) -> bool:
+        days = self._group_by_day(ind.slots)
+
+        if self.budget > 0:
+            weekly_cost = sum(max(_safe_float(ms.recipe.cost_per_serving), 0.0) for ms in ind.slots)
+            if weekly_cost > self.budget:
+                return True
+
+        excluded = set(self.disliked)
+        if excluded:
+            for ms in ind.slots:
+                ingredient_text = " ".join(ms.recipe.ingredients).lower()
+                if any(tok and tok in ingredient_text for tok in excluded):
+                    return True
+
+        for day_slots in days.values():
+            if len(day_slots) < 3 or len(day_slots) > 6:
+                return True
+
+            day_calories = sum(_safe_float(ms.recipe.calories_per_serving) for ms in day_slots)
+            if self.daily_calorie_target > 0:
+                if abs(day_calories - self.daily_calorie_target) / self.daily_calorie_target > 0.15:
+                    return True
+
+            day_protein = sum(_safe_float(ms.recipe.protein_g) for ms in day_slots)
+            if day_protein < (self.daily_protein_target * 0.8):
+                return True
+
+            for ms in day_slots:
+                calories = _safe_float(ms.recipe.calories_per_serving)
+                protein = _safe_float(ms.recipe.protein_g)
+                if calories < 400.0 or protein < 12.0:
+                    return True
+
+        return False
+
+    def _score_objective_nutrition(self, ind: Individual) -> float:
+        days = self._group_by_day(ind.slots)
+        if not days:
             return 0.0
 
-        total = sum(
-            slot_fitness(ms.recipe, ms.slot, self.profile, self.liked, self.disliked)
-            for ms in ind.slots
-        )
-        mean = total / len(ind.slots)
+        per_day_scores: list[float] = []
+        ranges = self.profile["macro_ranges"]
 
-        # Budget penalty: reduce fitness proportionally if over-budget
-        if self.budget > 0:
-            weekly_cost = sum(ms.recipe.cost_per_serving for ms in ind.slots)
-            if weekly_cost > self.budget:
-                penalty = (weekly_cost - self.budget) / self.budget
-                mean *= max(0.1, 1.0 - penalty)
+        for day_slots in days.values():
+            calories = sum(_safe_float(ms.recipe.calories_per_serving) for ms in day_slots)
+            protein_g = sum(_safe_float(ms.recipe.protein_g) for ms in day_slots)
+            fat_g = sum(_safe_float(ms.recipe.fat_g) for ms in day_slots)
+            carb_g = sum(_safe_float(ms.recipe.carbs_g) for ms in day_slots)
 
-        # Diversity bonus: penalise excessive recipe repetition
-        urls = [ms.recipe.url for ms in ind.slots]
-        unique_ratio = len(set(urls)) / len(urls)
-        mean *= 0.7 + 0.3 * unique_ratio
+            cal_score = self._calorie_target_points(calories, self.daily_calorie_target)
 
-        return mean
+            protein_bonus = 0.0
+            if abs(protein_g - self.daily_protein_target) <= 10.0:
+                protein_bonus = 30.0
 
-    # ── Selection ──────────────────────────────────────────────────────────
+            macro_bonus = 0.0
+            p_ratio, f_ratio, c_ratio = self._macro_ratio_from_day(protein_g, fat_g, carb_g, calories)
+            if (
+                ranges["protein"][0] <= p_ratio <= ranges["protein"][1]
+                and ranges["fat"][0] <= f_ratio <= ranges["fat"][1]
+                and ranges["carb"][0] <= c_ratio <= ranges["carb"][1]
+            ):
+                macro_bonus = 20.0
 
-    def _tournament(self, population: list[Individual], k: int = 5) -> Individual:
-        contestants = random.sample(population, min(k, len(population)))
-        return max(contestants, key=lambda ind: ind.fitness)
+            satiety_bonus = 0.0
+            if self.goal == "lose_weight":
+                satiety_bonus = min(10.0, (protein_g / max(calories, 1.0)) * 1000.0)
+            elif self.goal == "gain_weight":
+                avg_density = sum(
+                    _safe_float(ms.recipe.calories_per_serving) / max(_safe_float(ms.recipe.total_time_minutes), 1.0)
+                    for ms in day_slots
+                ) / max(len(day_slots), 1)
+                satiety_bonus = min(10.0, avg_density)
 
-    # ── Crossover ──────────────────────────────────────────────────────────
+            daily_raw = cal_score + protein_bonus + macro_bonus + satiety_bonus
+            per_day_scores.append(min(100.0, daily_raw))
+
+        return sum(per_day_scores) / len(per_day_scores)
+
+    def _score_preferences(self, ind: Individual) -> float:
+        slots = ind.slots
+        if not slots:
+            return 0.0
+
+        points = 0.0
+        preferred_recipe_count = 0
+
+        for ms in slots:
+            ingredient_text = " ".join(ms.recipe.ingredients).lower()
+            liked_hits = sum(1 for token in self.liked if token and token in ingredient_text)
+
+            if liked_hits >= 3:
+                points += 30.0
+                preferred_recipe_count += 1
+            elif liked_hits >= 1:
+                points += 15.0
+                preferred_recipe_count += 1
+
+        if preferred_recipe_count / len(slots) > 0.60:
+            points += 10.0
+
+        recipe_count: dict[str, int] = {}
+        for ms in slots:
+            rid = ms.recipe.id or ms.recipe.url
+            recipe_count[rid] = recipe_count.get(rid, 0) + 1
+        for count in recipe_count.values():
+            if count > 2:
+                points -= 20.0
+
+        unique_recipes = len(recipe_count)
+        if len(slots) >= 21 and unique_recipes >= 15:
+            points += 15.0
+
+        return max(0.0, min(100.0, points / max(len(slots), 1) * 4.0))
+
+    def _score_budget(self, ind: Individual) -> float:
+        if self.budget <= 0:
+            return 70.0
+
+        total_cost = sum(max(_safe_float(ms.recipe.cost_per_serving), 0.0) for ms in ind.slots)
+        if total_cost > self.budget:
+            return 0.0
+
+        utilisation = (total_cost / self.budget) * 100.0
+        if 85.0 <= utilisation <= 95.0:
+            points = 100.0
+        elif 70.0 <= utilisation < 85.0:
+            points = 80.0
+        elif 95.0 < utilisation <= 100.0:
+            points = 70.0
+        else:
+            points = 40.0
+
+        total_protein = sum(_safe_float(ms.recipe.protein_g) for ms in ind.slots)
+        total_calories = sum(_safe_float(ms.recipe.calories_per_serving) for ms in ind.slots)
+
+        euro_per_100g_protein = total_cost / max(total_protein / 100.0, 0.01)
+        euro_per_1000kcal = total_cost / max(total_calories / 1000.0, 0.01)
+
+        if euro_per_100g_protein <= 2.5:
+            points += 20.0
+        if euro_per_1000kcal <= 2.0:
+            points += 15.0
+
+        return max(0.0, min(100.0, points))
+
+    def _score_source_validation(self, ind: Individual) -> float:
+        def source_points(source: str) -> int:
+            s = source.lower()
+            if any(k in s for k in ["nutricionista", "nutritionist", "dietitian", " rd ", "rd"]):
+                return 25
+            if any(k in s for k in ["dgs", "who", "apn", "hospital", "clínica", "clinica"]):
+                return 20
+            if any(k in s for k in ["personal trainer", "fitness coach", " pt "]):
+                return 15
+            if any(k in s for k in ["health", "saude", "saúde", "nutrition"]):
+                return 10
+            return 0
+
+        slots = ind.slots
+        if not slots:
+            return 0.0
+
+        values = [source_points(ms.recipe.source or "") for ms in slots]
+        avg = sum(values) / len(values)
+        points = (avg / 25.0) * 100.0
+
+        nutritionist_ratio = sum(1 for v in values if v == 25) / len(values)
+        professional_ratio = sum(1 for v in values if v >= 15) / len(values)
+
+        if nutritionist_ratio >= 0.50:
+            points += 50.0
+        if professional_ratio >= 0.70:
+            points += 30.0
+
+        return max(0.0, min(100.0, points))
+
+    def _score_nutritional_quality(self, ind: Individual) -> float:
+        days = self._group_by_day(ind.slots)
+        if not days:
+            return 0.0
+
+        macro_points_total = 0.0
+        protein_distribution_total = 0.0
+
+        healthy_protein_min = 0.25 if self.goal == "lose_weight" else (0.30 if self.goal == "gain_muscle" else 0.15)
+
+        for day_slots in days.values():
+            calories = sum(_safe_float(ms.recipe.calories_per_serving) for ms in day_slots)
+            protein_g = sum(_safe_float(ms.recipe.protein_g) for ms in day_slots)
+            fat_g = sum(_safe_float(ms.recipe.fat_g) for ms in day_slots)
+            carb_g = sum(_safe_float(ms.recipe.carbs_g) for ms in day_slots)
+
+            p_ratio, f_ratio, c_ratio = self._macro_ratio_from_day(protein_g, fat_g, carb_g, calories)
+            healthy_ranges = {
+                "protein": (healthy_protein_min, 0.35),
+                "fat": (0.20, 0.35),
+                "carb": (0.45, 0.65),
+            }
+
+            macro_score = self._macro_quality_points(p_ratio, f_ratio, c_ratio, healthy_ranges)
+            macro_points_total += macro_score
+
+            per_meal_threshold = 25.0 if self.goal == "gain_muscle" else 20.0
+            day_dist = 0.0
+            protein_values = []
+            for ms in day_slots:
+                p = _safe_float(ms.recipe.protein_g)
+                protein_values.append(p)
+                if p >= per_meal_threshold:
+                    day_dist += 40.0
+                elif 15.0 <= p < 20.0:
+                    day_dist += 25.0
+                elif 10.0 <= p < 15.0:
+                    day_dist += 10.0
+
+            day_dist = day_dist / max(len(day_slots), 1)
+            if protein_values and max(protein_values) > (sum(protein_values) * 0.5):
+                day_dist = max(0.0, day_dist - 20.0)
+
+            protein_distribution_total += day_dist
+
+        macro_component = (macro_points_total / len(days)) * 0.60
+        distribution_component = (protein_distribution_total / len(days)) * 0.40
+
+        return max(0.0, min(100.0, macro_component + distribution_component))
+
+    def _score_practicality_bonus(self, ind: Individual) -> float:
+        days = self._group_by_day(ind.slots)
+        if not days:
+            return 0.0
+
+        bonus = 0.0
+        all_times: list[float] = []
+        fast_count = 0
+        total_meals = 0
+
+        for day_idx, day_slots in days.items():
+            for ms in day_slots:
+                t = _safe_float(ms.recipe.total_time_minutes)
+                all_times.append(t)
+                total_meals += 1
+
+                if t <= 40.0:
+                    fast_count += 1
+
+                if day_idx <= 4:
+                    if t <= 30.0:
+                        bonus += 10.0
+                    elif t <= 60.0:
+                        bonus += 5.0
+
+        avg_time = sum(all_times) / max(len(all_times), 1)
+        if avg_time <= 45.0:
+            bonus += 20.0
+
+        if total_meals > 0 and (fast_count / total_meals) >= 0.60:
+            bonus += 15.0
+
+        return max(0.0, min(50.0, bonus))
+
+    def _tournament(self, population: list[Individual], k: int = 4) -> Individual:
+        sampled = random.sample(population, min(k, len(population)))
+        return max(sampled, key=lambda x: x.fitness)
 
     def _crossover(self, p1: Individual, p2: Individual) -> Individual:
-        """Single-point crossover on the slot list."""
-        n = len(p1.slots)
-        point = random.randint(1, n - 1)
-        child_slots = deepcopy(p1.slots[:point]) + deepcopy(p2.slots[point:])
+        if random.random() > 0.78:
+            return deepcopy(p1)
+
+        day_count = self.planning_days
+        if day_count < 2:
+            return deepcopy(p1)
+
+        a = random.randint(0, day_count - 2)
+        b = random.randint(a + 1, day_count - 1)
+
+        p1_days = self._group_by_day(p1.slots)
+        p2_days = self._group_by_day(p2.slots)
+
+        child_slots: list[MealSlot] = []
+        for day in range(day_count):
+            source_days = p2_days if a <= day <= b else p1_days
+            selected = source_days.get(day, [])
+            for ms in selected:
+                child_slots.append(MealSlot(day=day, slot=ms.slot, recipe=ms.recipe))
+
         return Individual(slots=child_slots)
 
-    # ── Mutation ───────────────────────────────────────────────────────────
-
     def _mutate(self, ind: Individual) -> Individual:
-        """Replace a random slot with a new recipe."""
-        used_urls = {ms.recipe.url for ms in ind.slots}
-        for ms in ind.slots:
-            if random.random() < self.mutation_rate:
-                new_recipe = self._pick_unique(used_urls)
-                ms.recipe = new_recipe
-                used_urls.add(new_recipe.url)
+        if random.random() > self.mutation_rate:
+            return ind
+
+        mode = random.random()
+        slots = ind.slots
+
+        if not slots:
+            return ind
+
+        if mode < 0.50:
+            idx = random.randrange(len(slots))
+            slots[idx].recipe = random.choice(self.recipes)
+        elif mode < 0.80:
+            day = random.randrange(self.planning_days)
+            day_indices = [i for i, ms in enumerate(slots) if ms.day == day]
+            if len(day_indices) >= 2:
+                i1, i2 = random.sample(day_indices, 2)
+                slots[i1], slots[i2] = slots[i2], slots[i1]
+                slots[i1].day = day
+                slots[i2].day = day
+        else:
+            if self.planning_days >= 2:
+                d1, d2 = random.sample(range(self.planning_days), 2)
+                for ms in slots:
+                    if ms.day == d1:
+                        ms.day = -1
+                    elif ms.day == d2:
+                        ms.day = d1
+                for ms in slots:
+                    if ms.day == -1:
+                        ms.day = d2
+
         return ind
+
+    def _repair(self, ind: Individual) -> Individual:
+        grouped = self._group_by_day(ind.slots)
+        repaired_slots: list[MealSlot] = []
+
+        for day in range(self.planning_days):
+            day_slots = grouped.get(day, [])
+
+            slot_map = {ms.slot: ms for ms in day_slots if ms.slot in SLOTS}
+            for slot in SLOTS:
+                ms = slot_map.get(slot)
+                if ms is None:
+                    candidate = random.choice(self.recipes)
+                    repaired_slots.append(MealSlot(day=day, slot=slot, recipe=candidate))
+                else:
+                    repaired_slots.append(MealSlot(day=day, slot=slot, recipe=ms.recipe))
+
+        ind.slots = repaired_slots
+        return ind
+
+    def _group_by_day(self, slots: list[MealSlot]) -> dict[int, list[MealSlot]]:
+        grouped: dict[int, list[MealSlot]] = {}
+        for ms in slots:
+            grouped.setdefault(ms.day, []).append(ms)
+        for day in grouped:
+            grouped[day] = sorted(grouped[day], key=lambda x: SLOTS.index(x.slot) if x.slot in SLOTS else 99)
+        return grouped
+
+    def _calorie_target_points(self, calories: float, target: float) -> float:
+        if target <= 0:
+            return 0.0
+        pct = abs(calories - target) / target
+        if pct <= 0.05:
+            return 100.0
+        if pct <= 0.10:
+            return 80.0
+        if pct <= 0.15:
+            return 50.0
+        return 0.0
+
+    def _macro_ratio_from_day(
+        self,
+        protein_g: float,
+        fat_g: float,
+        carb_g: float,
+        calories: float,
+    ) -> tuple[float, float, float]:
+        total_kcal = max(calories, 1.0)
+        p = (protein_g * 4.0) / total_kcal
+        f = (fat_g * 9.0) / total_kcal
+        c = (carb_g * 4.0) / total_kcal
+        return p, f, c
+
+    def _range_score(self, value: float, lo: float, hi: float) -> float:
+        if lo <= value <= hi:
+            return 1.0
+        if value < lo:
+            return max(0.0, 1.0 - (lo - value) / max(lo, 0.01))
+        return max(0.0, 1.0 - (value - hi) / max(1.0 - hi, 0.01))
+
+    def _macro_quality_points(
+        self,
+        p_ratio: float,
+        f_ratio: float,
+        c_ratio: float,
+        ranges: dict[str, tuple[float, float]],
+    ) -> float:
+        in_range = (
+            ranges["protein"][0] <= p_ratio <= ranges["protein"][1]
+            and ranges["fat"][0] <= f_ratio <= ranges["fat"][1]
+            and ranges["carb"][0] <= c_ratio <= ranges["carb"][1]
+        )
+        if in_range:
+            return 60.0
+
+        def min_distance_to_range(value: float, lo: float, hi: float) -> float:
+            if lo <= value <= hi:
+                return 0.0
+            if value < lo:
+                return lo - value
+            return value - hi
+
+        d_p = min_distance_to_range(p_ratio, *ranges["protein"])
+        d_f = min_distance_to_range(f_ratio, *ranges["fat"])
+        d_c = min_distance_to_range(c_ratio, *ranges["carb"])
+        worst_pct = max(d_p, d_f, d_c) * 100.0
+
+        if worst_pct <= 5.0:
+            return 40.0
+        if worst_pct <= 10.0:
+            return 20.0
+        return 0.0

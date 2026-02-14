@@ -91,6 +91,13 @@ class GoalMealPlannerService:
         goal = _normalise_goal(constraints.get("goal"))
         planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
         max_budget = _safe_float(constraints.get("max_weekly_budget"), default=0.0)
+        tdee = _safe_float(constraints.get("tdee"), default=2200.0)
+        body_weight_kg = _safe_float(
+            constraints.get("body_weight_kg")
+            or constraints.get("weight_kg")
+            or constraints.get("weight"),
+            default=70.0,
+        )
 
         liked = _flat_tokens(
             constraints.get("favorite_foods"),
@@ -123,6 +130,8 @@ class GoalMealPlannerService:
                 liked=liked,
                 disliked=disliked,
                 max_weekly_budget=max_budget,
+                tdee=tdee,
+                body_weight_kg=body_weight_kg,
             )
             best_slots = ga.run()
         except Exception as exc:
@@ -132,11 +141,12 @@ class GoalMealPlannerService:
         days_payload = _build_days_payload(best_slots, planning_days)
         total_cost = sum(ms.recipe.cost_per_serving for ms in best_slots)
         goal_profile = GOAL_PROFILES[goal]
+        goal_daily_calories = max(1200.0, tdee + float(goal_profile.get("calorie_delta", 0.0)))
 
         return {
             "status": "generated",
             "goal": goal,
-            "goal_daily_calories": goal_profile["daily_calories"],
+            "goal_daily_calories": round(goal_daily_calories, 0),
             "planning_days": planning_days,
             "week_start": _current_week_start().isoformat(),
             "max_weekly_budget": max_budget or None,
