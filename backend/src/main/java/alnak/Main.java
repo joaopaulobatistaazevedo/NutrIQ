@@ -388,7 +388,7 @@ public class Main {
     private static int resolvePort() {
         String raw = System.getenv("PORT");
         if (raw == null || raw.isBlank()) raw = System.getenv("APP_PORT");
-        if (raw == null || raw.isBlank()) return 7070;
+        if (raw == null || raw.isBlank()) return 7071;
         try {
             int parsed = Integer.parseInt(raw.trim());
             if (parsed < 1 || parsed > 65535)
