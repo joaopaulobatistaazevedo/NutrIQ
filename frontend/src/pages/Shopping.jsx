@@ -11,6 +11,7 @@ import {
 } from '../services/priceService';
 import { fetchPersistedShoppingCart, savePersistedShoppingCart } from '../services/shoppingCartService';
 import { PROFILE_KEY, WEEKLY_PLAN_KEY, CART_GENERATE_REQUEST_KEY } from '../constants/storageKeys';
+import { resolveAccountId, scopedKey } from '../utils/accountScope';
 import '../styles/shopping.css';
 
 const CARD_ACCENTS = ['is-pingo', 'is-continente', 'is-lidl'];
@@ -45,18 +46,6 @@ function parseStorage(key, fallback) {
   } catch {
     return fallback;
   }
-}
-
-function resolveAccountId(profile) {
-  const username = String(profile?.username || '').trim().toLowerCase();
-  if (!username) {
-    return 'anonymous';
-  }
-  return username.replace(/\s+/g, '_');
-}
-
-function scopedKey(base, accountId) {
-  return `${base}:${accountId}`;
 }
 
 function normalizePriceItem(entry, index) {
@@ -333,6 +322,26 @@ function buildCartSnapshot({
   };
 }
 
+function applyCartSnapshotToState(snapshot, setters) {
+  if (!isPersistedCartSnapshot(snapshot)) {
+    return false;
+  }
+
+  const persistedLists = snapshot.lists || {};
+  const persistedActive = String(snapshot.activeListId || '');
+  const fallbackListId = Object.keys(persistedLists)[0] || '';
+
+  setters.setLists(persistedLists);
+  setters.setComparison(Array.isArray(snapshot.comparison) ? snapshot.comparison : []);
+  setters.setOptimizedTotal(Number(snapshot.optimizedTotal || 0));
+  setters.setCartSource(String(snapshot.cartSource || 'meal-plan'));
+  setters.setLastGeneratedSignature(String(snapshot.lastGeneratedSignature || ''));
+  setters.setActiveListId(
+    persistedActive && persistedLists[persistedActive] ? persistedActive : fallbackListId,
+  );
+  return true;
+}
+
 export default function Shopping() {
   const accountId = useMemo(() => {
     const profile = parseStorage(PROFILE_KEY, null);
@@ -475,17 +484,17 @@ export default function Shopping() {
 
       try {
         const persisted = await fetchPersistedShoppingCart();
-        if (!cancelled && isPersistedCartSnapshot(persisted)) {
-          const persistedLists = persisted.lists || {};
-          const persistedActive = String(persisted.activeListId || '');
-          const fallbackListId = Object.keys(persistedLists)[0] || '';
-
-          setLists(persistedLists);
-          setComparison(Array.isArray(persisted.comparison) ? persisted.comparison : []);
-          setOptimizedTotal(Number(persisted.optimizedTotal || 0));
-          setCartSource(String(persisted.cartSource || 'meal-plan'));
-          setLastGeneratedSignature(String(persisted.lastGeneratedSignature || ''));
-          setActiveListId(persistedActive && persistedLists[persistedActive] ? persistedActive : fallbackListId);
+        if (
+          !cancelled
+          && applyCartSnapshotToState(persisted, {
+            setLists,
+            setComparison,
+            setOptimizedTotal,
+            setCartSource,
+            setLastGeneratedSignature,
+            setActiveListId,
+          })
+        ) {
           setGenerationStatus('Carrinho carregado da base de dados.');
           return;
         }
@@ -538,9 +547,31 @@ export default function Shopping() {
       }
     };
 
+    const onShoppingCartUpdated = (event) => {
+      const payloadAccountId = event?.detail?.accountId;
+      if (payloadAccountId && payloadAccountId !== accountId) {
+        return;
+      }
+
+      const snapshot = event?.detail?.shoppingCart;
+      const applied = applyCartSnapshotToState(snapshot, {
+        setLists,
+        setComparison,
+        setOptimizedTotal,
+        setCartSource,
+        setLastGeneratedSignature,
+        setActiveListId,
+      });
+
+      if (applied) {
+        setGenerationStatus('Carrinho otimizado atualizado pelo NutriBot.');
+      }
+    };
+
     syncPlan();
     window.addEventListener('nutribot:weekly-plan-updated', onPlanUpdated);
     window.addEventListener('storage', onStorage);
+    window.addEventListener('nutribot:shopping-cart-updated', onShoppingCartUpdated);
 
     if (localStorage.getItem(CART_GENERATE_REQUEST_KEY)) {
       localStorage.removeItem(CART_GENERATE_REQUEST_KEY);
@@ -550,6 +581,7 @@ export default function Shopping() {
     return () => {
       window.removeEventListener('nutribot:weekly-plan-updated', onPlanUpdated);
       window.removeEventListener('storage', onStorage);
+      window.removeEventListener('nutribot:shopping-cart-updated', onShoppingCartUpdated);
     };
   }, [accountId, generateCartFromMealPlan]);
 
@@ -730,8 +762,8 @@ export default function Shopping() {
     const totalUnits = activeItems.reduce((total, item) => total + item.quantity, 0);
     const currency = activeItems[0]?.currency || 'EUR';
 
-    const cheapestComparisonTotal = comparison.length ? comparison[0].total : subtotal;
-    const saving = Math.max(0, subtotal - cheapestComparisonTotal);
+    const bestScenarioTotal = optimizedTotal > 0 ? optimizedTotal : subtotal;
+    const saving = Math.max(0, subtotal - bestScenarioTotal);
 
     return {
       subtotal,
@@ -740,7 +772,7 @@ export default function Shopping() {
       currency,
       saving,
     };
-  }, [activeItems, comparison]);
+  }, [activeItems, optimizedTotal]);
 
   const marketEntries = Object.entries(lists);
   const hasData = marketEntries.length > 0;
@@ -810,17 +842,23 @@ export default function Shopping() {
                   <div key={entry.marketKey} className="shopping-comparison-row">
                     <div>
                       <strong>{entry.supermarket}</strong>
+                      {Number.isFinite(Number(entry.healthScore)) ? (
+                        <small>Saúde: {Number(entry.healthScore).toFixed(1)} • Score: {Number(entry.marketScore || 0).toFixed(2)}</small>
+                      ) : null}
                       {entry.missingCount > 0 ? (
                         <small>
                           {entry.coveredCount}/{entry.totalIngredients} ingredientes com preço
                         </small>
+                      ) : null}
+                      {Number(entry.budgetPenalty || 0) > 0 ? (
+                        <small>Penalização orçamento: {Number(entry.budgetPenalty).toFixed(2)}</small>
                       ) : null}
                     </div>
                     <div className="shopping-comparison-prices">
                       <span>{formatCurrency(entry.total)}</span>
                       <small>
                         {entry.marketKey === bestComparison?.marketKey
-                          ? 'Mais barato'
+                          ? 'Melhor equilíbrio'
                           : `+${formatCurrency(Math.max(0, entry.total - (bestComparison?.total || 0)))}`}
                       </small>
                     </div>
@@ -986,7 +1024,7 @@ export default function Shopping() {
 
             <footer className="shopping-summary">
               <div className="summary-row">
-                <span>Poupança face ao mais barato</span>
+                <span>Poupança face ao melhor cenário otimizado</span>
                 <strong className="saving">{formatCurrency(summary.saving, summary.currency)}</strong>
               </div>
               <div className="summary-row">

@@ -78,8 +78,25 @@ function toIsoDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+function normalizeWeekStart(rawWeekStart) {
+  if (typeof rawWeekStart === 'string' && rawWeekStart.trim()) {
+    return rawWeekStart.trim();
+  }
+
+  if (Array.isArray(rawWeekStart) && rawWeekStart.length >= 3) {
+    const year = Number(rawWeekStart[0]);
+    const month = Number(rawWeekStart[1]);
+    const day = Number(rawWeekStart[2]);
+    if (Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day)) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  return '';
+}
+
 function toUiPlan(plan) {
-  const weekStartRaw = String(plan?.weekStart || '').trim();
+  const weekStartRaw = normalizeWeekStart(plan?.weekStart);
   if (!weekStartRaw) {
     return null;
   }

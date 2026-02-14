@@ -4,12 +4,14 @@ import { X, Send, HeartHandshake, Trash2 } from 'lucide-react';
 import { sendAssistantMessage, sendOnboardingMessage } from '../services/chatbotService';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import {
+  CART_GENERATE_REQUEST_KEY,
   CHAT_CONTEXT_KEY,
   CHAT_HISTORY_KEY,
   CHAT_MESSAGES_KEY,
   PROFILE_KEY,
   WEEKLY_PLAN_KEY,
 } from '../constants/storageKeys';
+import { resolveAccountId, scopedKey } from '../utils/accountScope';
 import '../styles/chatbot.css';
 
 const parseStorage = (key, fallback) => {
@@ -57,16 +59,6 @@ const toUiMessage = (item) => ({
   role: item.role === 'user' ? 'user' : 'bot',
   text: item.content,
 });
-
-const resolveAccountId = (profile) => {
-  const username = String(profile?.username || '').trim().toLowerCase();
-  if (!username) {
-    return 'anonymous';
-  }
-  return username.replace(/\s+/g, '_');
-};
-
-const scopedKey = (base, accountId) => `${base}:${accountId}`;
 
 const buildInitialMessages = ({ welcomeName, welcomeSex, accountId }) => {
   const storedMessages = parseStorage(scopedKey(CHAT_MESSAGES_KEY, accountId), []);
@@ -267,6 +259,43 @@ export default function ChatWidget() {
     setConversationHistory(nextHistory);
 
     try {
+      const persistShoppingCart = (cartPayload) => {
+        if (!cartPayload || typeof cartPayload !== 'object') {
+          return;
+        }
+
+        localStorage.setItem(CART_GENERATE_REQUEST_KEY, String(Date.now()));
+        window.dispatchEvent(
+          new CustomEvent('nutribot:shopping-cart-updated', {
+            detail: {
+              accountId,
+              shoppingCart: cartPayload,
+            },
+          }),
+        );
+      };
+
+      const persistPlan = async (planPayload) => {
+        if (!planPayload) {
+          return;
+        }
+
+        let planToStore = planPayload;
+
+        try {
+          const backendPlan = await fetchActiveMealPlan();
+          if (backendPlan) {
+            planToStore = backendPlan;
+          }
+        } catch {
+        }
+
+        localStorage.setItem(scopedKey(WEEKLY_PLAN_KEY, accountId), JSON.stringify(planToStore));
+        window.dispatchEvent(
+          new CustomEvent('nutribot:weekly-plan-updated', { detail: { accountId } })
+        );
+      };
+
       const shouldUseOnboarding = !chatContext?.onboarding_complete;
       const userId = activeProfile?.username || accountId || 'anonymous';
 
@@ -295,11 +324,58 @@ export default function ChatWidget() {
 
       if (shouldUseOnboarding && response?.onboarding_complete) {
         const updatedPreferences = response?.extracted_preferences || {};
+
         setChatContext((previous) => ({
           ...previous,
           onboarding_complete: true,
           preferences: updatedPreferences,
         }));
+
+        const autoPlanPrompt =
+          'Com base no meu onboarding, gera agora o meu plano semanal de refeições.';
+        const autoHistory = [
+          ...nextHistory,
+          { role: 'assistant', content: botText },
+          { role: 'user', content: autoPlanPrompt },
+        ];
+
+        const autoPlanResponse = await sendAssistantMessage({
+          message: autoPlanPrompt,
+          userId,
+          conversationHistory: autoHistory,
+          userContext: {
+            ...buildUserContext(),
+            ...updatedPreferences,
+            is_first_time: false,
+          },
+        });
+
+        const autoBotText = autoPlanResponse?.response || '';
+        if (autoBotText) {
+          setMessages((previous) => [
+            ...previous,
+            {
+              id: Date.now() + 2,
+              role: 'bot',
+              text: autoBotText,
+            },
+          ]);
+          setConversationHistory((previous) => [
+            ...previous,
+            { role: 'user', content: autoPlanPrompt },
+            { role: 'assistant', content: autoBotText },
+          ]);
+        }
+
+        if (autoPlanResponse?.meal_plan_draft) {
+          setChatContext((previous) => ({
+            ...previous,
+            meal_plan_draft: autoPlanResponse.meal_plan_draft,
+          }));
+        }
+
+        await persistPlan(autoPlanResponse?.meal_plan);
+        persistShoppingCart(autoPlanResponse?.shopping_cart);
       }
 
       if (response?.meal_plan_draft) {
@@ -309,22 +385,8 @@ export default function ChatWidget() {
         }));
       }
 
-      if (response?.meal_plan) {
-        let planToStore = response.meal_plan;
-
-        try {
-          const backendPlan = await fetchActiveMealPlan();
-          if (backendPlan) {
-            planToStore = backendPlan;
-          }
-        } catch {
-        }
-
-        localStorage.setItem(scopedKey(WEEKLY_PLAN_KEY, accountId), JSON.stringify(planToStore));
-        window.dispatchEvent(
-          new CustomEvent('nutribot:weekly-plan-updated', { detail: { accountId } })
-        );
-      }
+      await persistPlan(response?.meal_plan);
+      persistShoppingCart(response?.shopping_cart);
 
       setChatContext((previous) => ({
         ...previous,

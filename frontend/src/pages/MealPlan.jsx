@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } f
 import Layout from '../components/Layout';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { CART_GENERATE_REQUEST_KEY, PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
+import { resolveAccountId, scopedKey } from '../utils/accountScope';
 import '../styles/meal-plan.css';
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
@@ -58,18 +59,6 @@ function parseStorage(key, fallback) {
   } catch {
     return fallback;
   }
-}
-
-function resolveAccountId(profile) {
-  const username = String(profile?.username || '').trim().toLowerCase();
-  if (!username) {
-    return 'anonymous';
-  }
-  return username.replace(/\s+/g, '_');
-}
-
-function scopedKey(base, accountId) {
-  return `${base}:${accountId}`;
 }
 
 function slotMeta(slot) {

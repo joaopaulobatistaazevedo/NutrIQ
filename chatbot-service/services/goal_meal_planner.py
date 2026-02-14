@@ -89,7 +89,10 @@ class GoalMealPlannerService:
           goal                 : str  ← NEW  ("lose_weight"|"gain_weight"|"maintain"|"gain_muscle")
         """
         goal = _normalise_goal(constraints.get("goal"))
-        planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
+        requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
+        today = date.today()
+        days_remaining_this_week = 7 - today.weekday()
+        planning_days = max(1, min(requested_planning_days, days_remaining_this_week))
         max_budget = _safe_float(constraints.get("max_weekly_budget"), default=0.0)
         tdee = _safe_float(constraints.get("tdee"), default=2200.0)
         body_weight_kg = _safe_float(
@@ -138,7 +141,7 @@ class GoalMealPlannerService:
             logger.error("GA failed: %s", exc)
             return _empty_plan(planning_days, goal, disliked, liked, f"Erro no algoritmo: {exc}")
 
-        days_payload = _build_days_payload(best_slots, planning_days)
+        days_payload = _build_days_payload(best_slots, planning_days, today)
         total_cost = sum(ms.recipe.cost_per_serving for ms in best_slots)
         goal_profile = GOAL_PROFILES[goal]
         goal_daily_calories = max(1200.0, tdee + float(goal_profile.get("calorie_delta", 0.0)))
@@ -148,6 +151,8 @@ class GoalMealPlannerService:
             "goal": goal,
             "goal_daily_calories": round(goal_daily_calories, 0),
             "planning_days": planning_days,
+            "requested_planning_days": requested_planning_days,
+            "planning_start": today.isoformat(),
             "week_start": _current_week_start().isoformat(),
             "max_weekly_budget": max_budget or None,
             "estimated_weekly_cost": round(total_cost, 2),
@@ -238,8 +243,11 @@ class GoalMealPlannerService:
 # Payload builders
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _build_days_payload(slots: list[MealSlot], planning_days: int) -> list[dict[str, Any]]:
-    week_start = _current_week_start()
+def _build_days_payload(
+    slots: list[MealSlot],
+    planning_days: int,
+    planning_start: date,
+) -> list[dict[str, Any]]:
     # Group slots by day index
     by_day: dict[int, list[MealSlot]] = {}
     for ms in slots:
@@ -247,7 +255,7 @@ def _build_days_payload(slots: list[MealSlot], planning_days: int) -> list[dict[
 
     days: list[dict[str, Any]] = []
     for offset in range(planning_days):
-        meal_date = week_start + timedelta(days=offset)
+        meal_date = planning_start + timedelta(days=offset)
         day_slots = by_day.get(offset, [])
         meals = [
             {

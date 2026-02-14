@@ -3,7 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-RUN_DIR="$ROOT_DIR/.run"
+
+# Sempre usar pasta de runtime baseada no utilizador
+RUN_DIR="$ROOT_DIR/.run-${USER:-user}"
 LOG_DIR="$RUN_DIR/logs"
 PID_DIR="$RUN_DIR/pids"
 
@@ -41,14 +43,9 @@ wait_for_http() {
   local timeout_sec="${2:-45}"
   local start_ts
   start_ts="$(date +%s)"
-
   while true; do
-    if curl -fsS "$url" >/dev/null 2>&1; then
-      return 0
-    fi
-    if (( $(date +%s) - start_ts >= timeout_sec )); then
-      return 1
-    fi
+    if curl -fsS "$url" >/dev/null 2>&1; then return 0; fi
+    if (( $(date +%s) - start_ts >= timeout_sec )); then return 1; fi
     sleep 1
   done
 }
@@ -59,7 +56,6 @@ start_mysql() {
     echo "- MySQL já está a correr."
     return
   fi
-
   if docker ps -a --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$"; then
     docker start "$MYSQL_CONTAINER" >/dev/null
     echo "- MySQL container iniciado."
@@ -75,17 +71,12 @@ start_mysql() {
       --default-authentication-plugin=mysql_native_password >/dev/null
     echo "- MySQL container criado e iniciado."
   fi
-
   sleep 4
 }
 
 start_backend() {
   echo "[2/4] A garantir backend na porta ${BACKEND_PORT}..."
-  if is_port_listening "$BACKEND_PORT"; then
-    echo "- Backend já está ativo."
-    return
-  fi
-
+  if is_port_listening "$BACKEND_PORT"; then echo "- Backend já está ativo."; return; fi
   cd "$ROOT_DIR/backend"
   nohup env \
     MYSQL_HOST=127.0.0.1 \
@@ -98,7 +89,6 @@ start_backend() {
     mvn exec:java -Dexec.mainClass=alnak.Main \
     >"$BACKEND_LOG" 2>&1 &
   echo $! > "$BACKEND_PID_FILE"
-
   if wait_for_http "http://127.0.0.1:${BACKEND_PORT}/api/recipes" 90; then
     echo "- Backend iniciado com sucesso."
   else
@@ -109,105 +99,26 @@ start_backend() {
 
 seed_recipes_if_needed() {
   echo "- A verificar seed de receitas..."
-
   local recipe_count
   recipe_count="$($PYTHON_BIN - <<'PY'
-import json
-import urllib.request
-
+import json, urllib.request
 url = 'http://127.0.0.1:7071/api/recipes'
-with urllib.request.urlopen(url, timeout=10) as r:
-    data = json.loads(r.read().decode('utf-8'))
+with urllib.request.urlopen(url, timeout=10) as r: data = json.loads(r.read().decode('utf-8'))
 print(len(data) if isinstance(data, list) else 0)
 PY
 )"
-
-  if [[ "$recipe_count" -gt 0 ]]; then
-    echo "- Seed já existe (${recipe_count} receitas)."
-    return
-  fi
-
+  if [[ "$recipe_count" -gt 0 ]]; then echo "- Seed já existe (${recipe_count} receitas)."; return; fi
   echo "- Base vazia, a semear receitas de recipes_scraped.json..."
   cd "$ROOT_DIR"
-  "$PYTHON_BIN" - <<'PY'
-import json
-import re
-import urllib.request
-
-API = 'http://127.0.0.1:7071/api/recipes'
-
-with open('data/recipes_scraped.json', 'r', encoding='utf-8') as f:
-    data = json.load(f)
-
-recipes = data.get('recipes', [])
-created = 0
-
-for item in recipes[:50]:
-    title = (item.get('title') or '').strip()
-    if not title:
-        continue
-
-    tags = [str(t).strip().lower() for t in (item.get('tags') or []) if str(t).strip()]
-    lowered = ' '.join([title.lower(), ' '.join(tags)])
-    if any(k in lowered for k in ['pequeno', 'breakfast', 'matinal']):
-        meal_type = 'BREAKFAST'
-    elif any(k in lowered for k in ['almoço', 'almoco', 'lunch']):
-        meal_type = 'LUNCH'
-    elif any(k in lowered for k in ['snack', 'lanche']):
-        meal_type = 'SNACK'
-    else:
-        meal_type = 'DINNER'
-
-    servings_raw = str(item.get('servings') or '')
-    m = re.search(r'\d+', servings_raw)
-    servings = int(m.group(0)) if m else 2
-
-    steps = []
-    for i, step in enumerate(item.get('steps') or [], start=1):
-        step_txt = str(step).strip()
-        if step_txt:
-            steps.append({'stepOrder': i, 'description': step_txt, 'durationMinutes': 0})
-
-    payload = {
-        'name': title,
-        'description': (item.get('url') or '').strip(),
-        'mealType': meal_type,
-        'prepTimeMin': int(item.get('prep_time_minutes') or 0),
-        'cookTimeMin': int(item.get('cook_time_minutes') or 0),
-        'servings': max(1, servings),
-        'imageUrl': (item.get('image_url') or '').strip(),
-        'ingredients': [],
-        'steps': steps,
-    }
-
-    req = urllib.request.Request(
-        API,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
-        method='POST',
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=12) as r:
-            if r.status == 201:
-                created += 1
-    except Exception:
-        pass
-
-print(f'seed_created={created}')
-PY
+  "$PYTHON_BIN" scripts/seed_recipes.py
 }
 
 start_chatbot() {
   echo "[3/4] A garantir chatbot na porta ${CHATBOT_PORT}..."
-  if is_port_listening "$CHATBOT_PORT"; then
-    echo "- Chatbot já está ativo."
-    return
-  fi
-
+  if is_port_listening "$CHATBOT_PORT"; then echo "- Chatbot já está ativo."; return; fi
   cd "$ROOT_DIR/chatbot-service"
   nohup "$PYTHON_BIN" main.py >"$CHATBOT_LOG" 2>&1 &
   echo $! > "$CHATBOT_PID_FILE"
-
   if wait_for_http "http://127.0.0.1:${CHATBOT_PORT}/health" 45; then
     echo "- Chatbot iniciado com sucesso."
   else
@@ -218,15 +129,10 @@ start_chatbot() {
 
 start_frontend() {
   echo "[4/4] A garantir frontend na porta ${FRONTEND_PORT}..."
-  if is_port_listening "$FRONTEND_PORT"; then
-    echo "- Frontend já está ativo."
-    return
-  fi
-
+  if is_port_listening "$FRONTEND_PORT"; then echo "- Frontend já está ativo."; return; fi
   cd "$ROOT_DIR/frontend"
   nohup npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" >"$FRONTEND_LOG" 2>&1 &
   echo $! > "$FRONTEND_PID_FILE"
-
   if wait_for_http "http://127.0.0.1:${FRONTEND_PORT}" 45; then
     echo "- Frontend iniciado com sucesso."
   else

@@ -39,11 +39,18 @@ export default function Layout({ children }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [location.pathname, navigate, navItems]);
 
+  useEffect(() => {
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.scrollTop = 0;
+    }
+  }, [location.pathname]);
+
   return (
     <div className="layout">
       <a className="skip-link" href="#main-content">Saltar para conteúdo</a>
       <Sidebar />
-      <main id="main-content" className="layout-content" tabIndex={-1}>
+      <main key={location.pathname} id="main-content" className="layout-content" tabIndex={-1}>
         {children}
       </main>
     </div>

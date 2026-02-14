@@ -8,6 +8,7 @@ import alnak.controllers.SocialController;
 import alnak.controllers.ShoppingCartController;
 import alnak.controllers.UserController;
 import alnak.data.global.FriendshipDAO;
+import alnak.data.global.GlobalDatabase;
 import alnak.data.global.GlobalRecipeDAO;
 import alnak.data.global.GlobalMealPlanDAO;
 import alnak.data.global.PostDAO;
@@ -28,6 +29,7 @@ import alnak.services.UserService;
 import alnak.utils.JWTUtil;
 import io.javalin.Javalin;
 
+import java.sql.SQLException;
 import java.util.Map;
 
 public class Main {
@@ -76,6 +78,13 @@ public class Main {
                 (e, ctx) -> ctx.status(400).json(Map.of("error", e.getMessage())));
         app.exception(SecurityException.class,
                 (e, ctx) -> ctx.status(403).json(Map.of("error", e.getMessage())));
+
+        app.after(ctx -> {
+            try {
+                GlobalDatabase.getInstance().getConnection().close();
+            } catch (SQLException | RuntimeException ignored) {
+            }
+        });
 
         // ── Auth routes ───────────────────────────────────────────
         app.post("/api/auth/register", ctx -> {

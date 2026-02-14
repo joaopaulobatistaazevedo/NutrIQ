@@ -89,7 +89,26 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
         backend_service.persist_user_chat_data(backend_token, constraints)
 
     if response.meal_plan:
-        backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
+        generated_plan = dict(response.meal_plan)
+        persisted_plan = backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
+        if persisted_plan:
+            response.meal_plan = persisted_plan
+
+        cart_plan_input = dict(response.meal_plan or {})
+        for key in ("max_weekly_budget", "goal_daily_calories", "planning_days", "goal"):
+            if key not in cart_plan_input and key in generated_plan:
+                cart_plan_input[key] = generated_plan[key]
+
+        shopping_cart = backend_service.generate_and_persist_shopping_cart(
+            backend_token,
+            cart_plan_input,
+        )
+        if shopping_cart:
+            response.shopping_cart = shopping_cart
+            response.response = (
+                f"{response.response} Também otimizei o carrinho para ficar mais barato e mais saudável "
+                "com base no teu orçamento e objetivo calórico semanal."
+            ).strip()
 
     return response
 
