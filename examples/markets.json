@@ -1,0 +1,30 @@
+{
+  "supermarkets": [
+    {
+      "name": "Continente",
+      "search_url": "https://www.continente.pt/pesquisa/?q={query_compact}&start=0&srule=Continente&pmin=0.01",
+      "base_url": "https://www.continente.pt",
+      "result_selector": "li.product-grid-item",
+      "title_selector": "h3",
+      "price_selector": "[data-testid='price-value']",
+      "link_selector": "a",
+      "product_url_patterns": ["/produto/"],
+      "currency": "EUR",
+      "min_delay_seconds": 0.2,
+      "max_delay_seconds": 0.8
+    },
+    {
+      "name": "Auchan",
+      "search_url": "https://www.auchan.pt/pt/pesquisa?search-button=&q={query}&lang=pt_PT",
+      "base_url": "https://www.auchan.pt",
+      "result_selector": ".product-card",
+      "title_selector": ".product-card-title",
+      "price_selector": ".sales .value",
+      "link_selector": "a",
+      "product_url_patterns": ["/produto/", "/produtos/", "/product/"],
+      "currency": "EUR",
+      "min_delay_seconds": 0.2,
+      "max_delay_seconds": 0.8
+    }
+  ]
+}
