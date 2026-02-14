@@ -63,7 +63,32 @@ class BackendService:
         if allergens:
             payload["allergens"] = allergens
 
+        # ignorados e nunca chegavam ao backend
+        favorite_foods = self._normalize_string_list(data.get("favorite_foods"))
+        if favorite_foods:
+            payload["favoriteFoods"] = favorite_foods
+
+        disliked_ingredients = self._normalize_string_list(data.get("disliked_ingredients"))
+        if disliked_ingredients:
+            payload["dislikedIngredients"] = disliked_ingredients
+
         return payload
+
+    def _normalize_string_list(self, raw: Any) -> list[str]:
+        """Normaliza uma lista de strings, removendo vazios e duplicados."""
+        if raw is None:
+            return []
+        items = raw if isinstance(raw, list) else [raw]
+        seen: set[str] = set()
+        result = []
+        for item in items:
+            if not isinstance(item, str):
+                continue
+            clean = item.strip()
+            if clean and clean not in seen:
+                seen.add(clean)
+                result.append(clean)
+        return result
 
     def _normalize_items(self, raw: Any, allowed_values: set[str]) -> list[str]:
         if raw is None:
