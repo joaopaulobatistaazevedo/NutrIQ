@@ -190,6 +190,32 @@ export default function ChatWidget() {
     return () => window.removeEventListener('nutribot:meal-edit-request', onMealEditRequest);
   }, [accountId]);
 
+
+  useEffect(() => {
+    const onOpenChat = (event) => {
+      const detail = event?.detail || {};
+      if (detail.accountId && detail.accountId !== accountId) {
+        return;
+      }
+
+      setIsOpen(true);
+      setError('');
+
+      if (typeof detail.seedMessage === 'string' && detail.seedMessage.trim()) {
+        setInput(detail.seedMessage.trim());
+      }
+
+      requestAnimationFrame(() => {
+        if (detail.focusInput !== false) {
+          inputRef.current?.focus();
+        }
+      });
+    };
+
+    window.addEventListener('nutribot:open-chat', onOpenChat);
+    return () => window.removeEventListener('nutribot:open-chat', onOpenChat);
+  }, [accountId]);
+
   const buildUserContext = () => {
     const preferences = chatContext?.preferences || {};
     const weeklyPlan = parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null);

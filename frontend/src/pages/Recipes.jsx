@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import { fetchRecipes } from '../services/recipeService';
 import '../styles/recipes.css';
@@ -35,6 +35,14 @@ function normalizeMealType(value) {
   return 'DINNER';
 }
 
+function mealTypeLabel(value) {
+  const normalized = normalizeMealType(value);
+  if (normalized === 'BREAKFAST') return 'Pequeno-almoço';
+  if (normalized === 'LUNCH') return 'Almoço';
+  if (normalized === 'DINNER') return 'Jantar';
+  return 'Snack';
+}
+
 function formatDuration(recipe) {
   const total = Number(recipe?.totalTimeMin || 0);
   if (total > 0) return `${total} min`;
@@ -45,7 +53,7 @@ function formatDuration(recipe) {
 }
 
 function formatPrice(recipe) {
-  const candidates = [recipe?.price, recipe?.estimatedCostPerServing, recipe?.estimatedCost];
+  const candidates = [recipe?.price, recipe?.estimatedCostPerServing, recipe?.estimatedCost, recipe?.costPerServing];
   for (const candidate of candidates) {
     const amount = Number(candidate);
     if (Number.isFinite(amount) && amount > 0) {
@@ -62,7 +70,65 @@ function recipeImageFor(recipe) {
   return `https://picsum.photos/seed/${seed}/900/560`;
 }
 
-function CategoryCarousel({ category }) {
+function extractSourceUrl(recipe) {
+  const candidates = [
+    recipe?.sourceUrl,
+    recipe?.source_url,
+    recipe?.url,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate || '').trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+  }
+
+  const description = String(recipe?.description || '');
+  const match = description.match(/https?:\/\/[^\s|)]+/i);
+  if (!match?.[0]) {
+    return '';
+  }
+
+  return match[0].replace(/[.,;!?]+$/, '');
+}
+
+function recipeCalories(recipe) {
+  const direct = Number(recipe?.calories);
+  if (Number.isFinite(direct) && direct > 0) {
+    return Math.round(direct);
+  }
+  const nested = Number(recipe?.nutritionalInfo?.calories);
+  if (Number.isFinite(nested) && nested > 0) {
+    return Math.round(nested);
+  }
+  return 0;
+}
+
+function macroValue(recipe, macroKey) {
+  const nested = Number(recipe?.nutritionalInfo?.[macroKey]);
+  if (Number.isFinite(nested) && nested > 0) {
+    return nested;
+  }
+  const direct = Number(recipe?.[macroKey]);
+  if (Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+  return 0;
+}
+
+function formatIngredient(ingredient) {
+  const quantity = Number(ingredient?.quantity);
+  const qtyLabel = Number.isFinite(quantity) && quantity > 0 ? `${quantity}` : '';
+  const unit = String(ingredient?.unit || '').trim().toLowerCase();
+  const ingredientName = String(ingredient?.ingredientName || '').trim();
+  const notes = String(ingredient?.notes || '').trim();
+
+  const base = [qtyLabel, unit, ingredientName].filter(Boolean).join(' ').trim() || 'Ingrediente';
+  return notes ? `${base} — ${notes}` : base;
+}
+
+function CategoryCarousel({ category, onOpenNutritionistRecipe }) {
   const trackRef = useRef(null);
 
   const scrollByAmount = (direction) => {
@@ -107,8 +173,9 @@ function CategoryCarousel({ category }) {
       <div className="card-body">
         <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
         {category.recipes.map((recipe) => {
-          const sourceUrl = String(recipe?.sourceUrl || '').trim();
-          const hasSourceUrl = sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://');
+          const sourceUrl = extractSourceUrl(recipe);
+          const hasSourceUrl = Boolean(sourceUrl);
+          const calories = recipeCalories(recipe);
 
           return (
             <article key={recipe?.id || recipe?.name} className="recipe-card">
@@ -135,7 +202,7 @@ function CategoryCarousel({ category }) {
                 </span>
                 <span>
                   <Flame size={14} />
-                  {Number(recipe?.calories || 0) > 0 ? `${Math.round(recipe.calories)} kcal` : 'kcal N/A'}
+                  {calories > 0 ? `${calories} kcal` : 'kcal N/A'}
                 </span>
                 <span>
                   <Euro size={14} />
@@ -148,7 +215,7 @@ function CategoryCarousel({ category }) {
                   Ver receita
                 </a>
               ) : (
-                <button type="button" className="recipe-open-btn" disabled>
+                <button type="button" className="recipe-open-btn" onClick={() => onOpenNutritionistRecipe(recipe)}>
                   Ver receita
                 </button>
               )}
@@ -165,6 +232,7 @@ export default function Recipes() {
   const [recipes, setRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedNutritionistRecipe, setSelectedNutritionistRecipe] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -211,6 +279,28 @@ export default function Recipes() {
       .filter((category) => category.recipes.length > 0);
   }, [recipes]);
 
+  const nutritionistIngredients = useMemo(() => {
+    if (!Array.isArray(selectedNutritionistRecipe?.ingredients)) {
+      return [];
+    }
+    return selectedNutritionistRecipe.ingredients;
+  }, [selectedNutritionistRecipe]);
+
+  const nutritionistSteps = useMemo(() => {
+    if (!Array.isArray(selectedNutritionistRecipe?.steps)) {
+      return [];
+    }
+    return [...selectedNutritionistRecipe.steps]
+      .sort((a, b) => Number(a?.stepOrder || 0) - Number(b?.stepOrder || 0));
+  }, [selectedNutritionistRecipe]);
+
+  const nutritionistCalories = recipeCalories(selectedNutritionistRecipe || {});
+  const proteinG = macroValue(selectedNutritionistRecipe || {}, 'proteinG');
+  const carbsG = macroValue(selectedNutritionistRecipe || {}, 'carbsG');
+  const fatG = macroValue(selectedNutritionistRecipe || {}, 'fatG');
+
+  const closeNutritionistModal = () => setSelectedNutritionistRecipe(null);
+
   return (
     <Layout>
       <div className="page recipes-page">
@@ -233,11 +323,76 @@ export default function Recipes() {
               <div className="alert alert-secondary" role="status">Sem receitas na base de dados.</div>
             ) : null}
             {groupedCategories.map((category) => (
-              <CategoryCarousel key={category.id} category={category} />
+              <CategoryCarousel
+                key={category.id}
+                category={category}
+                onOpenNutritionistRecipe={setSelectedNutritionistRecipe}
+              />
             ))}
           </div>
         </div>
       </div>
+
+      {selectedNutritionistRecipe ? (
+        <div className="recipe-summary-overlay" role="dialog" aria-modal="true" aria-label="Resumo da receita" onClick={closeNutritionistModal}>
+          <div className="recipe-summary-card" onClick={(event) => event.stopPropagation()}>
+            <header className="recipe-summary-head">
+              <div>
+                <h3>{selectedNutritionistRecipe?.name || 'Receita'}</h3>
+                <p>{mealTypeLabel(selectedNutritionistRecipe?.mealType)} · {formatDuration(selectedNutritionistRecipe)}</p>
+              </div>
+              <button type="button" className="recipe-summary-close" onClick={closeNutritionistModal} aria-label="Fechar resumo">
+                <X size={16} />
+              </button>
+            </header>
+
+            <p className="recipe-summary-description">
+              {String(selectedNutritionistRecipe?.description || '').trim() || 'Sem descrição disponível.'}
+            </p>
+
+            <div className="recipe-summary-metrics">
+              <span><Flame size={14} /> {nutritionistCalories > 0 ? `${nutritionistCalories} kcal` : 'kcal N/A'}</span>
+              <span><Clock3 size={14} /> {formatDuration(selectedNutritionistRecipe)}</span>
+              <span><Euro size={14} /> {formatPrice(selectedNutritionistRecipe)}</span>
+              <span>🍗 {proteinG > 0 ? `${Math.round(proteinG)}g` : '--'} proteína</span>
+              <span>🍚 {carbsG > 0 ? `${Math.round(carbsG)}g` : '--'} hidratos</span>
+              <span>🥑 {fatG > 0 ? `${Math.round(fatG)}g` : '--'} gordura</span>
+            </div>
+
+            <div className="recipe-summary-sections">
+              <section>
+                <h4>Ingredientes</h4>
+                {nutritionistIngredients.length === 0 ? (
+                  <p>Sem ingredientes detalhados.</p>
+                ) : (
+                  <ul>
+                    {nutritionistIngredients.map((ingredient, index) => (
+                      <li key={`${ingredient?.id || index}-${ingredient?.ingredientName || 'ingredient'}`}>
+                        {formatIngredient(ingredient)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section>
+                <h4>Passos</h4>
+                {nutritionistSteps.length === 0 ? (
+                  <p>Sem passos detalhados.</p>
+                ) : (
+                  <ol>
+                    {nutritionistSteps.map((step, index) => (
+                      <li key={`${step?.stepOrder || index}-${step?.description || 'step'}`}>
+                        {String(step?.description || '').trim() || 'Passo'}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Layout>
   );
 }

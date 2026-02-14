@@ -113,6 +113,8 @@ function toUiPlan(plan) {
       source: 'backend',
       recipe_id: meal?.recipeId,
       meal_id: meal?.id,
+      completed: Boolean(meal?.completed),
+      completed_at: meal?.completedAt || null,
     });
   });
 
@@ -133,6 +135,7 @@ function toUiPlan(plan) {
     status: 'generated',
     source: 'backend_active_plan',
     week_start: weekStartRaw,
+    total_cost: Number(plan?.totalCost) || 0,
     days,
   };
 }

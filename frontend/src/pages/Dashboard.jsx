@@ -1,6 +1,7 @@
 import Layout from '../components/Layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -20,11 +21,12 @@ import {
   Sun,
   Moon,
   ChevronRight,
-  Utensils,
   Target,
 } from 'lucide-react';
 import { fetchMyProfile } from '../services/userService';
 import { listLatestPrices } from '../services/priceService';
+import { fetchActiveMealPlan } from '../services/mealPlanService';
+import { fetchRecipeById } from '../services/recipeService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/dashboard.css';
 
@@ -36,6 +38,19 @@ const fade = {
 };
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+const SLOT_ORDER = {
+  'Pequeno-almoço': 0,
+  Almoço: 1,
+  Jantar: 2,
+  Snack: 3,
+};
+
+const SLOT_META = {
+  'Pequeno-almoço': { icon: Sunrise, fallbackMinutes: 15, fallbackImage: 'https://picsum.photos/seed/breakfast-nutriq/1200/800' },
+  Almoço: { icon: Sun, fallbackMinutes: 25, fallbackImage: 'https://picsum.photos/seed/lunch-nutriq/1200/800' },
+  Jantar: { icon: Moon, fallbackMinutes: 20, fallbackImage: 'https://picsum.photos/seed/dinner-nutriq/1200/800' },
+  Snack: { icon: Sun, fallbackMinutes: 10, fallbackImage: 'https://picsum.photos/seed/snack-nutriq/1200/800' },
+};
 
 function toName(value) {
   const clean = String(value || '').trim();
@@ -57,12 +72,43 @@ function formatEuro(value) {
   });
 }
 
+function toIsoDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function buildWeeklyCalories(goal) {
-  const offsets = [0.03, -0.04, -0.01, -0.06, -0.02, -0.09, -0.05];
-  return WEEK_DAYS.map((day, index) => {
-    const real = Math.max(1200, Math.round(goal * (1 + offsets[index])));
-    return { day, real, meta: goal };
-  });
+  return WEEK_DAYS.map((day) => ({ day, real: 0, meta: goal }));
+}
+
+function formatMinutes(totalMinutes) {
+  const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+  return `${minutes} min`;
+}
+
+function extractSourceUrl(recipe) {
+  const candidates = [
+    recipe?.sourceUrl,
+    recipe?.source_url,
+    recipe?.url,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate || '').trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+  }
+
+  const description = String(recipe?.description || '');
+  const match = description.match(/https?:\/\/[^\s|)]+/i);
+  if (!match?.[0]) {
+    return '';
+  }
+
+  return match[0].replace(/[.,;!?]+$/, '');
 }
 
 function estimateWeeklySpend(prices) {
@@ -123,23 +169,21 @@ const CalorieRing = ({ consumed, goal }) => {
 };
 
 export default function Dashboard() {
-  const meals = [
-    { period: 'Pequeno-almoço', icon: Sunrise, name: 'Aveia com Banana e Mel', time: '10 min', kcal: 320, cost: '€2.50', image: 'https://picsum.photos/seed/breakfast-nutriq/1200/800' },
-    { period: 'Almoço', icon: Sun, name: 'Frango Grelhado com Arroz', time: '25 min', kcal: 580, cost: '€4.20', image: 'https://picsum.photos/seed/lunch-nutriq/1200/800' },
-    { period: 'Jantar', icon: Moon, name: 'Salmão com Legumes', time: '20 min', kcal: 520, cost: '€5.80', image: 'https://picsum.photos/seed/dinner-nutriq/1200/800' },
-  ];
-
+  const navigate = useNavigate();
   const [activeMeal, setActiveMeal] = useState(0);
-  const [completedMeals, setCompletedMeals] = useState(() => meals.map(() => false));
+  const [todayMeals, setTodayMeals] = useState([]);
   const [dashboardData, setDashboardData] = useState({
-    userName: 'Joana',
+    userName: 'Utilizador',
     dailyGoal: 2150,
-    consumedCalories: 1420,
+    consumedCalories: 0,
     weeklyBudget: 0,
-    estimatedWeeklySpend: 45,
-    ingredientCount: 18,
+    estimatedWeeklySpend: 0,
     weeklyCalories: buildWeeklyCalories(2150),
     goal: '',
+    streakCount: 0,
+    weeklyCompletedMeals: 0,
+    weeklyTotalMeals: 0,
+    weeklyAdherencePct: 0,
   });
 
   useEffect(() => {
@@ -152,27 +196,106 @@ export default function Dashboard() {
       }
 
       try {
-        const [apiUser, prices] = await Promise.all([fetchMyProfile(token), listLatestPrices()]);
+        const [apiUser, prices, activePlan] = await Promise.all([
+          fetchMyProfile(token),
+          listLatestPrices(),
+          fetchActiveMealPlan().catch(() => null),
+        ]);
+
+        const profile = apiUser?.profile || {};
+        const dailyGoal = Math.max(1200, Math.round(toNumberOr(2150, profile?.dailyCalories)));
+        const estimatedSpendByPrices = estimateWeeklySpend(prices);
+
+        const planDays = Array.isArray(activePlan?.days) ? activePlan.days : [];
+        const flatMeals = planDays.flatMap((day) => (Array.isArray(day?.meals)
+          ? day.meals.map((meal) => ({ ...meal, date: day.date, dayLabel: day.day_label }))
+          : []));
+
+        const uniqueRecipeIds = Array.from(
+          new Set(
+            flatMeals
+              .map((meal) => Number(meal?.recipe_id))
+              .filter((id) => Number.isInteger(id) && id > 0),
+          ),
+        );
+
+        const recipeEntries = await Promise.all(
+          uniqueRecipeIds.map(async (id) => {
+            try {
+              const recipe = await fetchRecipeById(id);
+              return [id, recipe];
+            } catch {
+              return [id, null];
+            }
+          }),
+        );
+        const recipeById = new Map(recipeEntries);
+
+        const weeklyCalories = WEEK_DAYS.map((dayLabel) => {
+          const dayMeals = flatMeals.filter((meal) => meal?.dayLabel === dayLabel);
+          const real = Math.round(dayMeals.reduce((sum, meal) => {
+            const recipe = recipeById.get(Number(meal?.recipe_id));
+            return sum + toNumberOr(0, recipe?.nutritionalInfo?.calories);
+          }, 0));
+          return { day: dayLabel, real, meta: dailyGoal };
+        });
+
+        const todayIso = toIsoDate(new Date());
+        const mealsForToday = flatMeals
+          .filter((meal) => meal?.date === todayIso)
+          .sort((a, b) => (SLOT_ORDER[a.slot] ?? 99) - (SLOT_ORDER[b.slot] ?? 99))
+          .map((meal) => {
+            const recipe = recipeById.get(Number(meal?.recipe_id));
+            const slot = String(meal?.slot || '').trim() || 'Refeição';
+            const meta = SLOT_META[slot] || SLOT_META.Snack;
+            const kcal = Math.round(toNumberOr(0, recipe?.nutritionalInfo?.calories));
+            const cost = toNumberOr(0, recipe?.costPerServing);
+            const totalTime = toNumberOr(meta.fallbackMinutes, recipe?.totalTimeMin);
+
+            return {
+              period: slot,
+              icon: meta.icon,
+              name: String(meal?.title || 'Refeição').trim() || 'Refeição',
+              time: formatMinutes(totalTime),
+              kcal,
+              cost: formatEuro(cost),
+              image: String(recipe?.imageUrl || '').trim() || meta.fallbackImage,
+              sourceUrl: extractSourceUrl(recipe),
+              completed: Boolean(meal?.completed),
+            };
+          });
+
+        const weeklyTotalMeals = flatMeals.length;
+        const weeklyCompletedMeals = flatMeals.filter((meal) => Boolean(meal?.completed)).length;
+        const weeklyAdherencePct = weeklyTotalMeals > 0
+          ? Math.round((weeklyCompletedMeals / weeklyTotalMeals) * 100)
+          : 0;
+
+        const weeklyPlanCost = toNumberOr(0, activePlan?.total_cost);
+        const estimatedWeeklySpend = weeklyPlanCost > 0 ? weeklyPlanCost : estimatedSpendByPrices;
+
         if (!isMounted) {
           return;
         }
 
-        const profile = apiUser?.profile || {};
-        const dailyGoal = Math.max(1200, Math.round(toNumberOr(2150, profile?.dailyCalories)));
-        const estimatedSpend = estimateWeeklySpend(prices);
-
         setDashboardData({
-          userName: toName(apiUser?.name) || 'Joana',
+          userName: toName(apiUser?.name),
           dailyGoal,
-          consumedCalories: Math.round(dailyGoal * 0.66),
+          consumedCalories: Math.round(mealsForToday.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0)),
           weeklyBudget: Math.max(0, toNumberOr(0, profile?.budgetWeekly)),
-          estimatedWeeklySpend: estimatedSpend > 0 ? estimatedSpend : 45,
-          ingredientCount: Array.isArray(prices) ? Math.max(0, prices.length) : 18,
-          weeklyCalories: buildWeeklyCalories(dailyGoal),
+          estimatedWeeklySpend,
+          weeklyCalories,
           goal: String(profile?.goal || '').trim(),
+          streakCount: Math.max(0, Math.round(toNumberOr(0, profile?.streakCount))),
+          weeklyCompletedMeals,
+          weeklyTotalMeals,
+          weeklyAdherencePct,
         });
+        setTodayMeals(mealsForToday);
       } catch {
-        // Keep current UI values.
+        if (isMounted) {
+          setTodayMeals([]);
+        }
       }
     };
 
@@ -182,19 +305,24 @@ export default function Dashboard() {
     };
   }, []);
 
-  const activeMealData = meals[activeMeal];
-  const MealIcon = activeMealData.icon;
-  const completedCount = completedMeals.filter(Boolean).length;
+  const meals = todayMeals;
+  const activeMealData = meals[activeMeal] || null;
+  const MealIcon = activeMealData?.icon || Sunrise;
+  const completedCount = meals.filter((meal) => Boolean(meal.completed)).length;
   const completedPct = meals.length ? (completedCount / meals.length) * 100 : 0;
-  const consumedKcal = meals.reduce((sum, meal, index) => {
-    if (completedMeals[index]) return sum + meal.kcal;
-    return sum;
-  }, 0);
-  const isActiveMealCompleted = completedMeals[activeMeal];
+  const consumedKcal = meals.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0);
+  const isActiveMealCompleted = Boolean(activeMealData?.completed);
 
-  const toggleMealCompleted = (mealIndex) => {
-    setCompletedMeals((prev) => prev.map((done, index) => (index === mealIndex ? !done : done)));
-  };
+  useEffect(() => {
+    if (!meals.length) {
+      setActiveMeal(0);
+      return;
+    }
+
+    if (activeMeal >= meals.length) {
+      setActiveMeal(0);
+    }
+  }, [activeMeal, meals.length]);
 
   const macros = useMemo(() => {
     if (dashboardData.goal === 'BULK') {
@@ -221,11 +349,60 @@ export default function Dashboard() {
   }, [dashboardData.goal]);
 
   const budgetPercent = useMemo(() => {
-    if (dashboardData.weeklyBudget <= 0) {
-      return 62;
+    if (dashboardData.weeklyBudget <= 0 || dashboardData.estimatedWeeklySpend <= 0) {
+      return 0;
     }
     return Math.min(100, Math.round((dashboardData.estimatedWeeklySpend / dashboardData.weeklyBudget) * 100));
   }, [dashboardData.estimatedWeeklySpend, dashboardData.weeklyBudget]);
+
+  const weeklySummaryTitle = useMemo(() => {
+    if (dashboardData.weeklyAdherencePct >= 80) {
+      return 'Estás com ótimo ritmo';
+    }
+    if (dashboardData.weeklyAdherencePct >= 50) {
+      return 'Boa consistência esta semana';
+    }
+    return 'Semana em recuperação';
+  }, [dashboardData.weeklyAdherencePct]);
+
+  const weeklySummaryText = useMemo(() => {
+    const mealsText = `${dashboardData.weeklyCompletedMeals}/${dashboardData.weeklyTotalMeals || 0} refeições concluídas`;
+
+    if (dashboardData.weeklyBudget > 0 && dashboardData.estimatedWeeklySpend > 0) {
+      const balance = dashboardData.weeklyBudget - dashboardData.estimatedWeeklySpend;
+      if (balance >= 0) {
+        return `${mealsText} e custo ${formatEuro(Math.abs(balance))} abaixo do orçamento semanal.`;
+      }
+      return `${mealsText} e custo ${formatEuro(Math.abs(balance))} acima do orçamento semanal.`;
+    }
+
+    return `${mealsText}. Define um orçamento no perfil para acompanhares melhor os gastos semanais.`;
+  }, [
+    dashboardData.weeklyBudget,
+    dashboardData.weeklyCompletedMeals,
+    dashboardData.weeklyTotalMeals,
+    dashboardData.estimatedWeeklySpend,
+  ]);
+
+  const openActiveMealRecipe = () => {
+    const sourceUrl = String(activeMealData?.sourceUrl || '').trim();
+    if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
+      window.open(sourceUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    navigate('/recipes');
+  };
+
+  const openChatbotForPlan = () => {
+    window.dispatchEvent(new CustomEvent('nutribot:open-chat', {
+      detail: {
+        focusInput: true,
+        seedMessage: 'Quero gerar um novo plano alimentar.',
+      },
+    }));
+  };
+
   const waterDrank = 1.5;
   const waterGoal = 3;
   const hydrationPct = Math.min((waterDrank / waterGoal) * 100, 100);
@@ -234,7 +411,6 @@ export default function Dashboard() {
     <Layout>
       <div className="page dash">
         <div className="container-xl">
-        {/* === DARK HERO === */}
         <motion.section className="dash-hero card" {...fade}>
           <div className="dash-hero-noise" />
           <div className="dash-hero-blob blob-1" />
@@ -242,13 +418,14 @@ export default function Dashboard() {
 
           <div className="dash-hero-content">
             <div className="dash-hero-left">
-              <span className="dash-streak-pill"><Flame size={17} /> Streak 12 dias</span>
+              <span className="dash-streak-pill"><Flame size={17} /> Streak {dashboardData.streakCount} dias</span>
               <h1>Boa tarde, {dashboardData.userName}</h1>
-              <p>Estás no caminho certo. 3 refeições planeadas, objetivo calórico sob controlo.</p>
+              <p>Estás no caminho certo. Planea as tuas refeições de forma simples, com os carrinhos de compras automáticos.</p>
               <motion.button
                 className="dash-hero-cta"
                 whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(52,211,153,0.4)' }}
                 whileTap={{ scale: 0.97 }}
+                onClick={openChatbotForPlan}
               >
                 Gerar Novo Plano <ArrowRight size={16} />
               </motion.button>
@@ -311,7 +488,6 @@ export default function Dashboard() {
           </div>
         </motion.section>
 
-        {/* === MEALS — tabs === */}
         <motion.section className="dash-meals" {...fade}>
           <div className="dash-meals-head">
             <h2>Refeições de hoje</h2>
@@ -323,7 +499,7 @@ export default function Dashboard() {
               const Icon = meal.icon;
               return (
                 <button
-                  key={meal.period}
+                  key={`${meal.period}-${i}`}
                   className={`dash-meal-tab ${activeMeal === i ? 'active' : ''}`}
                   onClick={() => setActiveMeal(i)}
                 >
@@ -334,36 +510,47 @@ export default function Dashboard() {
             })}
           </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              className="dash-meal-card"
-              key={activeMeal}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25 }}
-            >
-              <img src={activeMealData.image} alt={activeMealData.name} loading="lazy" className="dash-meal-image" />
-              <div className="dash-meal-icon"><MealIcon size={24} /></div>
-              <h3>{activeMealData.name}</h3>
-              <div className="dash-meal-meta">
-                <span><Clock3 size={13} /> {activeMealData.time}</span>
-                <span><Flame size={13} /> {activeMealData.kcal} kcal</span>
-                <span>{activeMealData.cost}</span>
-              </div>
+          {!activeMealData ? (
+            <div className="dash-meal-card">
+              <h3>Sem refeições planeadas para hoje</h3>
               <div className="dash-meal-actions">
-                <button type="button" className="dash-meal-view">Ver receita completa <ChevronRight size={15} /></button>
-                <button
-                  type="button"
-                  className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`}
-                  onClick={() => toggleMealCompleted(activeMeal)}
-                >
-                  <CheckCircle2 size={14} />
-                  <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Marcar como comida'}</span>
+                <button type="button" className="dash-meal-view" onClick={openChatbotForPlan}>
+                  Gerar plano no chatbot <ChevronRight size={15} />
                 </button>
               </div>
-            </motion.div>
-          </AnimatePresence>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                className="dash-meal-card"
+                key={activeMeal}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25 }}
+              >
+                <img src={activeMealData.image} alt={activeMealData.name} loading="lazy" className="dash-meal-image" />
+                <div className="dash-meal-icon"><MealIcon size={24} /></div>
+                <h3>{activeMealData.name}</h3>
+                <div className="dash-meal-meta">
+                  <span><Clock3 size={13} /> {activeMealData.time}</span>
+                  <span><Flame size={13} /> {activeMealData.kcal} kcal</span>
+                  <span>{activeMealData.cost}</span>
+                </div>
+                <div className="dash-meal-actions">
+                  <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>Ver receita completa <ChevronRight size={15} /></button>
+                  <button
+                    type="button"
+                    className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`}
+                    disabled
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Por concluir'}</span>
+                  </button>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          )}
 
           <div className="dash-meal-progress">
             <div className="dash-meal-progress-track">
@@ -379,13 +566,12 @@ export default function Dashboard() {
         </motion.section>
 
         <div className="dash-summary-stack">
-          {/* === INSIGHT BANNER — gradient bg === */}
           <motion.section className="dash-insight" {...fade}>
             <div className="dash-insight-head">
               <div className="dash-insight-content">
                 <span className="dash-insight-badge">Resumo semanal</span>
-                <h2>Estás com ótimo ritmo</h2>
-                <p>Custo abaixo do objetivo e consistência estável. Mais uma semana assim e fechas o ciclo com margem positiva.</p>
+                <h2>{weeklySummaryTitle}</h2>
+                <p>{weeklySummaryText}</p>
               </div>
               <div className="dash-insight-art">
                 <img src="https://picsum.photos/seed/summary-nutriq/520/360" alt="Prato saudável" loading="lazy" className="dash-insight-image" />
@@ -406,25 +592,24 @@ export default function Dashboard() {
                   />
                 </div>
                 <span className="bento-budget-label">
-                  {dashboardData.weeklyBudget > 0 ? `${budgetPercent}% do orçamento` : '62% do orçamento'}
+                  {dashboardData.weeklyBudget > 0 ? `${budgetPercent}% do orçamento` : 'Orçamento não definido'}
                 </span>
               </motion.div>
 
               <motion.div className="bento-cell bento-score" {...fade}>
                 <Target size={20} />
-                <strong>82<span className="score-pct">%</span></strong>
+                <strong>{dashboardData.weeklyAdherencePct}<span className="score-pct">%</span></strong>
                 <span>adesão semanal</span>
               </motion.div>
 
               <motion.div className="bento-cell bento-meals-done" {...fade}>
                 <CheckCircle2 size={20} />
-                <strong>{Math.min(21, Math.max(0, Math.round(dashboardData.ingredientCount)))}<span className="score-sep">/</span>21</strong>
+                <strong>{dashboardData.weeklyCompletedMeals}<span className="score-sep">/</span>{dashboardData.weeklyTotalMeals}</strong>
                 <span>refeições concluídas</span>
               </motion.div>
             </div>
           </motion.section>
 
-          {/* === CHART — dark bg === */}
           <motion.section className="dash-chart-section" {...fade}>
             <div className="dash-chart-noise" />
             <div className="dash-chart-head">
