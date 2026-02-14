@@ -1,0 +1,185 @@
+.nutri-social-page {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 48px;
+}
+
+.nutri-social-header h1 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.nutri-social-header p {
+  margin: 8px 0 0;
+  color: #475569;
+}
+
+.nutri-social-streak {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid #fdba74;
+  background: #fff7ed;
+  color: #9a3412;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.nutri-social-card {
+  background: #ffffff;
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.nutri-social-card h2 {
+  margin: 0 0 12px;
+  color: #0f172a;
+}
+
+.nutri-social-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nutri-social-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nutri-social-field span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.nutri-social-field textarea,
+.nutri-social-field select,
+.nutri-social-field input[type='number'] {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.nutri-social-field textarea:focus,
+.nutri-social-field select:focus,
+.nutri-social-field input[type='number']:focus {
+  outline: 2px solid #bae6fd;
+  border-color: #38bdf8;
+}
+
+.nutri-social-field.file-input input[type='file'] {
+  border: 1px dashed #94a3b8;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.nutri-social-preview {
+  max-height: 260px;
+  border-radius: 12px;
+  width: 100%;
+  object-fit: cover;
+  border: 1px solid #dbe4ee;
+}
+
+.nutri-social-share-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.nutri-social-share-toggle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nutri-social-submit {
+  border: none;
+  border-radius: 12px;
+  background: #0ea5e9;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.nutri-social-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.nutri-social-status,
+.nutri-social-feedback {
+  margin: 0;
+  font-size: 14px;
+  color: #334155;
+}
+
+.nutri-social-feedback.error {
+  color: #b91c1c;
+}
+
+.nutri-social-feed {
+  display: grid;
+  gap: 12px;
+}
+
+.nutri-social-post {
+  border: 1px solid #dbe4ee;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.nutri-social-post img {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  display: block;
+}
+
+.nutri-social-post-body {
+  padding: 12px;
+}
+
+.nutri-social-post-body h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.nutri-social-post-body p {
+  margin: 8px 0;
+  color: #475569;
+}
+
+.nutri-social-post-meta {
+  display: flex;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .nutri-social-card {
+    padding: 14px;
+  }
+}

@@ -15,6 +15,7 @@ const Recipes = lazy(() => import('./pages/Recipes'));
 const Shopping = lazy(() => import('./pages/Shopping'));
 const Progress = lazy(() => import('./pages/Progress'));
 const Profile = lazy(() => import('./pages/Profile'));
+const NutriSocial = lazy(() => import('./pages/NutriSocial'));
 
 function App() {
   const privateElements = {
@@ -24,6 +25,7 @@ function App() {
     '/shopping': <Shopping />,
     '/progress': <Progress />,
     '/profile': <Profile />,
+    '/nutrisocial': <NutriSocial />,
   };
 
   return (

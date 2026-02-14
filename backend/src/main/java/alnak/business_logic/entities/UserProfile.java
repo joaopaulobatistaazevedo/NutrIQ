@@ -1,5 +1,6 @@
 package alnak.business_logic.entities;
 
+import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -12,6 +13,8 @@ public class UserProfile {
     private Goal goal;
     private int dailyCalories;           // calculated via Harris-Benedict
     private double budgetWeekly;
+    private int streakCount;
+    private LocalDate lastMealPhotoDate;
     private Set<Restriction> restrictions = EnumSet.noneOf(Restriction.class);
     private Set<Allergen> allergens       = EnumSet.noneOf(Allergen.class);
 
@@ -67,6 +70,10 @@ public class UserProfile {
     public void setBudgetWeekly(double budgetWeekly)  { this.budgetWeekly = budgetWeekly; }
     public double getMaxWeeklyBudget()                { return budgetWeekly; }
     public void setMaxWeeklyBudget(double maxBudget)  { this.budgetWeekly = maxBudget; }
+    public int getStreakCount()                       { return streakCount; }
+    public void setStreakCount(int streakCount)       { this.streakCount = Math.max(streakCount, 0); }
+    public LocalDate getLastMealPhotoDate()           { return lastMealPhotoDate; }
+    public void setLastMealPhotoDate(LocalDate date)  { this.lastMealPhotoDate = date; }
     public Set<Restriction> getRestrictions()         { return restrictions; }
     public void setRestrictions(Set<Restriction> r)   {
         this.restrictions = EnumSet.noneOf(Restriction.class);

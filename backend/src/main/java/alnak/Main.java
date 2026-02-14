@@ -62,7 +62,7 @@ public class Main {
 
         // ── Controllers ───────────────────────────────────────────
         AuthController     authController     = new AuthController(authService);
-        UserController     userController     = new UserController(userService);
+        UserController     userController     = new UserController(userService, socialService);
         PriceController    priceController    = new PriceController(priceImportService);
         RecipeController   recipeController   = new RecipeController(recipeService);
         MealPlanController mealPlanController = new MealPlanController(mealPlanService);
@@ -99,6 +99,11 @@ public class Main {
             Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             UpdateProfileRequest request = ctx.bodyAsClass(UpdateProfileRequest.class);
             ctx.json(userController.updateMyProfile(userId, request));
+        });
+
+        app.post("/api/users/me/streak/photo", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.status(201).json(userController.registerMealPhoto(userId, ctx.body()));
         });
 
         app.get("/api/debug/users", ctx ->

@@ -69,17 +69,22 @@ public class GlobalDatabase
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_profiles (
-                    user_id        INT PRIMARY KEY,
-                    age            INT,
-                    sex            VARCHAR(20),
-                    height_cm      INT,
-                    weight_kg      DOUBLE,
-                    goal           VARCHAR(100),
-                    daily_calories INT,
-                    budget_weekly  DOUBLE,
+                    user_id               INT PRIMARY KEY,
+                    age                   INT,
+                    sex                   VARCHAR(20),
+                    height_cm             INT,
+                    weight_kg             DOUBLE,
+                    goal                  VARCHAR(100),
+                    daily_calories        INT,
+                    budget_weekly         DOUBLE,
+                    streak_count          INT NOT NULL DEFAULT 0,
+                    last_meal_photo_date  DATE,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             """);
+
+            ensureColumnExists(s, "user_profiles", "streak_count", "INT NOT NULL DEFAULT 0");
+            ensureColumnExists(s, "user_profiles", "last_meal_photo_date", "DATE");
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_profile_restrictions (
@@ -100,8 +105,6 @@ public class GlobalDatabase
             """);
 
             // ── Friendships ───────────────────────────────────────
-            // requester_id always < addressee_id to avoid duplicate pairs.
-            // status: PENDING | ACCEPTED | DECLINED
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS friendships (
                     requester_id INT         NOT NULL,
@@ -135,8 +138,6 @@ public class GlobalDatabase
             """);
 
             // ── User–Recipe ratings ───────────────────────────────
-            // Captures the rating a user gives a recipe (1–5).
-            // Separate from Post so a user can rate without posting.
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_recipe_ratings (
                     user_id    INT NOT NULL,
@@ -179,11 +180,25 @@ public class GlobalDatabase
         try {
             s.executeUpdate(sql);
         } catch (SQLException e) {
-            // MySQL duplicate index name
             if (e.getErrorCode() == 1061) {
                 return;
             }
             if (e.getMessage() != null && e.getMessage().toLowerCase().contains("duplicate key name")) {
+                return;
+            }
+            throw e;
+        }
+    }
+
+    private void ensureColumnExists(Statement s, String table, String column, String definition) throws SQLException {
+        try {
+            s.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1060) {
+                return;
+            }
+            String message = e.getMessage();
+            if (message != null && message.toLowerCase().contains("duplicate column name")) {
                 return;
             }
             throw e;
