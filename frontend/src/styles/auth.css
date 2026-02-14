@@ -162,6 +162,17 @@
 }
 .auth-forgot:hover { text-decoration: underline; }
 
+.auth-error {
+  margin: 2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Submit */
 .auth-submit {
   width: 100%;
@@ -180,6 +191,13 @@
 .auth-submit:hover {
   box-shadow: 0 8px 28px rgba(52, 211, 153, 0.35);
   transform: translateY(-1px);
+}
+
+.auth-submit:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 6px 20px rgba(52, 211, 153, 0.15);
 }
 
 /* Footer */

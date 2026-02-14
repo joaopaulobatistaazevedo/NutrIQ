@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon, Pencil } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
 import Layout from '../components/Layout';
-import PageHeader from '../components/PageHeader';
 import { PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
 import '../styles/meal-plan.css';
 
@@ -72,12 +71,12 @@ function scopedKey(base, accountId) {
 
 function slotMeta(slot) {
   if (slot === 'Pequeno-almoço') {
-    return { icon: Sunrise, time: '08:00' };
+    return { icon: Sunrise, time: '08:00', kcal: 380 };
   }
   if (slot === 'Almoço') {
-    return { icon: Sun, time: '13:00' };
+    return { icon: Sun, time: '13:00', kcal: 620 };
   }
-  return { icon: Moon, time: '20:00' };
+  return { icon: Moon, time: '20:00', kcal: 540 };
 }
 
 function getMealsByDate(date) {
@@ -149,6 +148,7 @@ export default function MealPlan() {
         icon: meta.icon,
         time: meta.time,
         dish: meal.title,
+        kcal: Number.isFinite(Number(meal.kcal)) ? Number(meal.kcal) : meta.kcal,
         source: meal.source,
       };
     });
@@ -189,36 +189,19 @@ export default function MealPlan() {
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  const handleEditMeal = (meal) => {
-    window.dispatchEvent(
-      new CustomEvent('nutribot:meal-edit-request', {
-        detail: {
-          accountId,
-          date: selectedIso,
-          day_label: selectedLabel,
-          slot: meal.slot,
-          current_dish: meal.dish,
-        },
-      })
-    );
-  };
-
   return (
     <Layout>
       <div className="meal-plan">
-        <PageHeader
-          className="meal-plan-header"
-          title="Plano Alimentar"
-          subtitle="Organiza, ajusta e acompanha o teu plano de refeições dia a dia"
-          titleClassName="meal-plan-title"
-          subtitleClassName="meal-plan-subtitle"
-          actions={(
-            <button className="btn-primary">
-              <CalendarDays size={16} />
-              <span>Gerar Plano</span>
-            </button>
-          )}
-        />
+        <header className="meal-plan-header">
+          <div>
+            <h1 className="meal-plan-title">Calendário de Refeições</h1>
+            <p className="meal-plan-subtitle">Organiza e acompanha o plano nutricional dia a dia</p>
+          </div>
+          <button className="btn-primary" type="button">
+            <CalendarDays size={16} />
+            <span>Gerar Semana</span>
+          </button>
+        </header>
 
         <section className="meal-plan-grid">
           <article className="calendar-card">
@@ -267,7 +250,7 @@ export default function MealPlan() {
 
           <article className="daily-plan-card">
             <h2 className="daily-plan-title">{selectedLabel}</h2>
-            <p className="daily-plan-subtitle">Plano alimentar do dia</p>
+            <p className="daily-plan-subtitle">Plano diário recomendado</p>
 
             <div className="daily-meals">
               {meals.map((meal) => {
@@ -286,16 +269,7 @@ export default function MealPlan() {
                     </div>
 
                     <h3>{meal.dish}</h3>
-                    <p>{meal.source ? `Fonte: ${meal.source}` : 'Plano diário recomendado'}</p>
-
-                    <button
-                      type="button"
-                      className="daily-meal-edit"
-                      onClick={() => handleEditMeal(meal)}
-                    >
-                      <Pencil size={14} />
-                      <span>Editar</span>
-                    </button>
+                    <p>{meal.kcal} kcal</p>
                   </article>
                 );
               })}

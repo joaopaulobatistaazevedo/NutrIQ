@@ -53,6 +53,7 @@ def match_recipes_by_ingredients(
                 title=recipe.title,
                 source=recipe.source,
                 url=recipe.url,
+                image_url=recipe.image_url,
                 match_ratio=ratio,
                 matched_ingredients=matched_lines,
                 missing_ingredients=missing_lines,

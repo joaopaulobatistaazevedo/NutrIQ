@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from recipe_scraper.backend_sync import sync_recipes_to_backend
 from recipe_scraper.matcher import match_recipes_by_ingredients
 from recipe_scraper.scraper import RecipeScraper, export_recipes_to_json, flatten_scrape_result
 from recipe_scraper.sources import default_sources
@@ -29,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     scrape_parser.add_argument(
         "--max-recipes-per-source",
         type=int,
-        default=60,
+        default=100,
         help="Maximo de receitas por fonte.",
     )
     scrape_parser.add_argument(
@@ -53,6 +54,16 @@ def parse_args() -> argparse.Namespace:
         "--sources",
         default="teleculinaria",
         help="Fontes a usar: all ou teleculinaria.",
+    )
+    scrape_parser.add_argument(
+        "--skip-backend-sync",
+        action="store_true",
+        help="Nao sincroniza receitas para a tabela recipes do MySQL do backend.",
+    )
+    scrape_parser.add_argument(
+        "--backend-env",
+        default="backend/.env",
+        help="Caminho do .env com credenciais MySQL do backend.",
     )
 
     suggest_parser = subparsers.add_parser(
@@ -109,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     run_parser.add_argument(
         "--max-recipes-per-source",
         type=int,
-        default=60,
+        default=1001,
         help="Maximo de receitas por fonte no scrape.",
     )
     run_parser.add_argument(
@@ -133,6 +144,16 @@ def parse_args() -> argparse.Namespace:
         "--sources",
         default="teleculinaria",
         help="Fontes a usar: all ou teleculinaria.",
+    )
+    run_parser.add_argument(
+        "--skip-backend-sync",
+        action="store_true",
+        help="Nao sincroniza receitas para a tabela recipes do MySQL do backend.",
+    )
+    run_parser.add_argument(
+        "--backend-env",
+        default="backend/.env",
+        help="Caminho do .env com credenciais MySQL do backend.",
     )
     run_parser.add_argument("--top", type=int, default=15, help="Quantidade maxima de sugestoes.")
     run_parser.add_argument(
@@ -179,10 +200,27 @@ def _cmd_scrape(args: argparse.Namespace) -> None:
     total = upsert_recipes(args.db, recipes)
     export_recipes_to_json(recipes, args.output_json)
 
+    backend_synced = 0
+    backend_sync_error: str | None = None
+    if not args.skip_backend_sync:
+        try:
+            backend_synced = sync_recipes_to_backend(
+                recipes=recipes,
+                backend_env_path=args.backend_env,
+            )
+        except Exception as exc:
+            backend_sync_error = str(exc)
+
     print("Scrape concluido.")
     for source, records in scrape_result.items():
         print(f"- {source}: {len(records)} receitas")
     print(f"Total importado/upsert no SQLite: {total}")
+    if args.skip_backend_sync:
+        print("Sync MySQL backend: desativado (--skip-backend-sync)")
+    elif backend_sync_error:
+        print(f"Sync MySQL backend: FALHOU ({backend_sync_error})")
+    else:
+        print(f"Total upsert na tabela recipes (MySQL backend): {backend_synced}")
     print(f"DB: {Path(args.db)}")
     print(f"JSON: {Path(args.output_json)}")
 
@@ -216,6 +254,17 @@ def _cmd_run(args: argparse.Namespace) -> None:
     recipes = flatten_scrape_result(scrape_result)
     upsert_recipes(args.db, recipes)
 
+    backend_synced = 0
+    backend_sync_error: str | None = None
+    if not args.skip_backend_sync:
+        try:
+            backend_synced = sync_recipes_to_backend(
+                recipes=recipes,
+                backend_env_path=args.backend_env,
+            )
+        except Exception as exc:
+            backend_sync_error = str(exc)
+
     ingredients = _resolve_ingredients(args)
     require_full_match = _requires_full_match(args)
     matches = match_recipes_by_ingredients(
@@ -229,6 +278,12 @@ def _cmd_run(args: argparse.Namespace) -> None:
     print("Scrape concluido:")
     for source, records in scrape_result.items():
         print(f"- {source}: {len(records)} receitas")
+    if args.skip_backend_sync:
+        print("- Sync MySQL backend: desativado (--skip-backend-sync)")
+    elif backend_sync_error:
+        print(f"- Sync MySQL backend: FALHOU ({backend_sync_error})")
+    else:
+        print(f"- Upsert recipes MySQL backend: {backend_synced}")
     print("")
     _print_suggestions(ingredients, matches, require_full_match=require_full_match)
 
@@ -330,6 +385,8 @@ def _print_suggestions(
             missing_preview = ", ".join(match.missing_ingredients[:4])
             print(f"   faltam: {missing_preview}")
         print(f"   link: {match.url}")
+        if match.image_url:
+            print(f"   foto: {match.image_url}")
 
 
 if __name__ == "__main__":

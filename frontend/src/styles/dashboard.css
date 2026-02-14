@@ -10,7 +10,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  padding-bottom: 60px;
+  padding-bottom: 0;
 }
 
 /* ---- NOISE OVERLAY util ---- */
@@ -43,11 +43,18 @@
   pointer-events: none;
 }
 .blob-1 {
-  width: 340px;
-  height: 340px;
-  background: rgba(52, 211, 153, 0.15);
-  top: -60px;
-  right: -40px;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(
+    circle,
+    rgba(52, 211, 153, 0.3) 0%,
+    rgba(52, 211, 153, 0.2) 42%,
+    rgba(52, 211, 153, 0) 74%
+  );
+  top: 50%;
+  left: 83.5%;
+  transform: translate(-50%, -50%);
+  filter: blur(72px);
 }
 .blob-2 {
   width: 260px;
@@ -81,15 +88,15 @@
 .dash-streak-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
   color: #065f46;
   background: rgba(16, 185, 129, 0.16);
   border: 1px solid rgba(16, 185, 129, 0.45);
   border-radius: 999px;
-  padding: 5px 10px;
-  margin-bottom: 10px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
 }
 
 .dash-hero-tag {
@@ -141,6 +148,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 14px;
+}
+
+.dash-hero-meters {
+  display: flex;
+  align-items: flex-end;
   gap: 18px;
 }
 
@@ -173,11 +186,158 @@
 
 /* ---- Macro bars ---- */
 .dash-hero-macros {
-  width: 160px;
+  width: 100%;
+  max-width: 334px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+
+/* ---- Hydration canister ---- */
+.dash-hydration-card {
+  width: 144px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.hydration-body {
+  display: flex;
+  justify-content: center;
+}
+
+.water-bottle {
+  width: 124px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  filter: drop-shadow(0 12px 16px rgba(15, 23, 42, 0.18));
+}
+
+.water-bottle-top {
+  width: 34px;
+  height: 20px;
+  border-radius: 6px 6px 4px 4px;
+  background: linear-gradient(180deg, #d9e1eb, #9aa4b2);
+  border: 2px solid rgba(0, 0, 0, 0.425);
+  margin-bottom: -3px;
+  position: relative;
+  z-index: 4;
+}
+
+.water-bottle-neck {
+  width: 30px;
+  height: 15px;
+  border-radius: 3px;
+  margin-bottom: 0;
+  background: rgba(97, 126, 234, 0.78);
+  border: 2px solid rgba(57, 82, 170, 0.86);
+  border-bottom: none;
+  box-shadow: none;
+  position: relative;
+  z-index: 2;
+}
+
+.water-bottle-neck::before,
+.water-bottle-neck::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  width: 0;
+  height: 6px;
+  border-bottom: 2px solid rgba(57, 82, 170, 0.86);
+  pointer-events: none;
+}
+
+.water-bottle-neck::before {
+  left: -2px;
+  border-left: 2px solid rgba(57, 82, 170, 0.86);
+  border-bottom-left-radius: 6px;
+}
+
+.water-bottle-neck::after {
+  right: -2px;
+  border-right: 2px solid rgba(57, 82, 170, 0.86);
+  border-bottom-right-radius: 6px;
+}
+
+.water-bottle-body {
+  width: 90px;
+  height: 160px;
+  border-radius: 36px 36px 14px 14px;
+  border: 2px solid rgba(57, 82, 170, 0.86);
+  border-top: none;
+  background: linear-gradient(180deg, rgba(97, 126, 234, 0.78), rgba(97, 126, 234, 0.78));
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.water-bottle-body::before,
+.water-bottle-body::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  width: 12px;
+  border-top: 2px solid rgba(57, 82, 170, 0.86);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.water-bottle-body::before {
+  left: calc(50% - 17px);
+}
+
+.water-bottle-body::after {
+  right: calc(50% - 17px);
+}
+
+.water-bottle-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(128, 231, 255, 0.78), rgba(77, 187, 255, 0.82));
+}
+
+.water-bottle-gloss {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  width: 20px;
+  height: 140px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.33), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.water-bottle-reading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  pointer-events: none;
+}
+
+.water-bottle-reading strong {
+  font-size: 20px;
+  font-weight: 800;
+  color: #eaf3ff;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+}
+
+.water-bottle-reading span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d9ebff;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+}
+
 .macro-bar-head {
   display: flex;
   justify-content: space-between;
@@ -200,7 +360,7 @@
 /* ==== BENTO GRID ==== */
 .dash-bento {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
 }
 
@@ -242,29 +402,6 @@
   pointer-events: none;
 }
 
-/* -- Water (teal) -- */
-.bento-water {
-  background: linear-gradient(145deg, #1a6b64, #14967e);
-  color: #ccfbf1;
-  position: relative;
-}
-.water-fill-wrap {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  pointer-events: none;
-}
-.water-fill {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(94, 234, 212, 0.15);
-  border-radius: 0 0 20px 20px;
-}
-
 /* -- Budget (purple) -- */
 .bento-budget {
   background: linear-gradient(145deg, #312e81, #4338ca);
@@ -279,7 +416,7 @@
 }
 .bento-budget-bar > div {
   height: 100%;
-  background: #a78bfa;
+  background: #8c02fd;
   border-radius: 3px;
 }
 .bento-budget-label {
@@ -289,8 +426,8 @@
 
 /* -- Score (dark green) -- */
 .bento-score {
-  background: linear-gradient(145deg, #0d7358, #059669);
-  color: #d1fae5;
+  background: #334155;
+  color: #e2e8f0;
 }
 .score-pct {
   font-size: 18px;
@@ -299,13 +436,17 @@
 
 /* -- Meals done (dark) -- */
 .bento-meals-done {
-  background: #334155;
-  color: #e2e8f0;
+  background: linear-gradient(145deg, #0d7358, #059669);
+  color: #d1fae5;
 }
 .score-sep {
-  font-weight: 400;
-  opacity: 0.3;
-  font-size: 20px;
+  display: inline-block;
+  margin: 0 6px;
+  font-weight: 700;
+  opacity: 0.6;
+  font-size: 28px;
+  line-height: 1;
+  transform: translateY(-1px);
 }
 
 /* ==== CHART — dark bg ==== */
@@ -358,6 +499,36 @@
   height: 240px;
 }
 
+.dash-summary-stack {
+  border-radius: 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+}
+
+.dash-summary-stack .dash-insight {
+  flex: none;
+  border-radius: 24px 24px 0 0;
+  margin: 0;
+  padding: 26px 32px 24px;
+  border: none;
+}
+
+.dash-summary-stack .dash-chart-section {
+  flex: none;
+  border-radius: 0 0 24px 24px;
+  margin: 0;
+  padding: 30px 32px 28px;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dash-summary-stack .dash-chart-canvas {
+  height: clamp(320px, 46vh, 440px);
+}
+
 /* ==== INSIGHT BANNER ==== */
 .dash-insight {
   position: relative;
@@ -367,10 +538,17 @@
   padding: 34px 38px;
   color: #fff;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dash-insight-head {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
 }
+
 .dash-insight-content {
   flex: 1;
 }
@@ -417,11 +595,69 @@
 }
 
 .dash-insight-image {
-  width: 180px;
-  height: 120px;
+  width: 172px;
+  height: 112px;
   object-fit: cover;
   border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.dash-insight-bento {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  width: 100%;
+  padding-top: 4px;
+}
+
+.dash-insight-bento .bento-cell {
+  min-height: auto;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+  color: #4b5563;
+  gap: 8px;
+}
+
+.dash-insight-bento .bento-cell > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dash-insight-bento .bento-cell strong {
+  font-size: 46px;
+  line-height: 0.95;
+}
+
+.dash-insight-bento .bento-cell > span {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.dash-insight-bento .bento-budget { --metric-color: #7c3aed; }
+.dash-insight-bento .bento-score { --metric-color: #2563eb; }
+.dash-insight-bento .bento-meals-done { --metric-color: #16a34a; }
+
+.dash-insight-bento .bento-cell > svg,
+.dash-insight-bento .bento-cell strong {
+  color: var(--metric-color);
+}
+
+.dash-insight-bento .bento-budget-bar {
+  margin-top: 2px;
+  height: 4px;
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.dash-insight-bento .bento-budget-bar > div {
+  background: var(--metric-color);
+}
+
+.dash-insight-bento .bento-budget-label {
+  color: #6b7280;
+  opacity: 1 !important;
 }
 
 /* ==== MEALS ==== */
@@ -530,6 +766,34 @@
   padding: 0;
 }
 
+.dash-meal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.dash-meal-complete {
+  border: 1px solid #7dd3bc;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash-meal-complete.done {
+  border-color: #10b981;
+  background: #10b981;
+  color: #064e3b;
+}
+
 /* -- meal progress bar -- */
 .dash-meal-progress {
   display: flex;
@@ -616,6 +880,9 @@
   .dash-bento {
     grid-template-columns: repeat(3, 1fr);
   }
+  .dash-insight-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .dash-actions-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -633,6 +900,30 @@
     flex-direction: column;
     align-items: center;
   }
+  .dash-hero-meters {
+    width: 100%;
+    justify-content: center;
+    gap: 10px;
+  }
+  .dash-hydration-card {
+    width: 118px;
+  }
+  .water-bottle {
+    width: 102px;
+  }
+  .water-bottle-neck {
+    width: 20px;
+  }
+  .water-bottle-body {
+    width: 102px;
+    height: 154px;
+  }
+  .water-bottle-body::before {
+    left: calc(50% - 12px);
+  }
+  .water-bottle-body::after {
+    right: calc(50% - 12px);
+  }
   .dash-hero-macros {
     width: 100%;
   }
@@ -647,6 +938,23 @@
     border-radius: 18px;
   }
 
+  .dash-summary-stack {
+    border-radius: 18px;
+    height: auto;
+    border-color: rgba(15, 23, 42, 0.2);
+  }
+
+  .dash-summary-stack .dash-insight {
+    border-radius: 18px 18px 0 0;
+    padding: 28px 22px;
+  }
+
+  .dash-summary-stack .dash-chart-section {
+    border-radius: 0 0 18px 18px;
+    padding: 24px 20px;
+    display: block;
+  }
+
   .dash-chart-canvas {
     height: 200px;
   }
@@ -655,8 +963,15 @@
     padding: 28px 22px;
     border-radius: 18px;
   }
+  .dash-insight-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .dash-insight-art {
     display: none;
+  }
+  .dash-insight-bento {
+    grid-template-columns: 1fr;
   }
   .dash-meals {
     padding: 22px 18px;
@@ -668,6 +983,10 @@
     scrollbar-width: none;
   }
   .dash-meal-tabs::-webkit-scrollbar { display: none; }
+  .dash-meal-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .dash-actions-grid {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
@@ -690,40 +1009,39 @@
    Light theme override (aligned with MealPlan)
    ========================================= */
 .dash-hero {
-  background: #eef2f7;
-  color: #0f172a;
-  border: 1px solid #d9e2ec;
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .dash-hero-left p {
-  color: #64748b;
+  color: #cbd5e1;
 }
 
 .dash-hero-tag {
-  color: #047857;
+  color: #34d399;
 }
 
 .dash-streak-pill {
-  color: #065f46;
-  background: #dcfce7;
-  border-color: #34d399;
+  color: #ffffff;
+  background: #e66c08cc;
+  border-color: #8d3a03d8;
 }
 
 .cal-ring-inner strong {
-  color: #0f172a;
+  color: #f8fafc;
 }
 
 .cal-ring-inner span,
 .macro-bar-head {
-  color: #64748b;
+  color: rgba(226, 232, 240, 0.78);
 }
 
 .macro-bar-track {
-  background: #dbe5ef;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .bento-streak,
-.bento-water,
 .bento-budget,
 .bento-score,
 .bento-meals-done {
@@ -735,41 +1053,37 @@
   background: #fef3c7;
 }
 
-.bento-water {
-  background: #ccfbf1;
-}
-
 .bento-budget {
-  background: #ede9fe;
+  background: #6618f738;
 }
 
 .bento-score {
-  background: #dcfce7;
+  background: #0077ff44;
 }
 
 .bento-meals-done {
-  background: #e2e8f0;
+  background: #51ff0044;
 }
 
 .dash-chart-section {
-  background: #eef2f7;
-  color: #0f172a;
-  border: 1px solid #d9e2ec;
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .dash-chart-head span,
 .dash-chart-legend {
-  color: #64748b;
+  color: #cbd5e1;
 }
 
 .dash-insight {
   background: #e8f7ef;
   color: #0f172a;
-  border: 1px solid #ccebd8;
+  border: 1px solid #18c259;
 }
 
 .dash-insight-badge {
-  color: #047857;
+  color: #047821;
 }
 
 .dash-insight p {
@@ -786,13 +1100,56 @@
 }
 
 .dash-meals {
-  background: #eef2f7;
-  border: 1px solid #d9e2ec;
+  background: #d6deea;
+  border: 1px solid #bcc9dc;
 }
 
 .dash-meal-card {
-  background: #f7f9fc;
-  border: 1px solid #dce4ee;
+  background: #eef3f9;
+  border: 1px solid #d1dce9;
+}
+
+.dash-meals-head h2 {
+  color: #1e293b;
+}
+
+.dash-meals-total {
+  color: #51617a;
+}
+
+.dash-meal-tab {
+  background: #c3d0e2;
+  color: #334155;
+}
+
+.dash-meal-tab.active {
+  background: #22cc9a;
+  color: #064e3b;
+}
+
+.dash-meal-icon {
+  background: rgba(16, 185, 129, 0.18);
+  color: #0f766e;
+}
+
+.dash-meal-card h3 {
+  color: #0f172a;
+}
+
+.dash-meal-meta {
+  color: #4b5c74;
+}
+
+.dash-meal-view {
+  color: #0f766e;
+}
+
+.dash-meal-progress-track {
+  background: #b8c5d8;
+}
+
+.dash-meal-progress > span {
+  color: #51617a;
 }
 
 .dash-actions h2 {

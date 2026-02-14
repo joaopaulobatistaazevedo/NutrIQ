@@ -1,5 +1,7 @@
 package alnak.data.global;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -11,17 +13,28 @@ public class GlobalDatabase
     private static GlobalDatabase instance;
     private Connection connection;
 
-    private static final String HOST     = System.getenv().getOrDefault("MYSQL_HOST", "localhost");
-    private static final String PORT     = System.getenv().getOrDefault("MYSQL_PORT", "3306");
-    private static final String DB_NAME  = System.getenv().getOrDefault("MYSQL_DB",   "meal_planner_users");
-    private static final String USER     = System.getenv().getOrDefault("MYSQL_USER", "root");
-    private static final String PASSWORD = System.getenv().getOrDefault("MYSQL_PASS", "");
+    private static final Dotenv DOTENV = Dotenv.configure()
+            .ignoreIfMissing()
+            .load();
+
+    private static final String HOST = readConfig("MYSQL_HOST", "DB_HOST", "localhost");
+    private static final String PORT = readConfig("MYSQL_PORT", "DB_PORT", "3306");
+    private static final String DB_NAME = readConfig("MYSQL_DB", "DB_NAME", "meal_planner_users");
+    private static final String USER = readConfig("MYSQL_USER", "DB_USER", "root");
+    private static final String PASSWORD = readConfig("MYSQL_PASS", "DB_PASS", "");
+    private static final String PARAMS = sanitizeParams(
+            readConfig(
+                    "MYSQL_PARAMS",
+                    "DB_PARAMS",
+                    "useSSL=true&serverTimezone=UTC&allowPublicKeyRetrieval=true"
+            )
+    );
 
     private GlobalDatabase() {
         try {
             String url = String.format(
-                    "jdbc:mysql://%s:%s/%s?useSSL=true&serverTimezone=UTC&allowPublicKeyRetrieval=true",
-                    HOST, PORT, DB_NAME
+                    "jdbc:mysql://%s:%s/%s?%s",
+                    HOST, PORT, DB_NAME, PARAMS
             );
             connection = DriverManager.getConnection(url, USER, PASSWORD);
             initSchema();
@@ -154,11 +167,56 @@ public class GlobalDatabase
             """);
 
             // ── Indexes ───────────────────────────────────────────
-            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_users_email        ON users(email)");
-            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_friendships_addr   ON friendships(addressee_id)");
-            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_posts_user         ON posts(user_id)");
-            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_posts_recipe       ON posts(recipe_id)");
-            s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ratings_recipe     ON user_recipe_ratings(recipe_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_users_email      ON users(email)");
+            createIndexIfMissing(s, "CREATE INDEX idx_friendships_addr ON friendships(addressee_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_posts_user       ON posts(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_posts_recipe     ON posts(recipe_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_ratings_recipe   ON user_recipe_ratings(recipe_id)");
         }
+    }
+
+    private void createIndexIfMissing(Statement s, String sql) throws SQLException {
+        try {
+            s.executeUpdate(sql);
+        } catch (SQLException e) {
+            // MySQL duplicate index name
+            if (e.getErrorCode() == 1061) {
+                return;
+            }
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("duplicate key name")) {
+                return;
+            }
+            throw e;
+        }
+    }
+
+    private static String readConfig(String mysqlKey, String dbKey, String defaultValue) {
+        String value = firstNonBlank(
+                System.getenv(mysqlKey),
+                System.getenv(dbKey),
+                DOTENV.get(mysqlKey),
+                DOTENV.get(dbKey)
+        );
+        return value != null ? value : defaultValue;
+    }
+
+    private static String firstNonBlank(String... candidates) {
+        for (String candidate : candidates) {
+            if (candidate != null && !candidate.isBlank()) {
+                return candidate.trim();
+            }
+        }
+        return null;
+    }
+
+    private static String sanitizeParams(String rawParams) {
+        if (rawParams == null || rawParams.isBlank()) {
+            return "useSSL=true&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+        }
+        String trimmed = rawParams.trim();
+        if (trimmed.startsWith("?")) {
+            return trimmed.substring(1);
+        }
+        return trimmed;
     }
 }

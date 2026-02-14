@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -119,6 +120,7 @@ public class LocalDatabase {
                     ingredient_name       TEXT,
                     product_name          TEXT,
                     product_url           TEXT,
+                    image_url             TEXT,
                     price                 REAL NOT NULL,
                     currency              TEXT DEFAULT 'EUR',
                     calories              REAL,
@@ -128,6 +130,7 @@ public class LocalDatabase {
                     PRIMARY KEY (ingredient_normalized, supermarket)
                 )
             """);
+            ensureColumnExists("ingredient_market_prices", "image_url", "TEXT");
 
             // ── Recipes ───────────────────────────────────────────
             s.executeUpdate("""
@@ -214,6 +217,29 @@ public class LocalDatabase {
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_market_prices_price      ON ingredient_market_prices(price)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_ri_recipe             ON recipe_ingredients(recipe_id)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_steps_recipe          ON recipe_steps(recipe_id, step_order)");
+        }
+    }
+
+    private void ensureColumnExists(String tableName, String columnName, String columnDefinition) throws SQLException {
+        boolean hasColumn = false;
+        String pragma = "PRAGMA table_info(" + tableName + ")";
+        try (Statement s = connection.createStatement();
+             ResultSet rs = s.executeQuery(pragma)) {
+            while (rs.next()) {
+                if (columnName.equalsIgnoreCase(rs.getString("name"))) {
+                    hasColumn = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasColumn) {
+            return;
+        }
+
+        String alter = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition;
+        try (Statement s = connection.createStatement()) {
+            s.executeUpdate(alter);
         }
     }
 }

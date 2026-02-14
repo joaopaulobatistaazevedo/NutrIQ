@@ -228,4 +228,17 @@ public class MealPlanDAO extends AbstractList<MealPlan> {
         }
         return result;
     }
+
+    public void removeMeal(int mealId) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "DELETE FROM meal_plan_meals WHERE id = ?")) {
+            ps.setInt(1, mealId);
+            int deleted = ps.executeUpdate();
+            if (deleted == 0)
+                throw new IllegalArgumentException("Refeição não encontrada: " + mealId);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

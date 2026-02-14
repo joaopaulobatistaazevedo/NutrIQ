@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-02-14T01:55:51.379725+00:00",
-  "count": 55,
+  "generated_at": "2026-02-14T05:08:14.154864+00:00",
+  "count": 94,
   "recipes": [
     {
       "source": "TeleCulinaria",
@@ -25,6 +25,7 @@
       "cook_time_minutes": 55,
       "total_time_minutes": 110,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/yhipbtcv3kke.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -68,6 +69,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 45,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/11/mhes547pprua.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -111,6 +113,7 @@
       "cook_time_minutes": 80,
       "total_time_minutes": 160,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/qn4119stqwy9.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -153,6 +156,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 90,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/w8nchfn4dnwf.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -191,6 +195,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 60,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/npn0nfzwz17z.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -226,6 +231,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 50,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/5bbzlnf1mi8f.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -269,6 +275,7 @@
       "cook_time_minutes": 35,
       "total_time_minutes": 70,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/dticeeb0muay.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -303,6 +310,7 @@
       "cook_time_minutes": 15,
       "total_time_minutes": 30,
       "servings": "['2']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/l1hjycw7g3sj.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -341,6 +349,7 @@
       "cook_time_minutes": 25,
       "total_time_minutes": 50,
       "servings": "['2']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/5fuafyu2qeke.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -382,6 +391,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 90,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2022/02/dxu3ozfx7enn.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -417,6 +427,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": null,
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/rhuz7ji7gtxl-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -461,6 +472,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": null,
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/11/dlhxqto9hjc6.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -521,6 +533,7 @@
       "cook_time_minutes": 75,
       "total_time_minutes": 75,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/6t72l4obsptl.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -554,6 +567,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 15,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/10qlqz28gfan.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -591,6 +605,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 30,
       "servings": "['2']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/l7anqjvgzkvl.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -631,6 +646,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 40,
       "servings": "['3']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/zaukxklqsmsf-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -664,6 +680,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/9njueppkocdd.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -707,6 +724,7 @@
       "cook_time_minutes": 30,
       "total_time_minutes": 30,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/lbndrl00pvn0.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -743,6 +761,7 @@
       "cook_time_minutes": 30,
       "total_time_minutes": 60,
       "servings": "['11']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/qjykcj2tg9iy.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -788,6 +807,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": null,
       "servings": null,
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/xzjqmm21mk0c-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -824,6 +844,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 35,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/01/lfsqxy9r80ol.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -856,6 +877,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 45,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2020/06/p4jwkonsmqpl.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -894,6 +916,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 45,
       "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/10/7yuhow0s4myx.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -940,6 +963,7 @@
       "cook_time_minutes": null,
       "total_time_minutes": 60,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/10/ea1twfufhhrf.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -980,6 +1004,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/hckabnguf504.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1014,6 +1039,7 @@
       "cook_time_minutes": 30,
       "total_time_minutes": 60,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2018/11/9fmzraaekrdm.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1053,6 +1079,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 60,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/3osl7pv9sfa6.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1092,6 +1119,7 @@
       "cook_time_minutes": 50,
       "total_time_minutes": 100,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2025/10/bwxwpeaxvekp.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1132,6 +1160,7 @@
       "cook_time_minutes": 120,
       "total_time_minutes": 240,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/11/ukuibvjpdxbi.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1174,6 +1203,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2019/03/21ib6zsl7nwb.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1209,6 +1239,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/11/uurl3x1cm6ml-1.png",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1247,6 +1278,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 40,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/02/jdluwsamkg8z.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1289,6 +1321,7 @@
       "cook_time_minutes": 70,
       "total_time_minutes": 140,
       "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2021/01/oqchcd0jxoqd-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1322,6 +1355,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['9']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/09/pnzyanrsp3hi.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1354,6 +1388,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/io28lbufdkge-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1391,6 +1426,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2016/03/llh1minjqzik-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1421,6 +1457,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/glspdejt0gxm.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1449,6 +1486,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/mqmculsue6pp-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1483,6 +1521,7 @@
       "cook_time_minutes": 35,
       "total_time_minutes": 70,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/tq4rkselnddj-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1519,6 +1558,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/lbju9hgul3rn-1.png",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1552,6 +1592,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/ag7hjxsvb9ec-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1592,6 +1633,7 @@
       "cook_time_minutes": 90,
       "total_time_minutes": 180,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/yugexfabp389-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1636,6 +1678,7 @@
       "cook_time_minutes": 80,
       "total_time_minutes": 160,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2021/02/dc7umrijcvj7-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1675,6 +1718,7 @@
       "cook_time_minutes": 75,
       "total_time_minutes": 150,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/aa0qzqxjinqx.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1716,6 +1760,7 @@
       "cook_time_minutes": 50,
       "total_time_minutes": 50,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/cybrbs3wvlys-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1757,6 +1802,7 @@
       "cook_time_minutes": 45,
       "total_time_minutes": 90,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zznoylpap0qv-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1810,6 +1856,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/jeudi31nirg1-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1852,6 +1899,7 @@
       "cook_time_minutes": 110,
       "total_time_minutes": 220,
       "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/lmfyeoiad3df-1.png",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1885,6 +1933,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2021/04/9nc6im0jokbe-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1930,6 +1979,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['24']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zq9y1tllmbgh-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -1972,6 +2022,7 @@
       "cook_time_minutes": 50,
       "total_time_minutes": 100,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zh0edjdqggys-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2006,6 +2057,7 @@
       "cook_time_minutes": 80,
       "total_time_minutes": 160,
       "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/lt2m1ckvq23f-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2045,6 +2097,7 @@
       "cook_time_minutes": 60,
       "total_time_minutes": 120,
       "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/pgdkb1chzg2c-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2078,6 +2131,7 @@
       "cook_time_minutes": 40,
       "total_time_minutes": 80,
       "servings": "['16']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/q4zhu1unjijl-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2119,6 +2173,7 @@
       "cook_time_minutes": 70,
       "total_time_minutes": 140,
       "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/ewen8xpwpuzi-1.jpg",
       "tags": [
         "pt",
         "teleculinaria",
@@ -2129,6 +2184,1450 @@
         "Robot de Cozinha",
         "sobremesas",
         "yammi"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/cheesecake-de-maracuja-2/",
+      "title": "Cheesecake de maracujá",
+      "ingredients": [
+        "200 g de bolachas tipo Maria",
+        "200 g de queijo creme",
+        "100 g de  manteiga",
+        "4 dl de natas frescas",
+        "1 lata de leite condensado",
+        "9 folhas de gelatina",
+        "800 g de maracujás",
+        "200 g de açúcar"
+      ],
+      "steps": [
+        "Para preparar esta receita simples de cheesecake, comece por fazer o molho: corte os maracujás ao meio, retire-lhes a polpa, deite-a no copo do robot, junte o açúcar e programe na temperatura vapor (120°C na Mycook), durante 10 minutos, na velocidade mínima (velocidade 2 na Mycook). Deite numa tigela e deixe arrefecer.",
+        "Demolhe as folhas de gelatina em água fria. Coloque as bolachas partidas em pedaços no copo lavado, ligue 50 segundos na velocidade máxima e deite numa tigela. Coloque depois a manteiga no copo e programe a 100°C, durante 1 minuto, na velocidade mínima (velocidade 2 na Mycook). Adicione a bolacha e ligue 20 segundos na velocidade 5 (velocidade 6 na Mycook), passando com a espátula a meio. Deite no fundo de uma forma de fundo amovível, alise bem e espalhe um pouco do molho de maracujá.",
+        "Deite o leite condensado e o queijo creme no copo, ligue 10 segundos na velocidade 5 (velocidade 6 na Mycook), depois ligue novamente o robot na velocidade 5, junte em fio pelo buraco as folhas de gelatina previamente escorridas e derretidas, desligue e deite numa tigela. Lave e limpe muito bem o copo, encaixe-lhe o acessório misturador, adicione as natas e ligue 2 minutos na velocidade 4 (velocidade 5 na Mycook), verificando sempre a consistência até ficar em chantilly. Adicione à tigela, envolva, verta na forma sobre a base de bolacha e leve ao frio até solidificar bem. Na hora de servir, desenforme e regue com o resto do molho de maracujá."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/eopipbukl0jk.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bimby",
+        "doces",
+        "my cook",
+        "receitas para robot de cozinha",
+        "Robot de Cozinha",
+        "sobremesas",
+        "yammi"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/crumble-de-maca-2/",
+      "title": "Crumble de maçã",
+      "ingredients": [
+        "1,200 kg  maçãs",
+        "100 g  farinha",
+        "100 g  açúcar amarelo",
+        "70 g  açúcar",
+        "70 g  manteiga",
+        "70 g  amêndoa moída",
+        "1 colher (sobremesa)  canela em pó",
+        "Açúcar em pó para polvilhar"
+      ],
+      "steps": [
+        "Lave e descasque as maçãs, corte-as ao meio, retire-lhes as sementes, corte-as depois em gomos finos, coloque-os no recipiente para cozinhar a vapor e polvilhe-os com a canela.",
+        "Encaixe no copo do robot com 500 g de água, feche e programe na temperatura vapor (120°C na Mycook), durante 25 minutos, na velocidade 2 (velocidade 3 na Mycook). Deite a maçã num tabuleiro de louça ou pirex, polvilhe com o açúcar amarelo e envolva.",
+        "Lave e seque o copo, deite-lhe a farinha, a manteiga, o açúcar e a amêndoa moída e ligue 10 segundos na velocidade 5. Espalhe por cima da maçã no tabuleiro e leve ao forno, na função grill, até que fique bem douradinho. Retire do forno, deixe amornar e sirva polvilhado com açúcar em pó e decorado a gosto."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/10/j2nifcpbq4gi-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bimby",
+        "doces",
+        "my cook",
+        "receitas para robot de cozinha",
+        "Robot de Cozinha",
+        "sobremesas",
+        "yammi"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/cupcakes-2/",
+      "title": "Cupcakes",
+      "ingredients": [
+        "400 g  natas frescas",
+        "350 g  farinha",
+        "300 g  açúcar + açúcar q.b.",
+        "220 g  manteiga",
+        "100 g  leite",
+        "5  ovos grandes",
+        "1 colher (chá)  essência de baunilha",
+        "1 colher (chá) bem cheia  fermento em pó",
+        "Pasta de açúcar branca q.b.",
+        "Pasta de açúcar verde q.b.",
+        "Pérolas prateadas q.b.",
+        "Corante alimentar verde q.b.",
+        "Margarina para untar",
+        "Farinha para polvilhar"
+      ],
+      "steps": [
+        "Ligue o forno a 180°C, unte forminhas com margarina e polvilhe-as com farinha. Deite o açúcar no copo do robot, junte a manteiga, a essência de baunilha e os ovos e ligue durante 30 segundos na velocidade 6. Passe com a espátula e ligue mais 30 segundos na velocidade 6.",
+        "Adicione o fermento, a farinha e o leite, ligue novamente 30 segundos na velocidade 6, passe mais uma vez a espátula e ligue na velocidade 6 mais 30 segundos. Divida o preparado pelas formas e leve ao forno durante 30 minutos. Espete um palito para verificar se estão cozidos, retire, desenforme e deixe arrefecer.",
+        "Encaixe o acessório misturador no copo, junte as natas e um pouco de açúcar e ligue na velocidade 4 (velocidade 5 na Mycook), durante 2 minutos e 30 segundos ou até que fique em chantilly. Retire do copo, adicione um pouco de corante verde a misture. Disponha o chantilly sobre alguns cupcakes e polvilhe com pérolas prateadas. Decore outros com as pastas de açúcar, como vê na foto, e sirva."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2016/11/hypz1les4ceb.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bimby",
+        "doces",
+        "my cook",
+        "receitas para robot de cozinha",
+        "Robot de Cozinha",
+        "sobremesas",
+        "yammi"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/delicia-de-gelatina-2/",
+      "title": "Delícia de gelatina",
+      "ingredients": [
+        "400 g  natas",
+        "3 pacotes  gelatina de cores diferentes",
+        "2  iogurtes açucarados naturais ou com aroma a gosto",
+        "1 lata  leite condensado",
+        "10 folhas  gelatina",
+        "Óleo para untar"
+      ],
+      "steps": [
+        "Deite 250 g de água no copo do robot e programe na temperatura vapor (120°C na Mycook), durante 5 minutos, na velocidade 3 (velocidade 4 na Mycook). Junte depois umas das gelatinas e ligue 30 segundos, progressivamente nas velocidades 6 e 7 (velocidades 7 e 8 na Mycook). Adicione 250 g de água fria, ligue 5 segundos na velocidade 5 (6 segundos e velocidade 6 na Mycook), verta para um tabuleiro e leve ao frio até solidificar. Repita todos os passos anteriores para fazer as outras duas gelatinas, deite em tabuleiros separados e leve ao frio.",
+        "Demolhe as folhas de gelatina em água fria. Deite os iogurtes no copo lavado, junte o leite condensado e programe a 100°C, durante 7 minutos, na velocidade 2 (velocidade 3 na Mycook), adicionando as folhas de gelatina escorridas quando estiver quase a terminar o programa. Deite numa tigela e deixe arrefecer. Lave e limpe o copo, deixe-o arrefecer, encaixe-lhe o acessório misturador, junte as natas, ligue 2 minutos e 30 segundos na velocidade 4 (velocidade 5 na Mycook), adicione à tigela e envolva.",
+        "Corte as gelatinas em cubos, reserve alguns para decorar, adicione os restantes à tigela e envolva. Unte uma forma com óleo, deixe-a escorrer, verta-lhe o preparado, leve ao frio até solidificar, depois desenforme e coloque num prato largo. Deite a gelatinas que reservou no copo lavado e já sem o acessório misturador, ligue 4 segundos na velocidade 4 (5 segundos e velocidade 5 na Mycook) e disponha à volta para decorar como vê na foto."
+      ],
+      "prep_time_minutes": 75,
+      "cook_time_minutes": 75,
+      "total_time_minutes": 150,
+      "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2020/05/uahyh94ccnc3-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bimby",
+        "doces",
+        "my cook",
+        "receitas para robot de cozinha",
+        "Robot de Cozinha",
+        "sobremesas",
+        "yammi"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/pao-de-lo-2/",
+      "title": "Pão-de-ló",
+      "ingredients": [
+        "250 g  açúcar",
+        "170 g  farinha",
+        "6  ovos + 3 gemas",
+        "20 g  essência de baunilha",
+        "Margarina para untar",
+        "Farinha para polvilhar",
+        "Papel vegetal"
+      ],
+      "steps": [
+        "Encaixe o acessório misturador no copo do robot, junte os ovos, as gemas e o açúcar e ligue durante 10 minutos na velocidade 4 (velocidade 5 na Mycook). Adicione a essência de baunilha e depois a farinha peneirada e ligue 15 segundos na velocidade 4 (velocidade 5 na Mycook).",
+        "Unte uma forma com margarina, forre-a com papel vegetal, unte novamente e polvilhe com farinha. Verta-lhe a mistura e leve ao forno pré-aquecido a 180°C durante 25 minutos.",
+        "Retire do forno, deixe arrefecer e sirva decorado a gosto. Pode polvilhar com açúcar em pó."
+      ],
+      "prep_time_minutes": 50,
+      "cook_time_minutes": 50,
+      "total_time_minutes": 100,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/03/icsbhauxnhds-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bimby",
+        "doces",
+        "my cook",
+        "receitas para robot de cozinha",
+        "Robot de Cozinha",
+        "sobremesas",
+        "yammi"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/tarte-de-peras-2/",
+      "title": "Tarte de peras",
+      "ingredients": [
+        "250 g de farinha",
+        "80 g de margarina",
+        "1 ovo grande",
+        "Farinha para polvilhar",
+        "4 peras",
+        "4 gemas + 2 ovos",
+        "2 latas de leite condensado",
+        "200 g de leite",
+        "Canela em pó para polvilhar"
+      ],
+      "steps": [
+        "Deite a farinha no copo do robot, junte a margarina e o ovo e ligue durante 30 segundos na velocidade 6. Deite numa bancada polvilhada com farinha, estenda com o rolo, forre uma tarteira de fundo amovível, apare os rebordos e pique o fundo com um garfo.",
+        "Faça o recheio: descasque e lave as peras, corte-as ao meio, retire-lhes as sementes, lamine-as e espalhe-as na tarteira.",
+        "Deite o leite condensado no copo, adicione o leite, as gemas e os ovos e ligue durante 10 segundos na velocidade 5. Verta sobre as peras na tarteira e leve ao forno pré-aquecido a 180°C durante 30 minutos ou até ficar bem cozida e douradinha. Retire a tarte do forno, deixe-a arrefecer, desenforme-a, polvilhe-a com canela em pó e sirva-a decorada a gosto."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/flemlb2hd4cf-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Vídeo"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/pasteis-de-massa-tenra-2/",
+      "title": "Pastéis de massa tenra",
+      "ingredients": [
+        "500 g  sobras de carne de vaca estufada com o molho",
+        "300 g  farinha + 1 colher (sopa) bem cheia de farinha",
+        "Sal fino q.b.",
+        "40 g  margarina amolecida",
+        "40 g  banha amolecida",
+        "1,5 dl  água",
+        "Farinha para polvilhar",
+        "Óleo para fritar"
+      ],
+      "steps": [
+        "Desfie a carne. Aqueça o molho da carne num tacho, adicione a colher (sopa) de farinha previamente dissolvida num pouco de água fria e mexa bem até engrossar. Junte novamente a carne, envolva, retire do lume e reserve.",
+        "Deite os 300 g de farinha numa tigela, junte uma pitada de sal fino, misture, adicione depois a margarina e a banha e misture bem com a ponta dos dedos. Acrescente a água e amasse bem, adicionando mais água se a massa estiver um pouco dura. Retire e deixe repousar durante 15 minutos.",
+        "Estenda depois a massa numa bancada polvilhada com farinha. Disponha um pouco da carne por cima, dobre a massa para cobrir.",
+        "Corte depois com um corta-massas ou um copo, no formato que vê na foto. Repita a operação até acabar a carne e a massa. Leve depois os pastéis a fritar em óleo até ficarem douradinhos de ambos os lados; retire, coloque a escorrer sobre papel absorvente e sirva."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['24']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/gxslya4eykbj-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "entradas",
+        "Passo-a-Passo",
+        "petiscos",
+        "pitéus"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/bacalhau-a-ze-do-pipo-2/",
+      "title": "Bacalhau à zé do pipo",
+      "ingredients": [
+        "500 g de bacalhau em postas altas",
+        "2,5 dl de leite",
+        "1 dente de alho",
+        "2 cebolas",
+        "1 dl de azeite",
+        "2 folhas de louro",
+        "1 kg de puré de batata",
+        "Pão ralado para polvilhar",
+        "Salsa para decorar",
+        "Sal e pimenta q.b.",
+        "1 ovo",
+        "1 colher (chá) de mostarda",
+        "1 colher (sopa) de vinagre",
+        "1 dl de óleo"
+      ],
+      "steps": [
+        "Leve ao lume as postas de bacalhau, o leite e o dente de alho picado, e deixe ferver entre 15 a 20 minutos. Desligue. Descasque as cebolas e pique-as. Deite-as para um tacho, junte o azeite e o louro e deixe refogar até estarem macias. Adicione 3 colheres de sopa do leite de cozer o bacalhau, deixe ferver e rectifique os temperos. Desligue o lume.",
+        "Aqueça o forno a 200°C. Escorra o bacalhau e coloque-o numa assadeira de barro; cubra-o com a mistura da cebola. Coloque o puré num saco de pasteleiro com boquilha e disponha-o na assadeira, à volta do bacalhau.",
+        "Para a maionese: numa taça, coloque o ovo e a mostarda e mexa, ligando tudo com umas varas. Adicione metade do azeite em fio, sem nunca parar de bater e depois uma colher de sopa de vinagre. Acrescente o óleo em fio, mexendo continuamente, e adicione o restante vinagre. Mexa. Tempere com sal e pimenta a gosto.",
+        "Verta a maionese por cima do bacalhau. Polvilhe com pão ralado e leve ao forno a gratinar.",
+        "Decore com salsa e sirva."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/peyh6wbwlpu2-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bacalhau",
+        "bacalhau à zé do pipo",
+        "Clássicos da Cozinha",
+        "Como preparar bacalhau a Ze do Pipo",
+        "Cozinha tradicional",
+        "Peixes",
+        "receita clássica",
+        "receitas de bacalhau",
+        "receitas de peixe",
+        "receitas de tradição",
+        "receitas faceis",
+        "receitas tradicionais"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/frango-em-franjas-2/",
+      "title": "Frango em franjas",
+      "ingredients": [
+        "1  cebola",
+        "2 dentes  alho",
+        "1 dl  azeite",
+        "1 lata grande  tomate pelado",
+        "1 colher (chá)  orégãos",
+        "Sal e pimenta q.b.",
+        "1  frango assado ou estufado",
+        "1 ramo  salsa picada",
+        "200 g  queijo mozzarella ralado",
+        "300 g  batata palha de compra"
+      ],
+      "steps": [
+        "Limpe o frango de peles e ossos, desfie-o e espalhe-o num tabuleiro de louça ou pirex. Reserve um pouco.",
+        "Descasque a cebola e os alhos, pique tudo grosseiramente e deite para um tacho. Junte o azeite e deixe cozinhar até a cebola começar a ficar douradinha. Adicione o tomate com o molho e os orégãos, tempere com sal e pimenta e deixe cozinhar, em lume brando, durante 10 minutos. Depois, reduza a puré com a varinha. Polvilhe o preparado do frango com a salsa picada, cubra com o molho, polvilhe com o queijo mozzarella ralado e cubra com a batata palha. Leve ao forno pré-aquecido a 180°C durante 20 minutos.",
+        "Retire e sirva quente polvilhado com mais salsa picada."
+      ],
+      "prep_time_minutes": 45,
+      "cook_time_minutes": 45,
+      "total_time_minutes": 90,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/d6n6yl6mxf3m-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "carne",
+        "Passo-a-Passo",
+        "receitas de carne"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/pave-de-chocolate-2/",
+      "title": "Pavê de chocolate",
+      "ingredients": [
+        "2 dl de leite frio",
+        "2 colheres (sopa) de chocolate em pó",
+        "2 colheres (sopa) de creme de licor de whisky",
+        "200 g de bolachas de água e sal",
+        "Raspas de chocolate q.b.",
+        "1 lata de leite condensado",
+        "3 colheres (sopa) de chocolate em pó",
+        "1 colher (sopa) de margarina",
+        "5 dl de  leite",
+        "1 saqueta de pudim flan instantâneo",
+        "1 colher (sopa) de farinha maisena"
+      ],
+      "steps": [
+        "Comece pelo creme de chocolate: deite o leite condensado para um tacho, junte o chocolate em pó e a margarina e leve ao lume durante 10 minutos, mexendo sempre. Retire do lume e deixe arrefecer.",
+        "Prepare o creme de pudim: deite o leite para um tacho, adicione o pó do pudim flan e a farinha maisena, mexa, leve ao lume e deixe ferver durante 2 minutos, mexendo sempre. Retire e deixe arrefecer.",
+        "Deite o creme de chocolate para um tabuleiro de louça ou pirex e espalhe.",
+        "Numa tigela, misture os 2 dl de leite frio com o chocolate em pó e o creme de licor de whisky, passe as bolachas por esta mistura e coloque-as em cima do creme de chocolate, como vê na foto.",
+        "Cubra com o creme de pudim e leve ao frio até ficar bem fresco.",
+        "Sirva decorado com raspas de chocolate."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/jay7gwzpns4u-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "doces",
+        "Passo-a-Passo",
+        "sobremesas"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/tarte-de-coco-com-laranja-2/",
+      "title": "Tarte de coco com laranja",
+      "ingredients": [
+        "1 rolo de massa quebrada estendida de compra",
+        "200 g de coco ralado",
+        "1 lata de leite condensado",
+        "1 dl de  leite",
+        "8 Ovos",
+        "Sumo de 1 laranja",
+        "Farinha para polvilhar",
+        "2 dl de natas",
+        "3 colheres (sopa) de açúcar em pó",
+        "Raspa de 1 laranja"
+      ],
+      "steps": [
+        "Ligue o forno a 180°C, forre uma tarteira com a massa quebrada, apare e pique o fundo com um garfo.",
+        "Deite o coco ralado para uma tigela, junte o leite condensado...",
+        "... o leite, os ovos e o sumo da laranja e misture bem.",
+        "Verta depois na tarteira e leve ao forno durante 30 minutos. Retire do forno e deixe arrefecer.",
+        "Antes de servir, prepare a cobertura: Bata as natas em chantilly, adicionando o açúcar em pó aos poucos e batendo até ficar bem firme. Desenforme a tarte, barre-a com o chantilly, polvilhe com a raspa da laranja.",
+        "Sirva decorada a gosto."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/eiur16nderip-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "doces",
+        "Passo-a-Passo",
+        "sobremesas"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/lombo-assado-a-suica-2/",
+      "title": "Lombo assado à suíça",
+      "ingredients": [
+        "1 lombo  porco com aprox.1,200 kg",
+        "250 g  queijo fatiado",
+        "1  cebola grande",
+        "4 dentes  alho",
+        "1 lata grande  tomate pelado",
+        "3 dl  vinho branco",
+        "0,5 dl  azeite",
+        "1 colher (chá)  pimentão-doce",
+        "1 cubo  caldo de carne",
+        "1 folha  louro",
+        "Manjericão q.b.",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Arranje o lombo de porco, coloque-o num tabuleiro e tempere-o com os alhos picados, o vinho branco, o pimentão-doce, a folha de louro, o caldo de carne desfeito, sal e pimenta. Envolva muito bem e deixe marinar durante 20 minutos.",
+        "Depois regue com o azeite e leve ao forno pré-aquecido a 180ºC durante 45 minutos, regando de vez em quando com o próprio molho e com um pouco de água se necessário. Retire do forno, deixe amornar e corte em fatias.",
+        "Deite num tacho o molho que ficou no tabuleiro, adicione a cebola cortada em pedaços, leve ao lume e deixe alourar. Junte o tomate pelado, deixe cozinhar até que fique macio, retire do lume, triture com a varinha e rectifique os temperos.",
+        "Disponha as fatias de queijo entre as fatias do lombo, leve novamente ao forno até que comecem a derreter, retire do forno, coloque numa travessa, regue com o molho e sirva polvilhado com manjericão picado. Acompanhe com batatas assadas ou fritas."
+      ],
+      "prep_time_minutes": 80,
+      "cook_time_minutes": 80,
+      "total_time_minutes": 160,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/09/oewfeexjmn31-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "lombo de porco assado",
+        "lombo de porco no forno"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/torta-de-chocolate-2/",
+      "title": "Torta de chocolate",
+      "ingredients": [
+        "150 g  farinha",
+        "150 g  açúcar",
+        "50 g  chocolate em pó",
+        "100 g  chocolate em barra",
+        "8  Ovos",
+        "3 colheres (sopa)  natas",
+        "Manteiga para untar",
+        "Açúcar em pó para polvilhar",
+        "Papel vegetal"
+      ],
+      "steps": [
+        "Bata as claras em castelo. À parte, bata as gemas com o açúcar até ficar uma mistura esbranquiçada. Junte o chocolate em pó misturado com a farinha, aos poucos e batendo sempre. Envolva depois as claras em castelo.",
+        "Unte o tabuleiro de forno com manteiga, forre-o com papel vegetal, verta-lhe o preparado anterior e leve ao forno pré-aquecido a 180ºC durante cerca de 15 minutos ou até ficar bem cozido.",
+        "Deite o chocolate em pedaços para uma tigela, adicione as natas, leve a derreter no microondas, retire e envolva bem. Desenforme o bolo sobre um pano polvilhado com açúcar em pó, barre com o chocolate e enrole com a ajuda do pano. Depois retire o pano, polvilhe com mais açúcar em pó e sirva a torta decorada a gosto."
+      ],
+      "prep_time_minutes": 45,
+      "cook_time_minutes": 45,
+      "total_time_minutes": 90,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2023/03/a3ukss6lcieh.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "doces",
+        "receitas faceis",
+        "receitas simples",
+        "sobremesas",
+        "torta de chocolate",
+        "Vídeo"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/doce-de-abobora-vinho-do-porto-e-amendoa-2/",
+      "title": "Doce de abóbora, Vinho do Porto e amêndoa",
+      "ingredients": [
+        "1 kg  abóbora amarela descascada e sem sementes",
+        "900 g  açúcar",
+        "100 g  amêndoa palitada",
+        "2 dl  Vinho do Porto Tawny",
+        "1 dl  água",
+        "1 casquinha  limão"
+      ],
+      "steps": [
+        "Corte a abóbora em pedaços pequenos e deite-os para um tacho. Junte a casca limão, o açúcar e a água, leve ao lume brando e deixe cozinhar, mexendo de vez em quando, até a abóbora começar a desfazer-se.",
+        "Adicione o Vinho do Porto e deixe cozinhar, mexendo, até evaporar o álcool e atingir o ponto estrada. Retire do lume, rejeite a casca de limão e triture um pouco com a varinha.",
+        "Leve novamente ao lume, junte a amêndoa palitada, envolva e deixe começar a ferver. Retire do lume, deixe arrefecer e sirva com pão, tostas, queijos, etc."
+      ],
+      "prep_time_minutes": 90,
+      "cook_time_minutes": 90,
+      "total_time_minutes": 180,
+      "servings": "['12']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/tqe7fnhryqtg-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "receita de doce",
+        "sobremesas com abóbora",
+        "sobremesas com amêndoa",
+        "sobremesas com vinho do porto"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/sopa-da-pedra-2/",
+      "title": "Sopa da pedra",
+      "ingredients": [
+        "1 orelha  porco",
+        "1  chispe",
+        "1 chouriço  carne",
+        "1 morcela  cozer",
+        "1  farinheira",
+        "500 g  feijão encarnado de lata",
+        "450 g  batatas",
+        "200 g  couve lombarda",
+        "2  cebolas",
+        "4 dentes  alho",
+        "1 dl  azeite",
+        "2 folhas  louro",
+        "1 ramo  coentros",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Arranje e orelha de porco e o chispe e coza-os em água temperada de sal juntamente com os enchidos, retirando conforme forem ficando cozidos. Depois corte os enchidos em rodelas e as carnes em pedaços. Deite o azeite para outra panela, junte uma das cebolas cortada em gomos e os alhos cortados em rodelas e deixe refogar um pouco.",
+        "Adicione então 150 g do feijão, o caldo de cozer as carnes e um pouco mais de água se necessário. Tempere com sal, deixe ferver, retire do lume e passe com a varinha.",
+        "Descasque as batatas e a restante cebola e corte-as em cubos. Arranje a couve e corte-a em pedaços. Leve novamente a panela ao lume, junte as batatas, a cebola, o chispe, a orelha, o chouriço, a morcela e a couve e deixe cozinhar até os legumes ficarem macios.",
+        "Junte depois o restante feijão, a farinheira e as folhas de louro, rectifique o sal, tempere com pimenta e deixe cozinhar até apurar. Sirva quente com os coentros picados."
+      ],
+      "prep_time_minutes": 75,
+      "cook_time_minutes": 75,
+      "total_time_minutes": 150,
+      "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/m1eyn4bqh0dk-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "receita regional",
+        "sopa da pedra"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/bolo-moka-cremoso-2/",
+      "title": "Bolo moka cremoso",
+      "ingredients": [
+        "200 g de farinha",
+        "200 g de açúcar",
+        "6 ovos grandes",
+        "1,5 dl de café açucarado",
+        "1 colher (chá) de fermento",
+        "Margarina para untar",
+        "Farinha para polvilhar",
+        "125 g de  manteiga",
+        "100 g de açúcar em pó",
+        "1 ovo",
+        "1 colher (sopa) de café bem forte"
+      ],
+      "steps": [
+        "Unte uma forma com margarina e polvilhe-a com farinha. Numa tigela, bata os ovos, adicionando o açúcar aos poucos, até que fique um creme bastante fofo e volumoso. Junte depois a farinha peneirada com o fermento e envolva suavemente.",
+        "Verta a mistura anterior para a forma e leve ao forno durante cerca de 40 minutos ou até que fique cozido. Espete um palito para verificar, retire do forno, desenforme, deixe arrefecer e corte depois o bolo em 3 rodelas.",
+        "Numa tigela, bata bem a manteiga até obter um creme, junte depois o açúcar em pó e o ovo e bata bem. Adicione de seguida o café forte e bata novamente.",
+        "Regue as rodelas do bolo, na parte cortada, com o 1,5 dl de café açucarado. Barre a rodela inferior com cerca de 1/3 do creme, coloque a rodela do meio, barre com mais creme e cubra com a parte superior. Barre todo o bolo com o restante creme, polvilhe com açúcar em pó e sirva decorado a gosto."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['8']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/t0g5sudgeuqr-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bolo de café",
+        "bolo moka",
+        "receita de bolo de café"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/enchidos-marinados-com-broa-2/",
+      "title": "Enchidos marinados com broa",
+      "ingredients": [
+        "2 chouriços  carne",
+        "2  linguiças",
+        "1  morcela",
+        "1  alheira",
+        "6 fatias  broa de milho",
+        "2 dentes  alho",
+        "1 dl  Vinho do Porto",
+        "1 dl  azeite",
+        "1 colher (sopa)  orégãos"
+      ],
+      "steps": [
+        "Corte o chouriço e a morcela em rodelas e depois as rodelas em quartos. Corte as linguiças e a alheira em rodelas. Deite todos estes enchidos num tabuleiro.",
+        "Adicione o azeite, os alhos descascados e esmagados e os orégãos e envolva. Por fim, regue com o Vinho do Porto e volte a mexer. Deixe marinar durante 24 horas.",
+        "No dia seguinte, torre as fatias de broa e sirva-as a acompanhar os enchidos marinados."
+      ],
+      "prep_time_minutes": 20,
+      "cook_time_minutes": 20,
+      "total_time_minutes": 40,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/g4jevzf89jqf-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "enchidos com broa",
+        "petisco de enchidos"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/arroz-de-peixe-com-courgette-2/",
+      "title": "Arroz de peixe com courgette",
+      "ingredients": [
+        "700 g  postas de garoupa",
+        "400 g  arroz carolino",
+        "1 lata pequena  tomate pelado",
+        "1  courgette",
+        "1  cebola",
+        "3 dentes  alho",
+        "1 dl  azeite",
+        "1 folha  louro",
+        "Salsa ou coentros picados q.b.",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Deite as postas de garoupa para um tacho, junte 1,5 L de água, tempere com pouco sal, leve ao lume até ferver, desligue o lume e deixe o peixe arrefecer dentro da água. Depois escorra a garoupa e rejeite-lhe a pele e as espinhas mantendo-a o mais inteiro possível. Passe a água pelo coador e leve-a ao lume brando num tacho.",
+        "Descasque a cebola e os alhos e pique-os. Retire as extremidades à courgette, lave-a e corte-a em cubinhos. Deite a cebola e os alhos para um tacho, adicione o azeite e o louro, leve ao lume e deixe cozinhar até a cebola ficar macia. Junte o tomate pelado picado com o molho, mexa e deixe cozinhar durante 5 minutos.",
+        "Adicione depois um pouco do caldo de cozer o peixe e deixe ferver mais 10 minutos. Junte o resto do caldo, deixe ferver, rectifique o sal, tempere com uma pitada de pimenta, adicione o arroz, mexa e deixe cozinhar 10 minutos. Junte finalmente a courgette e o peixe, mexa delicadamente e deixe e cozer mais 10 minutos. Desligue o lume, deixe repousar um pouco e sirva polvilhado com salsa ou coentros picados."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zp2mx7qemgns-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "arroz de garoupa",
+        "arroz malandrinho"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/chocos-com-pure-de-couve-flor-2/",
+      "title": "Chocos com puré de couve-flor",
+      "ingredients": [
+        "1,200 kg de choquinhos",
+        "2 dentes de alho",
+        "2 colheres (sopa) de azeite",
+        "1 folha de louro",
+        "Sal e pimenta q.b.",
+        "1 couve-flor grande",
+        "1 L de leite gordo",
+        "2 colheres (sopa) de  manteiga",
+        "Sumo de limão q.b.",
+        "Cebolinho q.b.",
+        "Noz-moscada q.b."
+      ],
+      "steps": [
+        "Ligue o forno a 180 graus. Descasque e lamine os dentes de alho. Coloque os choquinhos num tabuleiro, tempere-os com os alhos, a folha de louro, sal e pimenta e regue com o azeite. Envolva bem e leve ao forno durante cerca de 20 minutos ou até os chocos ficarem assados e macios.",
+        "Entretanto, prepare o puré: arranje e corte a couve-flor em pedaços e leve-os a cozer num tacho com o leite temperado com um pouco de sal grosso, durante cerca de 20 minutos ou até que a couve-flor fique macia.",
+        "Escorra a couve-flor, reduza-a a puré e acrescente apenas um pouco do leite da cozedura se necessário para ficar com uma textura cremosa. Junte a manteiga e cebolinho picado, tempere com uma pitada de noz-moscada e um pouco de sumo de limão, misture bem e rectifique o sal e a pimenta. Sirva a acompanhar os chocos."
+      ],
+      "prep_time_minutes": 35,
+      "cook_time_minutes": 35,
+      "total_time_minutes": 70,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/ozsxlm6ech38-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "chocos assados no forno",
+        "chocos no forno",
+        "pure de couve flor"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/frango-assado-com-maca-2/",
+      "title": "Frango assado com maçã",
+      "ingredients": [
+        "1  frango (de preferência do campo)",
+        "800 g  batatinhas",
+        "4  maçãs vermelhas",
+        "5 dentes  alho",
+        "3 dl  vinho branco",
+        "2 colheres (sopa)  banha",
+        "1 colher (chá)  paprica",
+        "1 raminho  alecrim",
+        "Sumo de 1 limão",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Tempere o frango com sal e pimenta por dentro e por fora e coloque-lhe o alecrim em raminhos no interior. Disponha o frango num tabuleiro.",
+        "Descasque os dentes de alho, pique-os, deite-os para uma tigela, junte a paprica e a banha e misture. Barre o frango com esta mistura, junte o vinho branco e deixe marinar durante 1 hora.",
+        "Leve depois o frango a assar no forno pré-aquecido a 180ºC durante 30 minutos, regando de vez em quando com o próprio molho. Descasque e lave as batatinhas, junte-as ao tabuleiro, envolva-as no molho e deixe assar mais 40 minutos.",
+        "Lave as maçãs, corte-as em gomos grossos com a casca, retire-lhes as pevides, regue com o sumo de limão, adicione também ao tabuleiro e deixe assar tudo mais 20 minutos. Retire do forno e sirva decorado a gosto."
+      ],
+      "prep_time_minutes": 120,
+      "cook_time_minutes": 120,
+      "total_time_minutes": 240,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/ztmcb9kwhgba-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "carnes brancas",
+        "frango assado no forno",
+        "frango do campo",
+        "frango no forno"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/tortilha-de-borrego-2/",
+      "title": "Tortilha de borrego",
+      "ingredients": [
+        "400 g  carne de borrego limpa",
+        "1/2  Pimento Vermelho",
+        "1/2  pimento verde",
+        "1  tomate",
+        "1  cebola",
+        "1 dente  alho",
+        "6  Ovos",
+        "2 colheres (sopa)  azeite",
+        "1 colher (sopa)  farinha maisena",
+        "1 raminho  salsa picada",
+        "Cominhos em pó q.b.",
+        "Molho Tabasco q.b.",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Corte a carne de borrego em cubos pequenos e tempere-os com sal, pimenta e uma pitada de cominhos em pó. Lave os pimentos, retire-lhes as sementes e peles brancas e corte-os em cubos pequenos. Lave o tomate, corte-o em quartos, retire-lhe as sementes e corte-o depois em cubinhos. Descasque a cebola e o alho e pique-os finamente.",
+        "Leve uma frigideira larga ao lume com 1 colher (sopa) do azeite, deixe aquecer, adicione a carne de borrego e deixe cozinhar até ganhar cor de ambos os lados. Retire a carne, adicione o resto do azeite à mesma frigideira, deixe aquecer, junte a cebola e o alho, tempere com sal e pimenta e deixe refogar, em lume brando, durante 10 minutos. Adicione depois os pimentos e o tomate, rectifique os temperos, junte umas gotas de tabasco e deixe cozinhar mais 10 minutos.",
+        "Bata os ovos com a farinha maisena, adicione à frigideira, junte também o borrego e deixe cozinhar, em lume médio, durante cerca de 5 minutos. Vire com a ajuda de um prato, deixe cozinhar mais 5 minutos do outro lado, retire do lume e sirva com a salsa picada. No emprego, aqueça um pouco no microondas e acompanhe com salada."
+      ],
+      "prep_time_minutes": 50,
+      "cook_time_minutes": 50,
+      "total_time_minutes": 100,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/dakkrcos6rqc-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "receita de tortilha",
+        "receitas de borrego",
+        "tortilhas"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/coelho-a-cacador-2/",
+      "title": "Coelho à caçador",
+      "ingredients": [
+        "1  coelho pequeno",
+        "150 g  cogumelos",
+        "1  tomate",
+        "1  cebola grande",
+        "1 dente  alho",
+        "3 dl  vinho tinto",
+        "4 colheres (sopa)  azeite",
+        "1 colher (sopa)  farinha",
+        "2  cravinhos",
+        "1 folha  louro",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Arranje e corte o coelho em pedaços, deite-os numa tigela, junte o vinho tinto, a cebola e o alho cortados em rodelas, tempere com sal, pimenta, os cravinhos e a folha de louro. Deixe marinar durante 2 horas.",
+        "Escorra os pedaços de coelho e reserve a marinada. Polvilhe o coelho com a farinha e envolva. Leve um tacho ao lume com o azeite, deixe aquecer, adicione o coelho e deixe alourar de ambos os lados. Junte a cebolas, o alho e o louro da marinada.",
+        "Adicione o tomate previamente pelado e cortado em cubos, deixe ferver um pouco, junte o líquido da marinada e retifique de temperos. Adicione então os cogumelos previamente arranjados e cortados em quartos, mexa, tape e deixe cozinhar lentamente até tudo ficar macio. Sirva decorado a gosto com batatas cozidas ou outra guarnição."
+      ],
+      "prep_time_minutes": null,
+      "cook_time_minutes": 80,
+      "total_time_minutes": 80,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/mils77pxwfpl-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Coelho à caçador",
+        "Coelho guisado",
+        "Coelho no tacho"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/pescada-no-forno-mariscada-2/",
+      "title": "Pescada no forno mariscada",
+      "ingredients": [
+        "4 postas  pescada",
+        "1 pacote  sopa instantânea creme de marisco",
+        "600 g  batatas pequenas",
+        "400 g  ervilhas",
+        "2  cenouras",
+        "2 dentes  alho",
+        "0,5 dl  azeite",
+        "Sumo de limão q.b.",
+        "Funcho q.b.",
+        "Sal q.b."
+      ],
+      "steps": [
+        "Descongele e arranje as postas de pescada e tempere-as com os dentes de alho picados finamente, um pouco de sumo de limão e sal. Deixe marinar durante 30 minutos.",
+        "Descasque e lave as batatas e as cenouras e corte as cenouras em meias luas ou cubinhos. Leve uma panela ao lume com água temperada de sal, deixe ferver, junte as batatas, as cenouras e as ervilhas e deixe cozer durante 15 minutos. Retire, escorra e reserve.",
+        "Deite o pó do creme de marisco numa tigela grande e regue com 800 g de água fria, aos poucos e mexendo sempre muito bem para que não fique com grumos.",
+        "Disponha as postas de pescada num tabuleiro, junte todos os legumes à volta, regue com a mistura do creme de marisco e o azeite e leve ao forno pré-aquecido a 180°C, regando com o próprio molho, durante cerca de 40 minutos ou até que o peixe fique bem cozinhado. Retire do forno e sirva polvilhado com funcho picado."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/06/l7oiua5vxeth.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "pescada",
+        "pescada assada no forno",
+        "pescada com creme de marisco",
+        "Pescada no forno mariscada",
+        "receita de peixe"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/mini-pasteis-de-feijao-2/",
+      "title": "Mini pastéis de feijão",
+      "ingredients": [
+        "600 g  massa folhada",
+        "500 g  açúcar",
+        "100 g  feijão branco cozido",
+        "25 g  amêndoa moída",
+        "6  ovos + 6 gemas",
+        "Farinha para polvilhar",
+        "Açúcar em pó para polvilhar",
+        "Caixinhas de papel"
+      ],
+      "steps": [
+        "Passe o feijão branco cozido pelo passevite. Deite o açúcar para um tacho, junte 2 dl de água, leve ao lume e deixe ferver durante 10 minutos. Adicione o puré de feijão e a amêndoa moída e mexa bem. Retire do lume, deixe arrefecer um pouco, junte os ovos e as gemas levemente batidas, misture bem e deixe arrefecer.",
+        "Ligue o forno a 200 graus. Estenda a massa folhada polvilhada com farinha, corte-a em pequenos círculos, forre forminhas e coloque-as no tabuleiro do forno. Encha depois com a mistura do feijão e polvilhe abundantemente com açúcar em pó.",
+        "Leve ao forno durante 20 minutos, retire, deixe arrefecer um pouco, desenforme e deixe arrefecer totalmente. Disponha em caixinhas de papel e sirva. Pode polvilhar com mais açúcar em pó."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['9']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/07/scmuirw3amqn.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Mini pastéis de feijão",
+        "Pastéis de Feijão"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/bolo-de-cenoura-e-passas-2/",
+      "title": "Bolo de cenoura e passas",
+      "ingredients": [
+        "255 g  açúcar",
+        "165 g  farinha",
+        "160 g  cenoura",
+        "60 g  passas ou sultanas",
+        "2  Ovos",
+        "1,2 dl  óleo",
+        "1 colher (chá)  fermento em pó",
+        "1 colher (chá)  bicarbonato",
+        "1 colher (chá)  canela em pó",
+        "Manteiga para untar",
+        "Papel vegetal"
+      ],
+      "steps": [
+        "Unte uma forma de bolo inglês com manteiga e forre-a a papel vegetal. Ligue o forno a 165 graus.",
+        "Descasque e rale finamente a cenoura. Numa tigela larga, bata os ovos com o açúcar, junte depois o óleo e a cenoura ralada e mexa bem. À parte, peneire e misture a farinha com a canela, o fermento e o bicarbonato, junte à tigela e envolva muito bem até ficar uma mistura homogénea. Adicione depois as passas e envolva novamente.",
+        "Verta a mistura anterior para a forma e leve ao forno durante cerca de 40 minutos ou até ficar bem cozido. Retire do forno, deixe arrefecer um pouco, desenforme, deixe arrefecer totalmente e sirva decorado a gosto e cortado em fatias."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/07/8iaxzb1dpabj.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Bolo de cenoura e passas",
+        "sobremesa com cenoura"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/frango-dourado-com-cogumelos-2/",
+      "title": "Frango dourado com cogumelos",
+      "ingredients": [
+        "5 pernas  frango",
+        "1 lata  cogumelos inteiros",
+        "1 embalagem  sopa instantânea de cogumelos",
+        "2 dl  vinho branco",
+        "1 dl  água",
+        "Salsa picada q.b.",
+        "Pimenta q.b."
+      ],
+      "steps": [
+        "Ligue o forno a 180 graus. Corte as pernas de frango ao meio, deite-as para um tabuleiro de louça ou pirex e tempere-as com um pouco de pimenta.",
+        "Numa tigela, misture o vinho branco com a água, junte o pó da sopa de cogumelos e mexa bem. Verta depois sobre o frango e junte os cogumelos escorridos.",
+        "Leve ao forno durante 50 minutos, virando de vez em quando. Retire do forno e sirva polvilhado com salsa picada e acompanhado com puré de batata"
+      ],
+      "prep_time_minutes": 80,
+      "cook_time_minutes": 80,
+      "total_time_minutes": 160,
+      "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2019/02/ug27lub46yx4.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "frango assado no forno",
+        "Frango dourado com cogumelos",
+        "frango no forno"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/empada-de-pizza-2/",
+      "title": "Empada de pizza",
+      "ingredients": [
+        "2 rolos  massa de pizza estendida de compra",
+        "250 g  cogumelos frescos",
+        "200 g  molho de tomate",
+        "8 fatias  queijo",
+        "8 fatias  fiambre",
+        "1  cebola média",
+        "1 dente  alho",
+        "2 colheres (sopa)  azeite",
+        "2  colheres (sopa) orégãos secos",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Ligue o forno a 200 graus. Forre uma forma de abrir com um rolo de massa de pizza.",
+        "Lave e corte os cogumelos em quartos. Descasque a cebola e o dente de alho, corte a cebola em rodelas, pique o alho, deite para uma frigideira, adicione os cogumelos e o azeite, leve ao lume e deixe saltear até os cogumelos ficarem macios. Tempere com sal e pimenta preta.",
+        "Espalhe metade do molho de tomate sobre a massa na forma, polvilhe com 1 colher (sopa) dos orégãos, disponha fatias de queijo até cobrir fundo e depois uma camada de fatias de fiambre e espalhe por cima a mistura dos cogumelos. Cubra com o resto do fiambre e do queijo, espalhe o restante molho de tomate e polvilhe com o resto dos orégãos.",
+        "Cubra com o outro rolo de massa, dobre as margens da massa inferior para dentro, pressione um pouco para colar e leve ao forno durante 20 minutos ou até ficar bem cozida e douradinha. Retire, desenforme e sirva."
+      ],
+      "prep_time_minutes": 40,
+      "cook_time_minutes": 40,
+      "total_time_minutes": 80,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/06/xoz0gfp3j0lu.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "empada",
+        "Empada de pizza",
+        "empada de pizza com cogumelos",
+        "receita de empada"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/carne-de-porco-com-enchidos-2/",
+      "title": "Carne de porco com enchidos",
+      "ingredients": [
+        "1,500 kg  perna de porco limpa",
+        "1 chouriço  carne",
+        "1  morcela",
+        "1  alheira",
+        "1  farinheira",
+        "3 dentes  alho",
+        "4 colheres (sopa)  banha",
+        "2 colheres (sopa)  massa de pimentão",
+        "1 folha  louro",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Corte a perna de porco em pedaços pequenos e tempere-os com uma pitada de sal, pimenta e a massa de pimentão. Coza o chouriço e a morcela em água durante 20 minutos. Pique a farinheira com um garfo e leve-a a cozer à parte durante 10 minutos.",
+        "Leve um tacho ao lume com a banha, deixe aquecer, junte a carne, a folha de louro e os alhos descascados e esmagados e deixe cozinhar, mexendo de vez em quando, até ficar douradinha.",
+        "Lave a alheira em água quente, coloque-a numa frigideira, junte 1 colher (sopa) da gordura de cozinhar a carne, leve ao lume brando, deixe cozinhar até ficar douradinha e retire-a. Adicione a farinheira à mesma frigideira e deixe-a fritar até ficar douradinha.",
+        "Sirva a carne com todos os enchidos cortados em pedaços e decorado a gosto. Pode acompanhar com batatas cozidas com a pele."
+      ],
+      "prep_time_minutes": 105,
+      "cook_time_minutes": 105,
+      "total_time_minutes": 210,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/09/rkuug7a8rcqw.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "carne com enchidos",
+        "carne de porco",
+        "Carne de porco com enchidos",
+        "enchidos",
+        "receita de carne"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/pave-de-chocolate-com-nozes-2/",
+      "title": "Pavê de chocolate com nozes",
+      "ingredients": [
+        "80 g de açúcar",
+        "60 g de farinha",
+        "4 Ovos",
+        "Margarina para untar",
+        "Farinha para polvilhar",
+        "1 frasco de cerejas em calda (aprox. 150g de cerejas + 100g de calda)",
+        "200 g de açúcar",
+        "50 g de chocolate em pó",
+        "1 L de leite morno",
+        "5 colheres (sopa) de farinha maisena",
+        "2 colheres (sopa) de margarina",
+        "100 g de miolo de noz",
+        "100 g de açúcar",
+        "3 dl de natas"
+      ],
+      "steps": [
+        "Ligue o forno a 180°C, barre um tabuleiro com margarina e polvilhe-o com farinha. Escorra as cerejas, reserve a calda e corte as cerejas em pedacinhos.",
+        "O bolo: numa tigela, bata os ovos com o açúcar durante 20 minutos, junte a farinha peneirada e misture delicadamente. Deite no tabuleiro, leve ao forno durante 15 minutos, verifique a cozedura com um palito, retire, desenforme e deixe arrefecer.",
+        "Prepare o creme: numa tigela, misture o açúcar com a farinha maisena e o chocolate em pó. Adicione o leite morno, em fio e mexendo sempre, deite num tacho e leve ao lume, mexendo continuamente até ferver. Retire do lume, junte a margarina, mexa até ficar bem derretida e deixe arrefecer. Faça agora a decoração: bata as natas em chantilly com o açúcar e reserve-as no frio.",
+        "Corte o bolo em fatias, regue-as com a calda das cerejas e disponha-as num tabuleiro de louça ou pirex fundo, alternadamente com as cerejas e o creme, sendo que a última camada deve ser de creme. Deite o chantilly num saco de pasteleiro com boquilha e espalhe por cima, como vê na foto. Decore com as nozes e raspas de chocolate se gostar e leve ao frio até ao momento de servir."
+      ],
+      "prep_time_minutes": 70,
+      "cook_time_minutes": 70,
+      "total_time_minutes": 140,
+      "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/07/atuiimyut6in.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "pavê",
+        "Pavê de chocolate com nozes",
+        "receita de pavê"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/bolo-de-chocolate-com-azeite-2/",
+      "title": "Bolo de chocolate com azeite",
+      "ingredients": [
+        "300 g de açúcar",
+        "240 g de farinha",
+        "90 g de chocolate em pó",
+        "3 Ovos",
+        "1,5 dl de azeite",
+        "2 dl de água quente",
+        "1 colher (sopa) de fermento em pó",
+        "1 colher (café) de canela em pó",
+        "Margarina para untar",
+        "Farinha para polvilhar",
+        "160 g de açúcar",
+        "50 g de chocolate em pó",
+        "1,5 dl de  leite"
+      ],
+      "steps": [
+        "Ligue o forno a 180°C, barre uma forma com margarina e polvilhe-a com farinha.",
+        "Numa tigela, misture a farinha com o chocolate em pó, o fermento e a canela. Deite o açúcar no copo liquidificador, junte os ovos, o azeite e a água quente e ligue até ficar bem misturado. Adicione depois à tigela e bata muito bem.",
+        "Deite a mistura anterior na forma e leve ao forno durante cerca de 40 minutos. Verifique a cozedura com um palito, retire e desenforme.",
+        "Entretanto, prepare a calda: deite o açúcar para um tacho, junte o chocolate em pó e o leite e leve ao lume, mexendo sempre durante 5 minutos. Regue o bolo ainda quente, depois deixe arrefecer e sirva decorado a gosto."
+      ],
+      "prep_time_minutes": 70,
+      "cook_time_minutes": 70,
+      "total_time_minutes": 140,
+      "servings": "['7']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2016/02/kdtvisvjjwdq.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/frango-recheado-com-cuscuz-e-frutos-secos-2/",
+      "title": "Frango recheado com cuscuz e frutos secos",
+      "ingredients": [
+        "1  frango com aprox. 1,200 kg",
+        "200 g  cuscuz",
+        "75 g  frutos secos (alperces, ameixas e figos)",
+        "50 g  passas demolhadas",
+        "25 g  pinhões",
+        "2 dentes  alho",
+        "15 g  manteiga",
+        "6 colheres (sopa)  azeite",
+        "5 dl  água",
+        "1  limão pequeno",
+        "1 ramo  salsa",
+        "Sal q.b."
+      ],
+      "steps": [
+        "Arranje e coloque o frango num tabuleiro, pincele-o com 2 colheres (sopa) do azeite, barre-o com a manteiga e tempere-o com sal.",
+        "Deite o cuscuz numa tigela grande. Ferva 3 dl de água com uma pitada de sal e o sumo de 1/2 limão, verta na taça, tape com película aderente e deixe repousar 5 minutos. Depois mexa com um garfo, volte a tapar mais 5 minutos, adicione 3 colheres (sopa) do restante azeite e mexa novamente com o garfo até os grãos ficarem soltos.",
+        "Pique os frutos secos e misture-os com as passas. Torre ligeiramente os pinhões numa frigideira anti-aderente. Adicione tudo ao cuscuz, envolva e recheie o frango. Reserve o que sobrar.",
+        "Pique a salsa muito finamente, deite para uma tigela e adicione os alhos descascados e esmagados. Retire a casca ao limão, corte-a em tiras finas, junte à tigela, adicione o resto do azeite e misture.",
+        "Regue o frango com os restantes 2 dl de água e leve ao forno pré-aquecido a 220°C durante 15 minutos. Reduza a temperatura para 190°C, deixe assar 30 minutos, depois deite a mistura da salsa sobre o frango e deixe assar mais 20 minutos, regando de vez em quando com o próprio molho. Retire e sirva o frango com a mistura de cuscuz que sobrou e decorado a gosto."
+      ],
+      "prep_time_minutes": 85,
+      "cook_time_minutes": 85,
+      "total_time_minutes": 170,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/07/xceznybnszwn.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "frango com cuscuz",
+        "frango no forno",
+        "Frango recheado com cuscuz e frutos secos",
+        "frango recheado no forno"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/fusilli-com-pescada-e-cenoura-2/",
+      "title": "Fusilli com pescada e cenoura",
+      "ingredients": [
+        "500 g  pescada congelada",
+        "2  cenouras",
+        "1  cebola",
+        "3 dentes  alho",
+        "500 g  massa fusilli",
+        "4 colheres (sopa)  azeite",
+        "5  tomates maduros",
+        "1 ramo  salsa picada para polvilhar",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Deixe descongelar a pescada, coloque-a num tacho grande, junte água fria e tempere de sal. Leve ao lume e deixe ferver.",
+        "Descasque as cenouras, a cebola e os alhos. De seguida, corte a cenoura em cubos pequenos ou em rodelas.",
+        "Retire a pescada do tacho e deixe-a arrefecer um pouco. Depois passe a água de cozer o peixe pelo coador e coloque-a de novo no tacho. Leve ao lume e deixe ferver. Junte a cenoura e 5 minutos depois adicione a massa, deixando a cozer durante mais 9 minutos.",
+        "Pique a cebola e os alhos e coloque-os num tacho. De seguida, adicione o azeite e leve ao lume, até a cebola ficar macia. Entretanto, limpe a pescada de peles e espinhas e desfaça-a em lascas.",
+        "Junte a cebola, o tomate picado sem peles e pevides, mexa bem e deixe cozinhar durante 10 minutos. Tempere com sal e pimenta, mexa e junte a pescada. Misture delicadamente, escorra a massa e coloque-a num prato. Cubra com a mistura da pescada, polvilhe com salsa picada e sirva."
+      ],
+      "prep_time_minutes": 30,
+      "cook_time_minutes": 30,
+      "total_time_minutes": 60,
+      "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2017/07/vyebz2wf1v05.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "pescada com massa",
+        "receita de peixe"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/lombinhos-de-salmao-com-camarao-2/",
+      "title": "Lombinhos de salmão com camarão",
+      "ingredients": [
+        "4 lombinhos  salmão",
+        "200 g  miolo de camarão",
+        "3 dentes  alho",
+        "1 dl  azeite",
+        "1 dl  aguardente",
+        "Sumo de limão q.b.",
+        "Coentros q.b.",
+        "Sal e piripiri q.b"
+      ],
+      "steps": [
+        "Descongele o miolo de camarão, junte-o aos lombinhos de salmão e tempere com os dentes de alho picados, sumo de limão, sal e piripiri. Envolva delicadamente e deixe marinar 20 minutos.",
+        "Aqueça uma frigideira com o azeite, junte o salmão e deixe corar de ambos os lados. Retire o salmão da frigideira, junte o miolo de camarão e deixe saltear. Retire o camarão da frigideira e regue-a com a aguardente. Acenda cuidadosamente um fósforo e deixe flamejar até o álcool evaporar.",
+        "Disponha o salmão num prato de servir, junte o camarão, regue com o molho, polvilhe com coentros picados e sirva."
+      ],
+      "prep_time_minutes": 35,
+      "cook_time_minutes": 35,
+      "total_time_minutes": 70,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/ivyrzaiw8czx-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Lombinhos de salmão com camarão",
+        "receita de peixe",
+        "salmão",
+        "salmão na frigideira"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/moqueca-de-peixe-2/",
+      "title": "Moqueca de peixe",
+      "ingredients": [
+        "1 kg  peixe para caldeirada (safio, raia, tamboril, etc.)",
+        "4  tomates maduros",
+        "1  pimento vermelho pequeno",
+        "1  pimento verde pequeno",
+        "1  cebola",
+        "2 dentes  alho",
+        "0,5 dl  azeite",
+        "4 dl  leite de coco",
+        "1 colher (sopa)  coco ralado",
+        "Sumo de 1 limão",
+        "Coentros q.b.",
+        "Sal e piripiri q.b"
+      ],
+      "steps": [
+        "Arranje o peixe e tempere-o com o sumo de limão, sal e piripiri. Descasque e lave os dentes de alho e a cebola e pique-os finamente. Lave os pimentos, corte-os ao meio, rejeite-lhes as pevides e peles brancas e corte-os em cubinhos. Lave os tomates, faça-lhes um corte em cruz, leve-os a escaldar durante 30 segundos, coloque-os numa tigela com água fria, depois pele-os, corte-os ao meio, retire-lhes as pevides e pique-os finamente.",
+        "Leve um tacho ao lume com o azeite, deixe aquecer, junte a cebola, os alhos e os pimentos e deixe cozinhar, mexendo de vez em quando, até que a cebola fique transparente. Adicione depois o tomate e deixe cozinhar mais um pouco até que fique macio.",
+        "Junte o leite de coco, deixe ferver, adicione o peixe e um raminho de coentros, rectifique os temperos, tape e deixe cozinhar, em lume brando, durante cerca de 30 minutos. Junte então o coco ralado, mexa cuidadosamente, rectifique os temperos, retire do lume e sirva decorado a gosto. Acompanhe com arroz branco."
+      ],
+      "prep_time_minutes": 60,
+      "cook_time_minutes": 60,
+      "total_time_minutes": 120,
+      "servings": "['4']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/v7p5v3hexkkc-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Moqueca de peixe",
+        "peixe",
+        "Peixes",
+        "receitas faceis",
+        "receitas simples",
+        "Vídeo"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/bolo-de-nozes-com-natas-2/",
+      "title": "Bolo de nozes com natas",
+      "ingredients": [
+        "400 g de açúcar",
+        "360 g de farinha",
+        "200 g de  manteiga",
+        "150 g de miolo de noz moído",
+        "6 Ovos",
+        "2 dl de natas",
+        "1 colher (chá) de fermento em pó",
+        "Margarina para untar",
+        "Farinha para polvilhar",
+        "100 g de nozes picadas finamente",
+        "1/2 lata de leite condensado",
+        "50 g de açúcar"
+      ],
+      "steps": [
+        "Ligue o forno a 180ºC, barre uma forma com margarina e polvilhe-a com farinha. Numa tigela, bata as claras em castelo. Numa tigela à parte, bata a manteiga com o açúcar até ficar um creme, junte as gemas e as natas e bata bem. Adicione depois a farinha misturada com o fermento e o miolo de noz moído, alternando com as claras em castelo e envolva delicadamente.",
+        "Deite a mistura anterior na forma e leve ao forno durante cerca de 50 minutos. Verifique a cozedura com um palito, retire do forno, desenforme e deixe arrefecer. Prepare entretanto a cobertura: bata as natas em chantilly bem espesso adicionando o açúcar aos poucos. Reserve no frio.",
+        "Corte o bolo ao meio de modo a obter duas rodelas, regue a metade inferior com o leite condensado, polvilhe com as nozes picadas e reponha a outra metade do bolo. Barre todo o bolo com o chantilly e sirva decorado a gosto, por exemplo com metades de nozes."
+      ],
+      "prep_time_minutes": 80,
+      "cook_time_minutes": 80,
+      "total_time_minutes": 160,
+      "servings": "['9']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/3ky2yhymmqjw-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bolo de nozes com natas",
+        "doces",
+        "nozes",
+        "receitas de doces",
+        "receitas de sobremesas",
+        "receitas económicas",
+        "receitas faceis",
+        "sobremesas",
+        "sobremesas com noz"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/creme-de-grao-com-cenoura-2/",
+      "title": "Creme de grão com cenoura",
+      "ingredients": [
+        "1 lata grande  grão",
+        "5  cenouras",
+        "1  courgette",
+        "1  alho-francês",
+        "1  cebola",
+        "5 colheres (sopa)  azeite",
+        "1 raminho  coentros picados",
+        "Sal q.b."
+      ],
+      "steps": [
+        "Descasque as cenouras e a cebola e corte a cebola em pedaços. Retire as extremidades à courgette, lave-a e corte-a também em pedaços. Arranje o alho francês, rejeite-lhe a parte verde, corte a parte branca em rodelas, lave-as e escorra-as.",
+        "Deite o grão com o molho para uma panela, junte a cebola, o alho francês, a courgette e três cenouras cortadas em pedaços, acrescente 2 L de água, leve ao lume e deixe cozinhar durante 20 minutos. Retire do lume, reduza a puré, leve de novo ao lume e deixe ferver.",
+        "Rale as restantes duas cenouras, adicione-as à panela, junte também o azeite, tempere com sal e deixe cozinhar mais 10 minutos. Depois sirva quente polvilhado com os coentros picados."
+      ],
+      "prep_time_minutes": 40,
+      "cook_time_minutes": 40,
+      "total_time_minutes": 80,
+      "servings": "['6']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/tldxcmm6hwhb-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "creme de grão com cenoura",
+        "receitas de sopas",
+        "receitas económicas",
+        "receitas faceis",
+        "sopa de grão",
+        "sopas"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/ensopado-de-bacalhau-2/",
+      "title": "Ensopado de bacalhau",
+      "ingredients": [
+        "600 g  bacalhau demolhado",
+        "1 kg  batatas",
+        "2  tomates maduros",
+        "3  cebolas",
+        "4 dentes  alho",
+        "1,5 dl  azeite",
+        "1,5 dl  vinho branco",
+        "1 colher (sopa)  colorau",
+        "1 folha  louro",
+        "Salsa picada q.b.",
+        "Sal e pimenta q.b."
+      ],
+      "steps": [
+        "Descasque as batatas, as cebolas e os alhos, lave tudo, corte as batatas em rodelas não muito finas, corte também as cebolas em rodelas e pique os alhos. Lave o tomate e corte-o igualmente em rodelas grossas. Corte o bacalhau em pedaços, como vê na foto",
+        "Num tacho, deite metade da cebola, metade dos alhos e metade das batatas, junte a folha de louro e polvilhe com metade do colorau. Adicione o bacalhau, o tomate, o resto da cebola, do alho e das batatas, polvilhe com o restante colorau e tempere com uma pitada de sal e pimenta.",
+        "Regue com o vinho branco e o azeite, tape, leve ao lume, deixe ferver, reduza o lume e deixe cozinhar, em lume brando, durante 40 minutos. Rectifique o sal e sirva polvilhado com salsa picada."
+      ],
+      "prep_time_minutes": 90,
+      "cook_time_minutes": 90,
+      "total_time_minutes": 180,
+      "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/pve6gnit3ubr-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "bacalhau",
+        "ensopado",
+        "ensopado de bacalhau",
+        "ensopado de peixe",
+        "Peixes",
+        "receitas de peixe",
+        "receitas económicas",
+        "receitas faceis"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/rolo-folhado-com-creme-pasteleiro-2/",
+      "title": "Rolo folhado com creme pasteleiro",
+      "ingredients": [
+        "400 g  massa folhada",
+        "100 g  açúcar",
+        "40 g  farinha",
+        "2,5 dl  leite",
+        "2  gemas + 1 ovo",
+        "Farinha para polvilhar",
+        "Açúcar em pó para polvilhar"
+      ],
+      "steps": [
+        "Prepare o creme: leve ao lume um tacho com 2 dl do leite e deixe ferver. Numa tigela, misture bem o açúcar, a farinha, o ovo, as gemas e o resto do leite, junte depois o leite a ferver em fio e mexendo, deite novamente para o tacho e leve ao lume, mexendo continuamente até ferver. Retire do lume e deixe arrefecer.",
+        "Ligue o forno a 180ºC e passe o tabuleiro do forno por água fria. Estenda a massa folhada com o rolo em cima da mesa polvilhada com farinha deixando-a com uma espessura fina e em forma de rectângulo. Barre depois com o creme, enrole e feche bem a dobra e as extremidades.",
+        "Coloque no tabuleiro e leve ao forno durante cerca de 20 minutos. Baixe a temperatura para os 150ºC e deixe mais 10 minutos. Depois retire, deixe arrefecer e sirva polvilhado com açúcar em pó e decorado a gosto."
+      ],
+      "prep_time_minutes": 70,
+      "cook_time_minutes": 70,
+      "total_time_minutes": 140,
+      "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/zjlc4rfoa00n-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "doces",
+        "massa folhada",
+        "receitas de doces",
+        "receitas de sobremesas",
+        "receitas económicas",
+        "receitas faceis",
+        "rolo folhado com creme pasteleiro",
+        "sobremesas",
+        "sobremesas com massa folhada"
+      ]
+    },
+    {
+      "source": "TeleCulinaria",
+      "source_tag": "pt",
+      "url": "https://teleculinaria.pt/receitas/sopa-do-mar-com-alho-frances-2/",
+      "title": "Sopa do mar com alho francês",
+      "ingredients": [
+        "200 g  delícias do mar",
+        "500 g  batatas",
+        "3  alhos-franceses",
+        "1  cebola",
+        "5 colheres (sopa)  azeite",
+        "1 cubo  caldo de legumes",
+        "Sal q.b."
+      ],
+      "steps": [
+        "Descasque as batatas e a cebola, corte tudo em pedaços, deite para uma panela, junte 1,5 L de água e o caldo de legumes, leve ao lume e deixe cozinhar durante 20 minutos.",
+        "Entretanto, limpe os alhos franceses, rejeite-lhes a parte verde, corte o restante em rodelas finas, lave-as e deixe-as escorrer. Corte as delícias do mar em rodelas.",
+        "Retire a panela do lume, reduza a puré, leve de novo ao lume, deixe ferver, junte as rodelas de alho francês e o azeite e deixe cozinhar mais 10 minutos. Adicione as delícias do mar, deixe ferver, rectifique o sal e sirva quente. Leve para o emprego numa caixa fechada e aqueça bem no microondas."
+      ],
+      "prep_time_minutes": 40,
+      "cook_time_minutes": 40,
+      "total_time_minutes": 80,
+      "servings": "['5']",
+      "image_url": "https://teleculinaria.pt/wp-content/uploads/2015/04/uvzbh7nj4dl9-1.jpg",
+      "tags": [
+        "pt",
+        "teleculinaria",
+        "Alho-francês",
+        "delicias do mar",
+        "receitas de sopas",
+        "receitas económicas",
+        "receitas faceis",
+        "sopa do mar com alho francês",
+        "sopas"
       ]
     }
   ]

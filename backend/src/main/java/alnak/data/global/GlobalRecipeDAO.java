@@ -33,6 +33,46 @@ public class GlobalRecipeDAO {
     // ── Sync / Mirror ─────────────────────────────────────────────
 
     /**
+     * Read recipes directly from global MySQL recipes table.
+     * Used by API endpoints that serve frontend recipe cards.
+     */
+    public List<Recipe> listRecipes(Integer limit, MealType mealType) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, name, description, meal_type, prep_time_min, cook_time_min,
+                       servings, calories, protein_g, carbs_g, fat_g, image_url
+                FROM recipes
+                """);
+
+        if (mealType != null) {
+            sql.append(" WHERE meal_type = ?");
+        }
+        sql.append(" ORDER BY id DESC");
+        if (limit != null && limit > 0) {
+            sql.append(" LIMIT ?");
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            int idx = 1;
+            if (mealType != null) {
+                ps.setString(idx++, mealType.name());
+            }
+            if (limit != null && limit > 0) {
+                ps.setInt(idx, limit);
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Recipe> items = new ArrayList<>();
+                while (rs.next()) {
+                    items.add(mapRecipeRow(rs));
+                }
+                return items;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to list recipes", e);
+        }
+    }
+
+    /**
      * Push a recipe from local SQLite into the global MySQL recipes table.
      * Uses the same id so both databases always refer to the same recipe
      * by the same integer key.
@@ -259,5 +299,35 @@ public class GlobalRecipeDAO {
         ps.setDouble(10, n != null ? n.getCarbsG()    : 0);
         ps.setDouble(11, n != null ? n.getFatG()      : 0);
         ps.setString(12, r.getImageUrl());
+    }
+
+    private Recipe mapRecipeRow(ResultSet rs) throws SQLException {
+        Recipe recipe = new Recipe();
+        recipe.setId(rs.getInt("id"));
+        recipe.setName(rs.getString("name"));
+        recipe.setDescription(rs.getString("description"));
+        recipe.setPrepTimeMin(rs.getInt("prep_time_min"));
+        recipe.setCookTimeMin(rs.getInt("cook_time_min"));
+        recipe.setServings(rs.getInt("servings"));
+        recipe.setImageUrl(rs.getString("image_url"));
+
+        String mealTypeRaw = rs.getString("meal_type");
+        if (mealTypeRaw != null && !mealTypeRaw.isBlank()) {
+            try {
+                recipe.setMealType(MealType.from(mealTypeRaw));
+            } catch (IllegalArgumentException ignored) {
+                // Keep null if an old row contains unexpected value.
+            }
+        }
+
+        recipe.setNutritionalInfo(
+                new NutritionalInfo(
+                        rs.getDouble("calories"),
+                        rs.getDouble("protein_g"),
+                        rs.getDouble("carbs_g"),
+                        rs.getDouble("fat_g")
+                )
+        );
+        return recipe;
     }
 }

@@ -25,6 +25,19 @@
       "currency": "EUR",
       "min_delay_seconds": 0.2,
       "max_delay_seconds": 0.8
+    },
+    {
+      "name": "Pingo Doce",
+      "search_url": "https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q={query}",
+      "base_url": "https://www.pingodoce.pt",
+      "result_selector": "li.grid-tile, div.product-tile, div.product, article.product",
+      "title_selector": ".name a, .product-name a, h2 a, h3 a, a.name-link",
+      "price_selector": ".price .sales .value, .sales .value, .price .value, [itemprop='price']",
+      "link_selector": ".name a, .product-name a, h2 a, h3 a, a.name-link, a",
+      "product_url_patterns": ["/home/produtos/", "/produtos/", ".html"],
+      "currency": "EUR",
+      "min_delay_seconds": 0.2,
+      "max_delay_seconds": 0.8
     }
   ]
 }
