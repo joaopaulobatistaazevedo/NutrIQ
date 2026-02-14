@@ -1,4 +1,4 @@
-package alnak.data;
+package alnak.data.local;
 
 import alnak.business_logic.entities.IngredientMarketPrice;
 
@@ -16,7 +16,7 @@ public class IngredientMarketPriceDAO {
     private final Connection conn;
 
     public IngredientMarketPriceDAO() {
-        this.conn = Database.getInstance().getConnection();
+        this.conn = LocalDatabase.getInstance().getConnection();
     }
 
     public synchronized int upsertBatch(List<IngredientMarketPrice> items) {

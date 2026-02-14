@@ -2,11 +2,10 @@ package alnak.services;
 
 import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.Goal;
-import alnak.business_logic.entities.Restriction;
 import alnak.business_logic.entities.Sex;
 import alnak.business_logic.entities.User;
 import alnak.business_logic.entities.UserProfile;
-import alnak.data.UserDAO;
+import alnak.data.global.UserDAO;
 import alnak.dto.UpdateProfileRequest;
 
 import java.util.EnumSet;

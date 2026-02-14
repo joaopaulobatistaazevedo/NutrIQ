@@ -26,13 +26,65 @@ pip install -r requirements.txt
 ## Como usar
 
 ```bash
-python main.py \
+python3 main.py \
   --meal-plan examples/meal_plan.json \
   --markets examples/markets.json \
   --output report.json
 ```
 
 Isso imprime uma tabela Markdown no terminal e salva os dados completos em `report.json`, incluindo `price` e `calories` quando encontrados.
+
+## Scraper de Receitas (Track A)
+
+Fluxo implementado:
+
+1. Scrape de TeleCulinaria.
+2. Extração de título, ingredientes, passos, tempo e porções.
+3. Import/upsert em SQLite.
+4. Matching por ingredientes para sugerir refeições possíveis (print no terminal).
+
+### 1) Scrape + import em SQLite
+
+```bash
+python3 recipe_main.py scrape \
+  --db recipes.db \
+  --output-json recipes_scraped.json \
+  --max-recipes-per-source 60 \
+  --max-pages-per-list 2 \
+  --debug
+```
+
+### 2) Import explícito JSON -> SQLite (script separado)
+
+```bash
+python3 recipe_import.py --input recipes_scraped.json --db recipes.db
+```
+
+### 3) Sugerir refeições com os ingredientes disponíveis
+
+```bash
+python3 recipe_main.py suggest \
+  --db recipes.db \
+  --report report.json
+```
+
+Modo estrito (apenas receitas 100% possíveis com os ingredientes disponíveis):
+
+```bash
+python3 recipe_main.py suggest \
+  --db recipes.db \
+  --report report.json \
+  --only-possible
+```
+
+### 4) Fazer tudo de uma vez (scrape + sugestões)
+
+```bash
+python3 recipe_main.py run \
+  --db recipes.db \
+  --report report.json \
+  --debug
+```
 
 ## Diagnóstico de erros
 
