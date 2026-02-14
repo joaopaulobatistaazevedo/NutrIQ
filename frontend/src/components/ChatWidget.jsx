@@ -322,7 +322,11 @@ export default function ChatWidget() {
       setMessages((previous) => [...previous, botMessage]);
       setConversationHistory((previous) => [...previous, { role: 'assistant', content: botText }]);
 
-      if (shouldUseOnboarding && response?.onboarding_complete) {
+      if (
+        shouldUseOnboarding
+        && response?.onboarding_complete
+        && response?.meal_plan_persisted !== true
+      ) {
         const updatedPreferences = response?.extracted_preferences || {};
 
         setChatContext((previous) => ({
@@ -374,7 +378,9 @@ export default function ChatWidget() {
           }));
         }
 
-        await persistPlan(autoPlanResponse?.meal_plan);
+        if (autoPlanResponse?.meal_plan_persisted !== false) {
+          await persistPlan(autoPlanResponse?.meal_plan);
+        }
         persistShoppingCart(autoPlanResponse?.shopping_cart);
       }
 
@@ -385,7 +391,9 @@ export default function ChatWidget() {
         }));
       }
 
-      await persistPlan(response?.meal_plan);
+      if (response?.meal_plan_persisted !== false) {
+        await persistPlan(response?.meal_plan);
+      }
       persistShoppingCart(response?.shopping_cart);
 
       setChatContext((previous) => ({

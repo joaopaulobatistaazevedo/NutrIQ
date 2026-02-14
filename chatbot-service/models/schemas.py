@@ -27,4 +27,5 @@ class ChatResponse(BaseModel):
     extracted_preferences: Optional[Dict[str, Any]] = None
     meal_plan_draft: Optional[Dict[str, Any]] = None
     meal_plan: Optional[Dict[str, Any]] = None
+    meal_plan_persisted: bool = False
     shopping_cart: Optional[Dict[str, Any]] = None

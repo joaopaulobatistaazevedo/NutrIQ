@@ -3,3 +3,53 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     127.0.0.1:42772 - "GET /health HTTP/1.1" 200 OK
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.18.0.1:60670 - "OPTIONS /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+Plano gerado mas não persistido no backend (token=present)
+INFO:     172.18.0.1:60670 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:60670 - "OPTIONS /chat/assistant HTTP/1.1" 200 OK
+Plano gerado mas não persistido no backend (token=present)
+INFO:     172.18.0.1:60670 - "POST /chat/assistant HTTP/1.1" 200 OK
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.18.0.7:41890 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.18.0.1:35854 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:35854 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:32862 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:49062 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:49062 - "POST /chat/onboarding HTTP/1.1" 200 OK
+Backend HTTPError 400 em POST /api/meal-plans/3/meals payload={'recipeId': 2040336820, 'dayOfWeek': 'SATURDAY', 'mealType': 'BREAKFAST'} detail={"error":"Receita não encontrada: 2040336820"}
+Backend HTTPError 400 em POST /api/meal-plans/3/meals payload={'recipeId': 2133261208, 'dayOfWeek': 'SATURDAY', 'mealType': 'LUNCH'} detail={"error":"Receita não encontrada: 2133261208"}
+Backend HTTPError 400 em POST /api/meal-plans/3/meals payload={'recipeId': 1551136234, 'dayOfWeek': 'SATURDAY', 'mealType': 'DINNER'} detail={"error":"Receita não encontrada: 1551136234"}
+Backend HTTPError 400 em POST /api/meal-plans/3/meals payload={'recipeId': 635345545, 'dayOfWeek': 'SUNDAY', 'mealType': 'BREAKFAST'} detail={"error":"Receita não encontrada: 635345545"}
+Backend HTTPError 400 em POST /api/meal-plans/3/meals payload={'recipeId': 1992713063, 'dayOfWeek': 'SUNDAY', 'mealType': 'LUNCH'} detail={"error":"Receita não encontrada: 1992713063"}
+Backend HTTPError 400 em POST /api/meal-plans/3/meals payload={'recipeId': 1687915653, 'dayOfWeek': 'SUNDAY', 'mealType': 'DINNER'} detail={"error":"Receita não encontrada: 1687915653"}
+Plano gerado mas não persistido no backend (token=present)
+INFO:     172.18.0.1:49062 - "POST /chat/onboarding HTTP/1.1" 200 OK
+Backend HTTPError 400 em POST /api/meal-plans/4/meals payload={'recipeId': 878711648, 'dayOfWeek': 'SATURDAY', 'mealType': 'BREAKFAST'} detail={"error":"Receita não encontrada: 878711648"}
+Backend HTTPError 400 em POST /api/meal-plans/4/meals payload={'recipeId': 1689524564, 'dayOfWeek': 'SATURDAY', 'mealType': 'LUNCH'} detail={"error":"Receita não encontrada: 1689524564"}
+Backend HTTPError 400 em POST /api/meal-plans/4/meals payload={'recipeId': 2040336820, 'dayOfWeek': 'SATURDAY', 'mealType': 'DINNER'} detail={"error":"Receita não encontrada: 2040336820"}
+Backend HTTPError 400 em POST /api/meal-plans/4/meals payload={'recipeId': 2113411215, 'dayOfWeek': 'SUNDAY', 'mealType': 'BREAKFAST'} detail={"error":"Receita não encontrada: 2113411215"}
+Backend HTTPError 400 em POST /api/meal-plans/4/meals payload={'recipeId': 530147887, 'dayOfWeek': 'SUNDAY', 'mealType': 'LUNCH'} detail={"error":"Receita não encontrada: 530147887"}
+Backend HTTPError 400 em POST /api/meal-plans/4/meals payload={'recipeId': 1558842502, 'dayOfWeek': 'SUNDAY', 'mealType': 'DINNER'} detail={"error":"Receita não encontrada: 1558842502"}
+Plano gerado mas não persistido no backend (token=present)
+INFO:     172.18.0.1:54286 - "POST /chat/assistant HTTP/1.1" 200 OK
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)

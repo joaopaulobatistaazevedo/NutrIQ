@@ -19,7 +19,7 @@ const mapHistory = (messages = []) =>
 const buildAuthHeaders = () => {
   const token = String(getAuthSession()?.token || '').trim();
   if (!token) {
-    return {};
+    throw new Error('Sessão inválida ou expirada. Inicia sessão novamente para gerar e guardar o plano.');
   }
   return {
     Authorization: `Bearer ${token}`,

@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,6 +11,7 @@ from services.openai_service import OpenAIService
 
 settings = get_settings()
 app = FastAPI(title="Meal Planner Chatbot (OpenAI)")
+logger = logging.getLogger(__name__)
 
 origins = ["*"] if settings.allowed_origins == "*" else [x.strip() for x in settings.allowed_origins.split(",")]
 app.add_middleware(
@@ -22,6 +24,49 @@ app.add_middleware(
 
 chat_service = OpenAIService()
 backend_service = BackendService()
+
+
+def _apply_plan_persistence_and_cart(response: ChatResponse, backend_token: Optional[str]) -> ChatResponse:
+    constraints = ((response.meal_plan_draft or {}).get("constraints") or {})
+    if constraints:
+        backend_service.persist_user_chat_data(backend_token, constraints)
+
+    if response.meal_plan:
+        generated_plan = dict(response.meal_plan)
+        persisted_plan = backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
+        if persisted_plan:
+            response.meal_plan = persisted_plan
+            response.meal_plan_persisted = True
+        else:
+            logger.warning(
+                "Plano gerado mas não persistido no backend (token=%s)",
+                "present" if backend_token else "missing",
+            )
+            response.meal_plan = None
+            response.meal_plan_persisted = False
+            response.response = (
+                "Consegui gerar o plano, mas não foi possível guardá-lo na base de dados. "
+                "Tenta novamente dentro de instantes."
+            )
+
+        if response.meal_plan_persisted:
+            cart_plan_input = dict(response.meal_plan or {})
+            for key in ("max_weekly_budget", "goal_daily_calories", "planning_days", "goal"):
+                if key not in cart_plan_input and key in generated_plan:
+                    cart_plan_input[key] = generated_plan[key]
+
+            shopping_cart = backend_service.generate_and_persist_shopping_cart(
+                backend_token,
+                cart_plan_input,
+            )
+            if shopping_cart:
+                response.shopping_cart = shopping_cart
+                response.response = (
+                    f"{response.response} Também otimizei o carrinho para ficar mais barato e mais saudável "
+                    "com base no teu orçamento e objetivo calórico semanal."
+                ).strip()
+
+    return response
 
 
 @app.get("/")
@@ -59,8 +104,43 @@ async def onboarding_chat(request: ChatRequest, http_request: Request):
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
     backend_token = _resolve_backend_token(request, http_request)
+    persisted = False
     if response.extracted_preferences:
-        backend_service.persist_user_chat_data(backend_token, response.extracted_preferences)
+        persisted = backend_service.persist_user_chat_data(backend_token, response.extracted_preferences)
+        if response.onboarding_complete and not persisted:
+            logger.warning(
+                "Onboarding completo mas sem persistência no backend (token=%s)",
+                "present" if backend_token else "missing",
+            )
+            response.onboarding_complete = False
+            response.extracted_preferences = None
+            response.response = (
+                "Ainda não consegui guardar as tuas preferências na base de dados. "
+                "Confirma a sessão e tenta novamente para eu gerar o plano."
+            )
+
+    if response.onboarding_complete and persisted and backend_token:
+        try:
+            auto_plan_response = await chat_service.assistant_chat(
+                "Com base no meu onboarding, gera agora o meu plano semanal de refeições.",
+                {
+                    **(response.extracted_preferences or {}),
+                    "is_first_time": False,
+                },
+                history,
+                auth_token=backend_token,
+            )
+            auto_plan_response = _apply_plan_persistence_and_cart(auto_plan_response, backend_token)
+
+            response.meal_plan_draft = auto_plan_response.meal_plan_draft
+            response.meal_plan = auto_plan_response.meal_plan
+            response.meal_plan_persisted = auto_plan_response.meal_plan_persisted
+            response.shopping_cart = auto_plan_response.shopping_cart
+
+            if auto_plan_response.response:
+                response.response = f"{response.response}\n{auto_plan_response.response}".strip()
+        except Exception as exc:
+            logger.warning("Falha ao auto-gerar plano pós-onboarding: %s", exc)
 
     return response
 
@@ -84,31 +164,7 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
-    constraints = ((response.meal_plan_draft or {}).get("constraints") or {})
-    if constraints:
-        backend_service.persist_user_chat_data(backend_token, constraints)
-
-    if response.meal_plan:
-        generated_plan = dict(response.meal_plan)
-        persisted_plan = backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
-        if persisted_plan:
-            response.meal_plan = persisted_plan
-
-        cart_plan_input = dict(response.meal_plan or {})
-        for key in ("max_weekly_budget", "goal_daily_calories", "planning_days", "goal"):
-            if key not in cart_plan_input and key in generated_plan:
-                cart_plan_input[key] = generated_plan[key]
-
-        shopping_cart = backend_service.generate_and_persist_shopping_cart(
-            backend_token,
-            cart_plan_input,
-        )
-        if shopping_cart:
-            response.shopping_cart = shopping_cart
-            response.response = (
-                f"{response.response} Também otimizei o carrinho para ficar mais barato e mais saudável "
-                "com base no teu orçamento e objetivo calórico semanal."
-            ).strip()
+    response = _apply_plan_persistence_and_cart(response, backend_token)
 
     return response
 
