@@ -114,9 +114,7 @@ export default function Dashboard() {
 
           <div className="dash-hero-content">
             <div className="dash-hero-left">
-              <span className="dash-hero-tag">
-                <Zap size={13} /> Streak de 12 dias
-              </span>
+              <span className="dash-streak-pill"><Zap size={13} /> Streak 12 dias</span>
               <h1>Boa tarde, Joana</h1>
               <p>Estás no caminho certo. 3 refeições planeadas, objetivo calórico sob controlo.</p>
               <motion.button

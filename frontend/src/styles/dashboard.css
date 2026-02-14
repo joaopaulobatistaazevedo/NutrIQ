@@ -59,7 +59,7 @@
 
 .dash-hero-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -68,6 +68,28 @@
 
 .dash-hero-left {
   flex: 1;
+}
+
+.dash-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.dash-streak-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 999px;
+  padding: 5px 10px;
+  margin-bottom: 10px;
 }
 
 .dash-hero-tag {
@@ -86,7 +108,7 @@
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 800;
   line-height: 1.12;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   letter-spacing: -0.02em;
 }
 
@@ -624,6 +646,7 @@
     padding: 22px 18px;
     border-radius: 18px;
   }
+
   .dash-chart-canvas {
     height: 200px;
   }
@@ -678,6 +701,12 @@
 
 .dash-hero-tag {
   color: #047857;
+}
+
+.dash-streak-pill {
+  color: #065f46;
+  background: #dcfce7;
+  border-color: #34d399;
 }
 
 .cal-ring-inner strong {

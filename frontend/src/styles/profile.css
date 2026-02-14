@@ -101,6 +101,25 @@
   letter-spacing: -0.01em;
 }
 
+.prof-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prof-streak-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fef3c7;
+  background: rgba(245, 158, 11, 0.32);
+  border: 1px solid rgba(252, 211, 77, 0.45);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+
 .prof-location {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);

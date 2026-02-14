@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import {
   Camera,
   Droplets,
+  Flame,
   MapPin,
   Moon,
   PencilLine,
@@ -57,14 +58,15 @@ export default function Profile() {
             </div>
 
             <div className="prof-id">
-              <span className="prof-badge">Plano Premium</span>
-              <h1>Joana Silva</h1>
+              <div className="prof-name-row">
+                <h1>Joana Silva</h1>
+                <span className="prof-streak-pill"><Flame size={12} /> Streak 12 dias</span>
+              </div>
               <p className="prof-location"><MapPin size={14} /> Porto, Portugal</p>
               <p className="prof-bio">Recomposição corporal · Foco em alimentação equilibrada</p>
               <div className="prof-mini-metrics">
                 <span>1950 kcal média</span>
                 <span>€7.80 / dia</span>
-                <span>Streak 12 dias</span>
               </div>
             </div>
 
