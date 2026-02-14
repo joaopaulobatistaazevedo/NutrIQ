@@ -1,50 +1,68 @@
-import { useRef } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers } from 'lucide-react';
+/* eslint-disable react/prop-types */
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock3, Flame, Layers, Users } from 'lucide-react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
+import { fetchRecipes } from '../services/recipeService';
 import '../styles/recipes.css';
 
-const RECIPE_CATEGORIES = [
-  {
-    id: 'massa',
-    title: 'Base: Massa',
-    description: 'Receitas com a mesma base de massa, ideais para rodar durante a semana.',
-    recipes: [
-      { name: 'Massa Carbonara Fit', time: '20 min', kcal: 620, price: '€3.80' },
-      { name: 'Massa Bolonhesa de Peru', time: '25 min', kcal: 590, price: '€4.10' },
-      { name: 'Massa com Atum e Espinafres', time: '18 min', kcal: 540, price: '€3.20' },
-      { name: 'Massa Cremosa de Frango', time: '24 min', kcal: 610, price: '€4.40' },
-    ],
+const CATEGORY_META = {
+  BREAKFAST: {
+    id: 'breakfast',
+    title: 'Pequeno-almoço',
+    description: 'Receitas para começar o dia com energia.',
   },
-  {
-    id: 'arroz',
-    title: 'Base: Arroz',
-    description: 'Combinações simples com arroz para almoço e jantar equilibrados.',
-    recipes: [
-      { name: 'Arroz de Frango e Legumes', time: '28 min', kcal: 600, price: '€4.50' },
-      { name: 'Arroz de Salmão e Brócolos', time: '22 min', kcal: 640, price: '€5.90' },
-      { name: 'Bowl de Arroz com Tofu', time: '20 min', kcal: 520, price: '€3.90' },
-      { name: 'Arroz de Peru com Feijão', time: '26 min', kcal: 610, price: '€4.20' },
-    ],
+  LUNCH: {
+    id: 'lunch',
+    title: 'Almoço',
+    description: 'Pratos principais para meio do dia.',
   },
-  {
-    id: 'wraps',
-    title: 'Base: Wrap / Tortilha',
-    description: 'Receitas rápidas para dias de pouco tempo, mantendo proteína alta.',
-    recipes: [
-      { name: 'Wrap de Frango e Iogurte', time: '12 min', kcal: 470, price: '€3.10' },
-      { name: 'Wrap de Atum Mediterrânico', time: '10 min', kcal: 450, price: '€2.90' },
-      { name: 'Wrap de Ovos e Abacate', time: '11 min', kcal: 430, price: '€2.70' },
-      { name: 'Wrap de Húmus e Grão', time: '9 min', kcal: 390, price: '€2.50' },
-    ],
+  DINNER: {
+    id: 'dinner',
+    title: 'Jantar',
+    description: 'Receitas ideais para o final do dia.',
   },
-];
+  SNACK: {
+    id: 'snack',
+    title: 'Snack',
+    description: 'Opções rápidas entre refeições.',
+  },
+};
 
-function recipeImageFor(name) {
-  const seed = encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'));
+const CATEGORY_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
+
+function normalizeMealType(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (CATEGORY_META[normalized]) {
+    return normalized;
+  }
+  return 'DINNER';
+}
+
+function formatDuration(recipe) {
+  const total = Number(recipe?.totalTimeMin || 0);
+  if (total > 0) {
+    return `${total} min`;
+  }
+  const prep = Number(recipe?.prepTimeMin || 0);
+  const cook = Number(recipe?.cookTimeMin || 0);
+  const fallback = prep + cook;
+  if (fallback > 0) {
+    return `${fallback} min`;
+  }
+  return '--';
+}
+
+function recipeImageFor(recipe) {
+  const fromBackend = String(recipe?.imageUrl || '').trim();
+  if (fromBackend) {
+    return fromBackend;
+  }
+  const seed = encodeURIComponent(String(recipe?.name || 'recipe').toLowerCase().replace(/\s+/g, '-'));
   return `https://picsum.photos/seed/${seed}/900/560`;
 }
 
+// eslint-disable-next-line react/prop-types
 function CategoryCarousel({ category }) {
   const trackRef = useRef(null);
 
@@ -88,57 +106,133 @@ function CategoryCarousel({ category }) {
       </header>
 
       <div className="recipes-carousel-track" ref={trackRef} onWheel={handleWheel}>
-        {category.recipes.map((recipe) => (
-          <article key={recipe.name} className="recipe-card">
-            <img
-              src={recipeImageFor(recipe.name)}
-              alt={recipe.name}
-              loading="lazy"
-              className="recipe-thumb"
-            />
-            <p className="recipe-badge">
-              <Layers size={13} />
-              {category.title}
-            </p>
-            <h3>{recipe.name}</h3>
+        {category.recipes.map((recipe) => {
+          const imageSrc = recipeImageFor(recipe);
+          const sourceUrl = String(recipe.sourceUrl || '').trim();
+          const hasSourceUrl = sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://');
 
-            <div className="recipe-meta">
-              <span>
-                <Clock3 size={14} />
-                {recipe.time}
-              </span>
-              <span>
-                <Flame size={14} />
-                {recipe.kcal} kcal
-              </span>
-              <span>
-                <Euro size={14} />
-                {recipe.price}
-              </span>
-            </div>
+          return (
+            <article key={recipe.id} className="recipe-card">
+              <img
+                src={imageSrc}
+                alt={recipe.name}
+                loading="lazy"
+                className="recipe-thumb"
+                onError={(event) => {
+                  event.currentTarget.src = recipeImageFor({ name: `${recipe.name}-fallback` });
+                }}
+              />
+              <p className="recipe-badge">
+                <Layers size={13} />
+                {category.title}
+              </p>
+              <h3>{recipe.name}</h3>
 
-            <button type="button" className="recipe-open-btn">
-              Ver receita
-            </button>
-          </article>
-        ))}
+              <div className="recipe-meta">
+                <span>
+                  <Clock3 size={14} />
+                  {formatDuration(recipe)}
+                </span>
+                <span>
+                  <Flame size={14} />
+                  {Number(recipe.calories || 0) > 0 ? `${Math.round(recipe.calories)} kcal` : 'kcal N/A'}
+                </span>
+                <span>
+                  <Users size={14} />
+                  {Math.max(1, Number(recipe.servings || 1))} porções
+                </span>
+              </div>
+
+              {hasSourceUrl ? (
+                <a href={sourceUrl} target="_blank" rel="noreferrer" className="recipe-open-btn">
+                  Ver receita
+                </a>
+              ) : (
+                <button type="button" className="recipe-open-btn" disabled>
+                  Sem link de origem
+                </button>
+              )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
 }
 
 export default function Recipes() {
+  const [recipes, setRecipes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const run = async () => {
+      setIsLoading(true);
+      setError('');
+      try {
+        const data = await fetchRecipes({ limit: 300 });
+        if (!isMounted) {
+          return;
+        }
+        setRecipes(data);
+      } catch (loadError) {
+        if (!isMounted) {
+          return;
+        }
+        setError(loadError.message || 'Não foi possível carregar as receitas.');
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const groupedCategories = useMemo(() => {
+    const grouped = {
+      BREAKFAST: [],
+      LUNCH: [],
+      DINNER: [],
+      SNACK: [],
+    };
+
+    recipes.forEach((recipe) => {
+      const mealType = normalizeMealType(recipe.mealType);
+      grouped[mealType].push(recipe);
+    });
+
+    return CATEGORY_ORDER
+      .map((mealType) => ({
+        ...CATEGORY_META[mealType],
+        recipes: grouped[mealType],
+      }))
+      .filter((category) => category.recipes.length > 0);
+  }, [recipes]);
+
   return (
     <Layout>
       <div className="recipes-page">
         <PageHeader
           className="recipes-header"
-          title="Receitas por Base"
-          subtitle="Organização por categoria para veres receitas parecidas juntas como pediste (ex: carbonara e bolonhesa na base massa)."
+          title="Receitas da Base de Dados"
+          subtitle="Receitas carregadas da tabela `recipes` do backend, com as respetivas fotos."
         />
 
+        {isLoading ? <p className="recipes-feedback">A carregar receitas...</p> : null}
+        {!isLoading && error ? <p className="recipes-feedback recipes-feedback-error">{error}</p> : null}
+        {!isLoading && !error && groupedCategories.length === 0 ? (
+          <p className="recipes-feedback">Sem receitas na base de dados. Corre o scraper/import primeiro.</p>
+        ) : null}
+
         <div className="recipes-categories">
-          {RECIPE_CATEGORIES.map((category) => (
+          {groupedCategories.map((category) => (
             <CategoryCarousel key={category.id} category={category} />
           ))}
         </div>

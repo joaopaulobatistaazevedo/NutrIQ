@@ -41,7 +41,8 @@ Fluxo implementado:
 1. Scrape de TeleCulinaria.
 2. Extração de título, ingredientes, passos, tempo e porções.
 3. Import/upsert em SQLite.
-4. Matching por ingredientes para sugerir refeições possíveis (print no terminal).
+4. Sync automático para `backend` MySQL na tabela `recipes`.
+5. Matching por ingredientes para sugerir refeições possíveis (print no terminal).
 
 ### 1) Scrape + import em SQLite
 
@@ -52,6 +53,15 @@ python3 recipe_main.py scrape \
   --max-recipes-per-source 60 \
   --max-pages-per-list 2 \
   --debug
+```
+
+Por padrão, no fim do scrape as receitas também são sincronizadas para a tabela
+`recipes` do MySQL (credenciais lidas de `backend/.env`).
+
+Para desativar:
+
+```bash
+python3 recipe_main.py scrape --skip-backend-sync
 ```
 
 ### 2) Import explícito JSON -> SQLite (script separado)

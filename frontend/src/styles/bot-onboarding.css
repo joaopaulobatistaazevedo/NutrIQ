@@ -208,6 +208,11 @@
   color: #047857;
 }
 
+.bot-option-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .bot-submit-btn {
   width: 100%;
   min-height: 46px;
@@ -228,6 +233,23 @@
 .bot-submit-btn:hover {
   filter: brightness(1.03);
   transform: translateY(-1px);
+}
+
+.bot-submit-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bot-onboarding-error {
+  margin: 2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.12);
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .bot-welcome-card {
