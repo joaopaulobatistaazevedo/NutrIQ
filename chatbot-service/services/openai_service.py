@@ -24,9 +24,7 @@ class OpenAIService:
         onboarding_complete = self._is_onboarding_complete(extracted_preferences)
 
         if onboarding_complete:
-            bot_response = (
-                "Perfeito! Já tenho o necessário para preparar o teu plano semanal de refeições 🎯"
-            )
+            bot_response = "Perfeito! Já tenho o necessário para preparar o teu plano semanal de refeições 🎯"
 
         return ChatResponse(
             response=bot_response,
@@ -40,20 +38,9 @@ class OpenAIService:
         user_context: Optional[Dict[str, Any]],
         history: Optional[List[Message]] = None,
     ) -> ChatResponse:
-        recurring_user = bool(user_context and user_context.get("is_first_time") is False)
         planning_request = self._looks_like_meal_plan_request(user_message)
 
-        if recurring_user and planning_request and not self._has_recurring_feedback(user_context):
-            return ChatResponse(
-                response=(
-                    "Antes de montar o novo plano, diz-me duas coisas: "
-                    "1) Nas últimas receitas gostaste de algum ingrediente novo? "
-                    "2) Queres incluir algum ingrediente específico nas próximas refeições?"
-                )
-            )
-
         system_prompt = load_prompt("prompts/assistant.txt")
-
         if user_context:
             system_prompt += f"\n\nContexto do utilizador:\n{user_context}"
 
@@ -63,18 +50,23 @@ class OpenAIService:
         messages.append({"role": "user", "content": user_message})
 
         bot_response = self._chat(messages)
-
         meal_plan_draft = None
+
         if planning_request:
             constraints = await self._extract_meal_plan_constraints(messages)
             meal_plan_draft = self._build_meal_plan_draft(constraints, user_context)
-
             missing = meal_plan_draft.get("missing_required", [])
+
             if missing:
                 bot_response = (
                     "Para fechar o planeamento desta semana, ainda preciso de: "
                     + ", ".join(missing)
                     + "."
+                )
+            else:
+                bot_response = (
+                    "Perfeito. Vou usar as receitas do backend para montar o teu planeamento "
+                    "com os critérios definidos e sem inventar receitas."
                 )
 
         return ChatResponse(response=bot_response, meal_plan_draft=meal_plan_draft)
@@ -92,6 +84,7 @@ class OpenAIService:
         extraction_prompt = (
             "Extrai APENAS preferências para JSON válido com as chaves: "
             "favorite_foods (array), disliked_ingredients (array), "
+            "restrictions (array), allergens (array), "
             "max_weekly_budget (number), planning_days (number). "
             "Se faltar algo usa null. Responde APENAS JSON."
         )
@@ -106,7 +99,7 @@ class OpenAIService:
         extraction_prompt = (
             "Extrai os constraints para meal planning para JSON válido com as chaves: "
             "max_weekly_budget, planning_days, favorite_foods, disliked_ingredients, "
-            "new_liked_ingredients, requested_extra_ingredients. "
+            "restrictions, allergens, new_liked_ingredients, requested_extra_ingredients. "
             "Se faltar algum campo usa null ou array vazio. Responde APENAS JSON."
         )
 
@@ -136,15 +129,6 @@ class OpenAIService:
             "menu",
         ]
         return any(word in lower for word in keywords)
-
-    def _has_recurring_feedback(self, user_context: Optional[Dict[str, Any]]) -> bool:
-        if not user_context:
-            return False
-
-        new_liked = user_context.get("new_liked_ingredients") or []
-        requested = user_context.get("requested_extra_ingredients") or []
-
-        return bool(new_liked or requested)
 
     def _build_meal_plan_draft(
         self,
@@ -178,6 +162,8 @@ class OpenAIService:
                 "disliked_ingredients": merged.get("disliked_ingredients", []),
                 "new_liked_ingredients": merged.get("new_liked_ingredients", []),
                 "requested_extra_ingredients": merged.get("requested_extra_ingredients", []),
+                "restrictions": merged.get("restrictions", []),
+                "allergens": merged.get("allergens", []),
             },
             "missing_required": missing_required,
             "recipe_candidates": [],

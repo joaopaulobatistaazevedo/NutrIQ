@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     max_tokens: int = 600
     temperature: float = 0.7
     allowed_origins: str = "*"
+    backend_api_url: str = "http://localhost:7070"
+    backend_timeout_seconds: float = 6.0
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
