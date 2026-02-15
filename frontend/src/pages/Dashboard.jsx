@@ -984,7 +984,7 @@ export default function Dashboard() {
                 <span className="dash-streak-pill">
                   <Flame size={17} /> Streak {dashboardData.streakCount} dias
                 </span>
-                <h1>Boa tarde, {dashboardData.userName}</h1>
+                <h1>Olá {dashboardData.userName}</h1>
                 <p>
                   Estás no caminho certo. Planea as tuas refeições de forma simples, com os carrinhos de compras
                   automáticos.
