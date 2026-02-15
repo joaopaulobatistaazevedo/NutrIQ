@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, Flame, MessageCircle, Pencil, Search, Send, ThumbsUp, Trash2, UserMinus, UserPlus, Users, XCircle } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
   acceptFriendRequest,
   addPostComment,
   declineFriendRequest,
   deleteSocialPost,
+  registerMealPhoto,
   fetchFriends,
   fetchNutriSocialFeed,
   fetchNutriSocialUserPosts,
@@ -20,6 +21,7 @@ import {
   searchUsersForFriendRequest,
   sendFriendRequest,
   togglePostKudo,
+  uploadSocialPostImage,
   updateSocialPost,
   createCommunity,
   renameCommunity,
@@ -27,6 +29,7 @@ import {
   acceptCommunityInvite,
   declineCommunityInvite,
 } from '../services/nutriSocialService';
+import { fetchRecipes } from '../services/recipeService';
 import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/nutrisocial.css';
@@ -241,6 +244,7 @@ function encodeFriendshipId(requesterId, addresseeId) {
 
 export default function NutriSocial() {
   const location = useLocation();
+  const navigate = useNavigate();
   const authSession = getAuthSession();
   const token = String(authSession?.token || '').trim();
   const currentUserId = Number(authSession?.userId || 0);
@@ -282,6 +286,16 @@ export default function NutriSocial() {
   const [editingPostId, setEditingPostId] = useState('');
   const [editingDraft, setEditingDraft] = useState({ description: '', rating: 5 });
   const [expandedCommentsPostId, setExpandedCommentsPostId] = useState('');
+  const [mealPhotoPath, setMealPhotoPath] = useState('');
+  const [mealPhotoPreview, setMealPhotoPreview] = useState('');
+  const [mealPhotoFile, setMealPhotoFile] = useState(null);
+  const [mealDescription, setMealDescription] = useState('');
+  const [mealVisibility, setMealVisibility] = useState('public');
+  const [mealSelectedRecipeId, setMealSelectedRecipeId] = useState('');
+  const [mealRating, setMealRating] = useState(5);
+  const [mealIsSubmitting, setMealIsSubmitting] = useState(false);
+  const [mealSubmitStatus, setMealSubmitStatus] = useState('');
+  const [mealRecipes, setMealRecipes] = useState([]);
 
   const hydratePostInteractions = useCallback(async (posts) => {
     if (!token) {
@@ -548,6 +562,46 @@ export default function NutriSocial() {
     return () => clearTimeout(timeout);
   }, [friendToast]);
 
+  useEffect(() => () => {
+    if (mealPhotoPreview && mealPhotoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(mealPhotoPreview);
+    }
+  }, [mealPhotoPreview]);
+
+  useEffect(() => {
+    if (activeTab !== 'meal' || !token || mealRecipes.length > 0) {
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const recipes = await fetchRecipes({ limit: 300 });
+        if (cancelled) return;
+
+        const normalized = (Array.isArray(recipes) ? recipes : [])
+          .map((recipe) => ({
+            id: Number(recipe?.id || 0),
+            name: String(recipe?.name || '').trim(),
+          }))
+          .filter((recipe) => Number.isInteger(recipe.id) && recipe.id > 0)
+          .sort((left, right) => left.name.localeCompare(right.name, 'pt-PT'));
+
+        setMealRecipes(normalized);
+      } catch {
+        if (!cancelled) {
+          setMealSubmitStatus('Não foi possível carregar as receitas. Tenta novamente.');
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, mealRecipes.length, token]);
+
   const userDirectory = useMemo(() => {
     const map = new Map();
 
@@ -667,6 +721,92 @@ export default function NutriSocial() {
 
   const handleCloseCommentsModal = () => {
     setExpandedCommentsPostId('');
+  };
+
+  const handleMealPhotoChange = (event) => {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+
+    if (mealPhotoPreview && mealPhotoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(mealPhotoPreview);
+    }
+
+    const preview = URL.createObjectURL(file);
+    setMealPhotoPreview(preview);
+    setMealPhotoPath(preview);
+    setMealPhotoFile(file);
+    setMealSubmitStatus('');
+  };
+
+  const handleMealSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!token) {
+      setMealSubmitStatus('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const cleanPhotoPath = String(mealPhotoPath || '').trim();
+    const shareOnNutriSocial = mealVisibility === 'public';
+
+    if (!cleanPhotoPath) {
+      setMealSubmitStatus('Para aumentar o streak tens de tirar uma foto da refeição.');
+      return;
+    }
+
+    if (shareOnNutriSocial && !mealSelectedRecipeId) {
+      setMealSubmitStatus('Seleciona uma receita para partilhar no NutriSocial.');
+      return;
+    }
+
+    setMealIsSubmitting(true);
+    setMealSubmitStatus('');
+
+    try {
+      let finalPicturePath = cleanPhotoPath;
+      if (mealPhotoFile instanceof File) {
+        finalPicturePath = await uploadSocialPostImage(token, mealPhotoFile);
+      } else if (cleanPhotoPath.startsWith('blob:')) {
+        throw new Error('A foto selecionada expirou. Escolhe novamente a imagem antes de submeter.');
+      }
+
+      const payload = {
+        picturePath: finalPicturePath,
+        description: String(mealDescription || '').trim() || null,
+        shareOnNutriSocial,
+        recipeId: shareOnNutriSocial ? Number(mealSelectedRecipeId) : null,
+        rating: shareOnNutriSocial ? Number(mealRating) : null,
+      };
+
+      const result = await registerMealPhoto(token, payload);
+      const nextStreak = Number(result?.streakCount || 0);
+      setStreakCount(Number.isFinite(nextStreak) ? nextStreak : 0);
+
+      setMealSubmitStatus(
+        shareOnNutriSocial
+          ? 'Refeição registada e publicada com sucesso.'
+          : 'Refeição registada como privada com sucesso.',
+      );
+
+      setMealDescription('');
+      setMealSelectedRecipeId('');
+      setMealRating(5);
+      setMealVisibility('public');
+      setMealPhotoFile(null);
+      setMealPhotoPath('');
+      if (mealPhotoPreview && mealPhotoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(mealPhotoPreview);
+      }
+      setMealPhotoPreview('');
+
+      await loadData({ silent: true });
+      setActiveTab('profile');
+      navigate('/nutrisocial?tab=profile', { replace: true });
+    } catch (error) {
+      setMealSubmitStatus(error?.message || 'Não foi possível registar a foto.');
+    } finally {
+      setMealIsSubmitting(false);
+    }
   };
 
   const expandedCommentsPost = useMemo(
@@ -1864,8 +2004,107 @@ export default function NutriSocial() {
                 <h3 className="card-title m-0">Registar Refeição</h3>
               </div>
               <div className="card-body">
-                <p className="text-secondary mb-3">Usa esta aba para abrir o registo de refeição.</p>
-                <Link to="/progress" className="btn btn-primary">Ir para Registar Refeição</Link>
+                <p className="text-secondary mb-3">Regista aqui a tua refeição sem sair do NutriSocial.</p>
+                <form className="d-grid gap-3" onSubmit={handleMealSubmit}>
+                  <div>
+                    <label className="form-label">Foto da refeição</label>
+                    <input
+                      className="form-control"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleMealPhotoChange}
+                    />
+                  </div>
+
+                  {mealPhotoPreview ? (
+                    <img
+                      src={mealPhotoPreview}
+                      alt="Pré-visualização da refeição"
+                      className="img-fluid rounded border"
+                      style={{ maxHeight: 320, objectFit: 'cover' }}
+                    />
+                  ) : null}
+
+                  <div>
+                    <label className="form-label">Descrição (opcional)</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={mealDescription}
+                      onChange={(event) => setMealDescription(event.target.value)}
+                      placeholder="Ex: almoço com frango grelhado e legumes."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="form-label mb-1">Visibilidade da refeição</label>
+                    <div className="d-flex flex-wrap gap-3">
+                      <label className="form-check d-inline-flex align-items-center gap-2 mb-0">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="mealVisibility"
+                          value="public"
+                          checked={mealVisibility === 'public'}
+                          onChange={(event) => setMealVisibility(event.target.value)}
+                        />
+                        <span className="form-check-label">Pública (aparece no NutriSocial)</span>
+                      </label>
+                      <label className="form-check d-inline-flex align-items-center gap-2 mb-0">
+                        <input
+                          className="form-check-input"
+                          type="radio"
+                          name="mealVisibility"
+                          value="private"
+                          checked={mealVisibility === 'private'}
+                          onChange={(event) => setMealVisibility(event.target.value)}
+                        />
+                        <span className="form-check-label">Privada (só conta para streak)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {mealVisibility === 'public' ? (
+                    <div className="row g-3">
+                      <div className="col-12 col-md-8">
+                        <label className="form-label">Receita associada</label>
+                        <select
+                          className="form-select"
+                          value={mealSelectedRecipeId}
+                          onChange={(event) => setMealSelectedRecipeId(event.target.value)}
+                          required
+                        >
+                          <option value="">Seleciona uma receita</option>
+                          {mealRecipes.map((recipe) => (
+                            <option key={recipe.id} value={recipe.id}>{recipe.name || `Receita #${recipe.id}`}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-12 col-md-4">
+                        <label className="form-label">Avaliação (1-5)</label>
+                        <input
+                          className="form-control"
+                          type="number"
+                          min={1}
+                          max={5}
+                          value={mealRating}
+                          onChange={(event) => setMealRating(event.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="d-flex flex-wrap gap-2">
+                    <button type="submit" className="btn btn-primary" disabled={mealIsSubmitting}>
+                      <Send size={16} />
+                      {mealIsSubmitting ? 'A registar...' : 'Registar refeição'}
+                    </button>
+                  </div>
+
+                  {mealSubmitStatus ? <p className="mb-0 text-secondary">{mealSubmitStatus}</p> : null}
+                </form>
               </div>
             </section>
           ) : null}
