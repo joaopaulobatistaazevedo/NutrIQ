@@ -8,6 +8,7 @@ import alnak.controllers.SocialController;
 import alnak.controllers.ShoppingCartController;
 import alnak.controllers.UserController;
 import alnak.data.global.FriendshipDAO;
+import alnak.data.global.CommunityDAO;
 import alnak.data.global.GlobalDatabase;
 import alnak.data.global.GlobalRecipeDAO;
 import alnak.data.global.GlobalMealPlanDAO;
@@ -44,6 +45,7 @@ public class Main {
         UserDAO          userDAO          = new UserDAO();
         PostDAO          postDAO          = new PostDAO();
         FriendshipDAO    friendshipDAO    = new FriendshipDAO();
+        CommunityDAO     communityDAO     = new CommunityDAO();
         GlobalRecipeDAO  globalRecipeDAO  = new GlobalRecipeDAO();
         GlobalMealPlanDAO globalMealPlanDAO = new GlobalMealPlanDAO();
 
@@ -60,7 +62,7 @@ public class Main {
         RecipeService    recipeService    = new RecipeService(recipeDAO, globalRecipeDAO);
         MealPlanService  mealPlanService  = new MealPlanService(globalMealPlanDAO, globalRecipeDAO, recipeDAO);
         SocialService    socialService    = new SocialService(
-                postDAO, friendshipDAO, globalRecipeDAO, userDAO, recipeDAO);
+                postDAO, friendshipDAO, globalRecipeDAO, userDAO, recipeDAO, communityDAO);
         ShoppingCartService shoppingCartService = new ShoppingCartService(shoppingCartSnapshotDAO);
 
         // ── Controllers ───────────────────────────────────────────
@@ -411,6 +413,48 @@ public class Main {
         app.get("/api/social/friends/requests/sent", ctx -> {
             Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             ctx.json(socialController.getPendingSentRequests(userId));
+        });
+
+        app.get("/api/social/communities", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(socialController.getMyCommunities(userId));
+        });
+
+        app.post("/api/social/communities", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.status(201).json(socialController.createCommunity(userId, ctx.body()));
+        });
+
+        app.put("/api/social/communities/{communityId}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            ctx.json(socialController.renameCommunity(communityId, userId, ctx.body()));
+        });
+
+        app.post("/api/social/communities/{communityId}/invite", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            socialController.inviteFriendToCommunity(communityId, userId, ctx.body());
+            ctx.status(204);
+        });
+
+        app.get("/api/social/communities/invites/pending", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(socialController.getPendingCommunityInvites(userId));
+        });
+
+        app.post("/api/social/communities/{communityId}/invites/accept", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            socialController.acceptCommunityInvite(communityId, userId);
+            ctx.status(204);
+        });
+
+        app.post("/api/social/communities/{communityId}/invites/decline", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            socialController.declineCommunityInvite(communityId, userId);
+            ctx.status(204);
         });
 
         app.post("/api/social/posts/{id}/kudos", ctx -> {

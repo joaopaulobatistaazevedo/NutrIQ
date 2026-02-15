@@ -6,11 +6,11 @@ import alnak.business_logic.entities.Post;
 import alnak.business_logic.entities.Recipe;
 import alnak.data.global.FriendshipDAO;
 import alnak.data.global.GlobalRecipeDAO;
+import alnak.data.global.CommunityDAO;
 import alnak.data.global.PostDAO;
 import alnak.data.global.UserDAO;
 import alnak.data.local.RecipeDAO;
 import alnak.business_logic.entities.User;
-import alnak.business_logic.entities.PostComment;
 
 import java.util.List;
 import java.util.Map;
@@ -27,23 +27,28 @@ import java.util.Optional;
 public class SocialService {
     public record FriendUserSummary(long id, String name, String email) {}
     public record UserSearchSuggestion(long id, String name, String email, String relationStatus) {}
+    public record CommunitySummary(long id, long ownerUserId, String name, List<Long> memberIds, List<Long> pendingInviteUserIds) {}
+    public record CommunityInviteSummary(long communityId, String communityName, long inviterId, String inviterName, java.time.LocalDateTime createdAt) {}
 
     private final PostDAO postDAO;
     private final FriendshipDAO friendshipDAO;
     private final GlobalRecipeDAO globalRecipeDAO;
     private final UserDAO userDAO;
     private final RecipeDAO localRecipeDAO;   // source of truth for recipe content
+    private final CommunityDAO communityDAO;
 
     public SocialService(PostDAO postDAO,
                          FriendshipDAO friendshipDAO,
                          GlobalRecipeDAO globalRecipeDAO,
                          UserDAO userDAO,
-                         RecipeDAO localRecipeDAO) {
+                         RecipeDAO localRecipeDAO,
+                         CommunityDAO communityDAO) {
         this.postDAO          = postDAO;
         this.friendshipDAO    = friendshipDAO;
         this.globalRecipeDAO  = globalRecipeDAO;
         this.userDAO          = userDAO;
         this.localRecipeDAO   = localRecipeDAO;
+        this.communityDAO     = communityDAO;
     }
 
     // ── Posts ─────────────────────────────────────────────────────
@@ -293,6 +298,53 @@ public class SocialService {
         return friendshipDAO.areFriends(userA, userB);
     }
 
+    // ── Communities ─────────────────────────────────────────
+
+    public CommunitySummary createCommunity(long ownerUserId, String name) {
+        CommunityDAO.Community community = communityDAO.createCommunity(ownerUserId, name);
+        return toCommunitySummary(community);
+    }
+
+    public CommunitySummary renameCommunity(long communityId, long ownerUserId, String name) {
+        CommunityDAO.Community community = communityDAO.renameCommunity(communityId, ownerUserId, name);
+        return toCommunitySummary(community);
+    }
+
+    public void inviteFriendToCommunity(long communityId, long inviterId, long friendUserId) {
+        if (!areFriends(inviterId, friendUserId)) {
+            throw new IllegalArgumentException("Só podes convidar amigos para a comunidade.");
+        }
+        userDAO.findById(friendUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilizador não encontrado: " + friendUserId));
+        communityDAO.inviteUser(communityId, inviterId, friendUserId);
+    }
+
+    public List<CommunitySummary> getMyCommunities(long userId) {
+        return communityDAO.listCommunitiesForUser(userId).stream()
+                .map(this::toCommunitySummary)
+                .toList();
+    }
+
+    public List<CommunityInviteSummary> getPendingCommunityInvites(long userId) {
+        return communityDAO.listPendingInvitesForUser(userId).stream()
+                .map(item -> new CommunityInviteSummary(
+                        item.communityId(),
+                        item.communityName(),
+                        item.inviterId(),
+                        safe(item.inviterName(), "Utilizador #" + item.inviterId()),
+                        item.createdAt()
+                ))
+                .toList();
+    }
+
+    public void acceptCommunityInvite(long userId, long communityId) {
+        communityDAO.acceptInvite(communityId, userId);
+    }
+
+    public void declineCommunityInvite(long userId, long communityId) {
+        communityDAO.declineInvite(communityId, userId);
+    }
+
     // ── Kudos & Comments ──────────────────────────────────────────────────────
 
     /**
@@ -350,6 +402,18 @@ public class SocialService {
         }
         if (recipe != null) post.setRecipe(recipe);
         return post;
+    }
+
+    private CommunitySummary toCommunitySummary(CommunityDAO.Community community) {
+        List<Long> memberIds = communityDAO.listAcceptedMemberIds(community.id());
+        List<Long> pendingIds = communityDAO.listPendingInviteUserIds(community.id());
+        return new CommunitySummary(
+                community.id(),
+                community.ownerUserId(),
+                safe(community.name(), "Comunidade #" + community.id()),
+                memberIds,
+                pendingIds
+        );
     }
 
     private FriendUserSummary toFriendSummary(User user) {

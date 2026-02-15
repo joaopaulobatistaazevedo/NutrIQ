@@ -259,6 +259,125 @@ export async function fetchPendingSentRequests(token) {
   }
 }
 
+export async function fetchCommunities(token) {
+  try {
+    const { data } = await client.get('/api/social/communities', {
+      headers: buildAuthHeaders(token),
+    });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function createCommunity(token, name) {
+  const cleanName = String(name || '').trim();
+  if (cleanName.length < 2) {
+    throw new Error('O nome da comunidade deve ter pelo menos 2 caracteres.');
+  }
+
+  try {
+    const { data } = await client.post(
+      '/api/social/communities',
+      { name: cleanName },
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function renameCommunity(token, communityId, name) {
+  const id = Number(communityId || 0);
+  const cleanName = String(name || '').trim();
+
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Comunidade inválida.');
+  }
+  if (cleanName.length < 2) {
+    throw new Error('O nome da comunidade deve ter pelo menos 2 caracteres.');
+  }
+
+  try {
+    const { data } = await client.put(
+      `/api/social/communities/${id}`,
+      { name: cleanName },
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function inviteFriendToCommunity(token, communityId, friendUserId) {
+  const id = Number(communityId || 0);
+  const friendId = Number(friendUserId || 0);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Comunidade inválida.');
+  }
+  if (!Number.isInteger(friendId) || friendId <= 0) {
+    throw new Error('Seleciona um amigo para convidar.');
+  }
+
+  try {
+    await client.post(
+      `/api/social/communities/${id}/invite`,
+      { friendUserId: friendId },
+      { headers: buildAuthHeaders(token) },
+    );
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function fetchPendingCommunityInvites(token) {
+  try {
+    const { data } = await client.get('/api/social/communities/invites/pending', {
+      headers: buildAuthHeaders(token),
+    });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function acceptCommunityInvite(token, communityId) {
+  const id = Number(communityId || 0);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Comunidade inválida.');
+  }
+
+  try {
+    await client.post(
+      `/api/social/communities/${id}/invites/accept`,
+      {},
+      { headers: buildAuthHeaders(token) },
+    );
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function declineCommunityInvite(token, communityId) {
+  const id = Number(communityId || 0);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Comunidade inválida.');
+  }
+
+  try {
+    await client.post(
+      `/api/social/communities/${id}/invites/decline`,
+      {},
+      { headers: buildAuthHeaders(token) },
+    );
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
 export async function sendFriendRequest(token, addresseeId) {
   try {
     const { data } = await client.post(

@@ -327,7 +327,7 @@
 
 .nutri-social-friends-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 10px;
 }
 
@@ -627,12 +627,15 @@
   border: 1px solid var(--app-border-1);
   border-radius: 10px;
   padding: 8px 10px;
+  align-items: flex-start;
 }
 
 .nutri-social-friend-item > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .nutri-social-friend-item > div > span {

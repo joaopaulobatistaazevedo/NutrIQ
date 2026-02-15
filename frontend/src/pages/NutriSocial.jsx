@@ -11,14 +11,21 @@ import {
   fetchNutriSocialFeed,
   fetchNutriSocialUserPosts,
   fetchPostInteractionsMap,
+  fetchPendingCommunityInvites,
   fetchPendingReceivedRequests,
   fetchPendingSentRequests,
+  fetchCommunities,
   removeFriend,
   resolveNutriSocialImageUrl,
   searchUsersForFriendRequest,
   sendFriendRequest,
   togglePostKudo,
   updateSocialPost,
+  createCommunity,
+  renameCommunity,
+  inviteFriendToCommunity,
+  acceptCommunityInvite,
+  declineCommunityInvite,
 } from '../services/nutriSocialService';
 import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
@@ -26,7 +33,6 @@ import '../styles/nutrisocial.css';
 
 const FALLBACK_POST_IMAGE = 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
 const QUICK_EMOJI_COMMENTS = ['🔥', '🤤', '😍', '👏', '💚', '🍽️'];
-const NUTRISOCIAL_COMMUNITIES_STORAGE_KEY = 'nutrisocial.communities.v1';
 
 function emojiToTwemojiUrl(emoji) {
   const codePoints = Array.from(String(emoji || ''))
@@ -258,6 +264,7 @@ export default function NutriSocial() {
   const [communities, setCommunities] = useState([]);
   const [communityNameDraft, setCommunityNameDraft] = useState('');
   const [communityInviteDraftById, setCommunityInviteDraftById] = useState({});
+  const [pendingCommunityInvites, setPendingCommunityInvites] = useState([]);
 
   const [feedPosts, setFeedPosts] = useState([]);
   const [profileFeedPosts, setProfileFeedPosts] = useState([]);
@@ -313,13 +320,15 @@ export default function NutriSocial() {
     }
 
     try {
-      const [feed, myPosts, profile, friends, receivedRequests, sentRequests] = await Promise.all([
+      const [feed, myPosts, profile, friends, receivedRequests, sentRequests, communitiesResponse, pendingCommunityInvitesResponse] = await Promise.all([
         fetchNutriSocialFeed(token),
         fetchNutriSocialUserPosts(token, currentUserId),
         fetchMyProfile(token),
         fetchFriends(token),
         fetchPendingReceivedRequests(token),
         fetchPendingSentRequests(token),
+        fetchCommunities(token),
+        fetchPendingCommunityInvites(token),
       ]);
 
       const normalizedFeed = (Array.isArray(feed) ? feed : [])
@@ -335,7 +344,7 @@ export default function NutriSocial() {
         .filter((post) => !isInvalidLegacyBlobPath(post))
         .map((post) => ({
           ...post,
-          userId: Number(post?.userId || post?.user_id || 0),
+          userId: Number(post?.userId || post?.user_id || currentUserId || 0),
           createdAt: normalizeDateTimeValue(post?.createdAt, post?.created_at, post?.currentTime, post?.current_time),
           currentTime: normalizeDateTimeValue(post?.currentTime, post?.current_time, post?.createdAt, post?.created_at),
         }));
@@ -375,6 +384,37 @@ export default function NutriSocial() {
       );
       setPendingReceived(Array.isArray(receivedRequests) ? receivedRequests : []);
       setPendingSent(Array.isArray(sentRequests) ? sentRequests : []);
+
+      const normalizedCommunities = (Array.isArray(communitiesResponse) ? communitiesResponse : [])
+        .map((community) => ({
+          id: String(community?.id || ''),
+          ownerUserId: Number(community?.ownerUserId || 0),
+          name: String(community?.name || '').trim(),
+          memberIds: Array.isArray(community?.memberIds)
+            ? community.memberIds
+              .map((memberId) => Number(memberId))
+              .filter((memberId) => Number.isInteger(memberId) && memberId > 0)
+            : [],
+          pendingInviteUserIds: Array.isArray(community?.pendingInviteUserIds)
+            ? community.pendingInviteUserIds
+              .map((memberId) => Number(memberId))
+              .filter((memberId) => Number.isInteger(memberId) && memberId > 0)
+            : [],
+        }))
+        .filter((community) => community.id && community.name);
+
+      const normalizedPendingCommunityInvites = (Array.isArray(pendingCommunityInvitesResponse) ? pendingCommunityInvitesResponse : [])
+        .map((invite) => ({
+          communityId: Number(invite?.communityId || 0),
+          communityName: String(invite?.communityName || '').trim(),
+          inviterId: Number(invite?.inviterId || 0),
+          inviterName: String(invite?.inviterName || '').trim(),
+          createdAt: normalizeDateTimeValue(invite?.createdAt),
+        }))
+        .filter((invite) => Number.isInteger(invite.communityId) && invite.communityId > 0);
+
+      setCommunities(normalizedCommunities);
+      setPendingCommunityInvites(normalizedPendingCommunityInvites);
       announceFriendRequestRefresh();
       void hydratePostInteractions([...normalizedFeed, ...normalizedMyPosts]);
     } catch (error) {
@@ -387,7 +427,7 @@ export default function NutriSocial() {
         setFriendsLoading(false);
       }
     }
-  }, [announceFriendRequestRefresh, hydratePostInteractions, sessionName, token]);
+  }, [announceFriendRequestRefresh, currentUserId, hydratePostInteractions, sessionName, token]);
 
   useEffect(() => {
     void loadData();
@@ -486,46 +526,6 @@ export default function NutriSocial() {
       clearTimeout(timer);
     };
   }, [activeTab, friendSearchQuery, token]);
-
-  useEffect(() => {
-    try {
-      const savedValue = localStorage.getItem(NUTRISOCIAL_COMMUNITIES_STORAGE_KEY);
-      if (!savedValue) {
-        setCommunities([]);
-        return;
-      }
-
-      const parsed = JSON.parse(savedValue);
-      if (!Array.isArray(parsed)) {
-        setCommunities([]);
-        return;
-      }
-
-      const normalized = parsed
-        .map((community) => ({
-          id: String(community?.id || ''),
-          name: String(community?.name || '').trim(),
-          memberIds: Array.isArray(community?.memberIds)
-            ? community.memberIds
-              .map((memberId) => Number(memberId))
-              .filter((memberId) => Number.isInteger(memberId) && memberId > 0)
-            : [],
-        }))
-        .filter((community) => community.id && community.name);
-
-      setCommunities(normalized);
-    } catch {
-      setCommunities([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(NUTRISOCIAL_COMMUNITIES_STORAGE_KEY, JSON.stringify(communities));
-    } catch {
-      // ignore persistence errors
-    }
-  }, [communities]);
 
   const userDirectory = useMemo(() => {
     const map = new Map();
@@ -872,7 +872,7 @@ export default function NutriSocial() {
     }
   };
 
-  const handleCreateCommunity = (event) => {
+  const handleCreateCommunity = async (event) => {
     event.preventDefault();
     const name = String(communityNameDraft || '').trim();
 
@@ -881,55 +881,100 @@ export default function NutriSocial() {
       return;
     }
 
-    setCommunities((previous) => [
-      {
-        id: `community-${Date.now()}`,
-        name,
-        memberIds: [],
-      },
-      ...previous,
-    ]);
-    setCommunityNameDraft('');
+    setFriendActionLoadingId('community-create');
     setFriendError('');
-    setFriendStatus('Comunidade criada com sucesso.');
+    setFriendStatus('');
+
+    try {
+      await createCommunity(token, name);
+      await loadData({ silent: true });
+      setCommunityNameDraft('');
+      setFriendStatus('Comunidade criada com sucesso.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível criar comunidade.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
   };
 
-  const handleRenameCommunity = (communityId, nextName) => {
+  const handleRenameCommunity = async (communityId, nextName) => {
     const name = String(nextName || '').trim();
     if (name.length < 2) {
       setFriendError('O nome da comunidade deve ter pelo menos 2 caracteres.');
       return;
     }
 
-    setCommunities((previous) => previous.map((community) => (
-      community.id === communityId ? { ...community, name } : community
-    )));
+    setFriendActionLoadingId(`community-rename-${communityId}`);
     setFriendError('');
-    setFriendStatus('Nome da comunidade atualizado.');
+    setFriendStatus('');
+
+    try {
+      await renameCommunity(token, communityId, name);
+      await loadData({ silent: true });
+      setFriendStatus('Nome da comunidade atualizado.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível atualizar o nome da comunidade.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
   };
 
-  const handleInviteFriendToCommunity = (communityId) => {
+  const handleInviteFriendToCommunity = async (communityId) => {
     const selected = Number(communityInviteDraftById[communityId] || 0);
     if (!Number.isInteger(selected) || selected <= 0) {
       setFriendError('Seleciona um amigo para convidar.');
       return;
     }
 
-    setCommunities((previous) => previous.map((community) => {
-      if (community.id !== communityId) return community;
-      if (community.memberIds.includes(selected)) return community;
-      return {
-        ...community,
-        memberIds: [...community.memberIds, selected],
-      };
-    }));
-
-    setCommunityInviteDraftById((previous) => ({
-      ...previous,
-      [communityId]: '',
-    }));
+    setFriendActionLoadingId(`community-invite-${communityId}`);
     setFriendError('');
-    setFriendStatus('Convite adicionado à comunidade.');
+    setFriendStatus('');
+
+    try {
+      await inviteFriendToCommunity(token, communityId, selected);
+      await loadData({ silent: true });
+      setCommunityInviteDraftById((previous) => ({
+        ...previous,
+        [communityId]: '',
+      }));
+      setFriendStatus('Convite enviado para a comunidade.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível enviar convite para a comunidade.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
+  };
+
+  const handleAcceptCommunityInvite = async (communityId) => {
+    setFriendActionLoadingId(`community-accept-${communityId}`);
+    setFriendError('');
+    setFriendStatus('');
+
+    try {
+      await acceptCommunityInvite(token, communityId);
+      await loadData({ silent: true });
+      setFriendStatus('Convite para comunidade aceite.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível aceitar o convite da comunidade.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
+  };
+
+  const handleDeclineCommunityInvite = async (communityId) => {
+    setFriendActionLoadingId(`community-decline-${communityId}`);
+    setFriendError('');
+    setFriendStatus('');
+
+    try {
+      await declineCommunityInvite(token, communityId);
+      await loadData({ silent: true });
+      setFriendStatus('Convite para comunidade recusado.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível recusar o convite da comunidade.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
   };
 
   return (
@@ -959,8 +1004,11 @@ export default function NutriSocial() {
                   aria-selected={activeTab === 'feed'}
                   className={`nutri-social-tab ${activeTab === 'feed' ? 'is-active' : ''}`}
                   onClick={() => setActiveTab('feed')}
-                >
-                  Feed
+                title="Feed"
+                aria-label="Feed"
+              >
+                  <span aria-hidden="true">🏠</span>
+                  <span className="visually-hidden">Feed</span>
                 </button>
                 <button
                   type="button"
@@ -968,8 +1016,11 @@ export default function NutriSocial() {
                   aria-selected={activeTab === 'friends'}
                   className={`nutri-social-tab ${activeTab === 'friends' ? 'is-active' : ''}`}
                   onClick={() => setActiveTab('friends')}
-                >
-                  Amigos
+                title="Amigos"
+                aria-label="Amigos"
+              >
+                  <span aria-hidden="true">👥</span>
+                  <span className="visually-hidden">Amigos</span>
                 </button>
                 <button
                   type="button"
@@ -977,8 +1028,11 @@ export default function NutriSocial() {
                   aria-selected={activeTab === 'meal'}
                   className={`nutri-social-tab ${activeTab === 'meal' ? 'is-active' : ''}`}
                   onClick={() => setActiveTab('meal')}
-                >
-                  Registar Refeição
+                title="Registar Refeição"
+                aria-label="Registar Refeição"
+              >
+                  <span aria-hidden="true">➕</span>
+                  <span className="visually-hidden">Registar Refeição</span>
                 </button>
                 <button
                   type="button"
@@ -986,8 +1040,11 @@ export default function NutriSocial() {
                   aria-selected={activeTab === 'profile'}
                   className={`nutri-social-tab ${activeTab === 'profile' ? 'is-active' : ''}`}
                   onClick={() => setActiveTab('profile')}
-                >
-                  Perfil
+                title="Perfil"
+                aria-label="Perfil"
+              >
+                  <span aria-hidden="true">👤</span>
+                  <span className="visually-hidden">Perfil</span>
                 </button>
               </div>
             </div>
@@ -1156,12 +1213,42 @@ export default function NutriSocial() {
                         />
                       </div>
                       <div className="col-auto">
-                        <button type="submit" className="btn btn-primary btn-sm">Criar comunidade</button>
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={friendActionLoadingId === 'community-create'}>{friendActionLoadingId === 'community-create' ? 'A criar...' : 'Criar comunidade'}</button>
                       </div>
                     </form>
 
-                    {communities.length === 0 ? <p className="text-secondary mb-0">Ainda não criaste comunidades.</p> : null}
-                    {communities.map((community) => (
+                    <div className="mb-3">
+                      <h5 className="h6 mb-2">Convites para ti ({pendingCommunityInvites.length})</h5>
+                      {pendingCommunityInvites.length === 0 ? <p className="text-secondary mb-0">Sem convites pendentes.</p> : null}
+                      {pendingCommunityInvites.map((invite) => (
+                        <div className="nutri-social-friend-item" key={`community-pending-${invite.communityId}`}>
+                          <span>{invite.communityName || `Comunidade #${invite.communityId}`} · por {invite.inviterName || `#${invite.inviterId}`}</span>
+                          <div className="nutri-social-actions">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => handleAcceptCommunityInvite(invite.communityId)}
+                              disabled={friendActionLoadingId === `community-accept-${invite.communityId}`}
+                            >
+                              {friendActionLoadingId === `community-accept-${invite.communityId}` ? 'A aceitar...' : 'Aceitar'}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDeclineCommunityInvite(invite.communityId)}
+                              disabled={friendActionLoadingId === `community-decline-${invite.communityId}`}
+                            >
+                              {friendActionLoadingId === `community-decline-${invite.communityId}` ? 'A recusar...' : 'Recusar'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {communities.length === 0 ? <p className="text-secondary mb-0">Ainda não tens comunidades.</p> : null}
+                    {communities.map((community) => {
+                      const isOwnerCommunity = Number(community.ownerUserId) === Number(currentUserId);
+                      return (
                       <article className="nutri-social-community-item" key={community.id}>
                         <div className="row g-2 align-items-center">
                           <div className="col-12 col-md-5">
@@ -1170,7 +1257,8 @@ export default function NutriSocial() {
                               className="form-control form-control-sm"
                               type="text"
                               value={community.name}
-                              onChange={(event) => handleRenameCommunity(community.id, event.target.value)}
+                              onBlur={(event) => handleRenameCommunity(community.id, event.target.value)}
+                              disabled={!isOwnerCommunity}
                             />
                           </div>
                           <div className="col-12 col-md-5">
@@ -1182,7 +1270,7 @@ export default function NutriSocial() {
                                 ...previous,
                                 [community.id]: event.target.value,
                               }))}
-                              disabled={friendUsers.length === 0}
+                              disabled={friendUsers.length === 0 || !isOwnerCommunity}
                             >
                               <option value="">Seleciona um amigo</option>
                               {friendUsers.map((friend) => (
@@ -1193,8 +1281,13 @@ export default function NutriSocial() {
                             </select>
                           </div>
                           <div className="col-12 col-md-2 d-grid">
-                            <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => handleInviteFriendToCommunity(community.id)}>
-                              Convidar
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary btn-sm"
+                              onClick={() => handleInviteFriendToCommunity(community.id)}
+                              disabled={!isOwnerCommunity || friendActionLoadingId === `community-invite-${community.id}`}
+                            >
+                              {friendActionLoadingId === `community-invite-${community.id}` ? 'A enviar...' : 'Convidar'}
                             </button>
                           </div>
                         </div>
@@ -1212,8 +1305,21 @@ export default function NutriSocial() {
                             )}
                           </div>
                         </div>
+
+                        {Array.isArray(community.pendingInviteUserIds) && community.pendingInviteUserIds.length > 0 ? (
+                          <div className="nutri-social-community-members mt-2">
+                            <small className="text-secondary">Convites pendentes:</small>
+                            <div className="nutri-social-id-cloud">
+                              {community.pendingInviteUserIds.map((memberId) => {
+                                const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
+                                return <span key={`community-${community.id}-pending-${memberId}`}>{member?.name || `#${memberId}`}</span>;
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </article>
-                    ))}
+                    );
+                    })}
                   </section>
                   </>
                 ) : null}
@@ -1221,7 +1327,7 @@ export default function NutriSocial() {
             </section>
           ) : null}
 
-          {activeTab === 'feed' ? (
+          {activeTab === 'feed' || activeTab === 'profile' ? (
             <section className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h3 className="card-title m-0">{activeTab === 'profile' ? 'Perfil · As tuas publicações' : 'Feed NutriSocial'}</h3>
