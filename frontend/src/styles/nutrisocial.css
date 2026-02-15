@@ -585,3 +585,57 @@
     padding: 12px;
   }
 }
+
+.nutri-social-feed-post {
+  overflow: visible;
+}
+
+.nutri-social-post-header {
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.nutri-social-post-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 4;
+  min-width: 146px;
+  border: 1px solid var(--app-border-1);
+  border-radius: 12px;
+  padding: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+.nutri-social-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--app-surface-2);
+  border: 1px solid var(--app-border-1);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.nutri-social-friend-item {
+  background: #ffffff;
+  border: 1px solid var(--app-border-1);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.nutri-social-friend-item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nutri-social-friend-item > div > span {
+  font-size: 12px;
+  color: var(--app-text-muted);
+}

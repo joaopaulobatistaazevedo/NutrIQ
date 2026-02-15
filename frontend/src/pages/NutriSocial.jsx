@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Flame, MessageCircle, Send, ThumbsUp, UserPlus, Users, X } from 'lucide-react';
+import { Clock3, Flame, MessageCircle, Pencil, Send, ThumbsUp, Trash2, UserMinus, UserPlus, Users, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
   acceptFriendRequest,
   addPostComment,
   declineFriendRequest,
+  deleteSocialPost,
   fetchFriends,
   fetchNutriSocialFeed,
   fetchPostInteractionsMap,
   fetchPendingReceivedRequests,
   fetchPendingSentRequests,
+  removeFriend,
   resolveNutriSocialImageUrl,
   searchUsersForFriendRequest,
   sendFriendRequest,
   togglePostKudo,
+  updateSocialPost,
 } from '../services/nutriSocialService';
 import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
@@ -155,6 +158,53 @@ function relationStatusLabel(status) {
   return 'Disponível';
 }
 
+function mealTypeLabel(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'BREAKFAST') return 'Pequeno-almoço';
+  if (normalized === 'LUNCH') return 'Almoço';
+  if (normalized === 'DINNER') return 'Jantar';
+  if (normalized === 'SNACK') return 'Snack';
+  return '';
+}
+
+function inferMealTypeFromDate(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'SNACK';
+  const hour = parsed.getHours();
+  if (hour < 11) return 'BREAKFAST';
+  if (hour < 15) return 'LUNCH';
+  if (hour < 19) return 'SNACK';
+  return 'DINNER';
+}
+
+function mealTypeFromPost(post) {
+  const candidates = [post?.mealType, post?.meal_type, post?.type, post?.meal];
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '').trim().toUpperCase();
+    if (['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'].includes(normalized)) {
+      return normalized;
+    }
+  }
+  return inferMealTypeFromDate(post?.createdAt);
+}
+
+function dayHourLabel(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'hora desconhecida';
+  }
+
+  const date = parsed.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const hour = parsed.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${hour}`;
+}
+
+function encodeFriendshipId(requesterId, addresseeId) {
+  const requester = BigInt(Number(requesterId) >>> 0);
+  const addressee = BigInt(Number(addresseeId) >>> 0);
+  return ((requester << 32n) | addressee).toString();
+}
+
 export default function NutriSocial() {
   const authSession = getAuthSession();
   const token = String(authSession?.token || '').trim();
@@ -184,6 +234,9 @@ export default function NutriSocial() {
   const [pendingSent, setPendingSent] = useState([]);
   const [interactionsByPost, setInteractionsByPost] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
+  const [activePostMenuId, setActivePostMenuId] = useState('');
+  const [editingPostId, setEditingPostId] = useState('');
+  const [editingDraft, setEditingDraft] = useState({ description: '', rating: 5 });
 
   const hydratePostInteractions = useCallback(async (posts) => {
     if (!token) {
@@ -548,6 +601,121 @@ export default function NutriSocial() {
     }
   };
 
+  const handleRemoveFriend = async (friendId) => {
+    const numericFriendId = Number(friendId);
+    if (!Number.isInteger(numericFriendId) || numericFriendId <= 0) return;
+
+    const candidateFriendshipIds = [
+      encodeFriendshipId(currentUserId, numericFriendId),
+      encodeFriendshipId(numericFriendId, currentUserId),
+    ];
+
+    setFriendActionLoadingId(`remove-${numericFriendId}`);
+    setFriendError('');
+    setFriendStatus('');
+
+    try {
+      let removed = false;
+      for (const friendshipId of candidateFriendshipIds) {
+        try {
+          await removeFriend(token, friendshipId);
+          removed = true;
+          break;
+        } catch {
+          // try inverse id encoding as fallback
+        }
+      }
+
+      if (!removed) {
+        throw new Error('Não foi possível remover esta amizade.');
+      }
+
+      await loadData();
+      setFriendStatus('Amigo removido com sucesso.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível remover o amigo.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
+  };
+
+  const handleStartEditPost = (post) => {
+    const postId = String(post?.id || '');
+    if (!postId) return;
+
+    setEditingPostId(postId);
+    setEditingDraft({
+      description: String(post?.description || ''),
+      rating: Math.min(5, Math.max(1, Number(post?.rating || 5))),
+    });
+    setActivePostMenuId('');
+    setFeedError('');
+  };
+
+  const handleCancelEditPost = () => {
+    setEditingPostId('');
+    setEditingDraft({ description: '', rating: 5 });
+  };
+
+  const handleSavePostEdit = async (postId) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const normalizedPostId = String(postId || '');
+    if (!normalizedPostId) return;
+
+    try {
+      const updated = await updateSocialPost(token, normalizedPostId, {
+        description: String(editingDraft.description || '').trim(),
+        rating: Number(editingDraft.rating || 0),
+      });
+
+      setFeedPosts((previous) => previous.map((post) => (
+        String(post?.id) === normalizedPostId
+          ? {
+            ...post,
+            description: updated?.description ?? String(editingDraft.description || '').trim(),
+            rating: Number(updated?.rating || editingDraft.rating || post?.rating || 5),
+          }
+          : post
+      )));
+
+      setFeedStatus('Publicação atualizada com sucesso.');
+      handleCancelEditPost();
+    } catch (error) {
+      setFeedError(error?.message || 'Não foi possível editar a publicação.');
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const normalizedPostId = String(postId || '');
+    if (!normalizedPostId) return;
+
+    try {
+      await deleteSocialPost(token, normalizedPostId);
+      setFeedPosts((previous) => previous.filter((post) => String(post?.id) !== normalizedPostId));
+      setInteractionsByPost((previous) => {
+        const next = { ...previous };
+        delete next[normalizedPostId];
+        return next;
+      });
+      setActivePostMenuId('');
+      setFeedStatus('Publicação removida com sucesso.');
+      if (editingPostId === normalizedPostId) {
+        handleCancelEditPost();
+      }
+    } catch (error) {
+      setFeedError(error?.message || 'Não foi possível remover a publicação.');
+    }
+  };
+
   const togglePanel = (panelName) => {
     setActivePanel((previous) => (previous === panelName ? '' : panelName));
   };
@@ -651,72 +819,73 @@ export default function NutriSocial() {
                 {friendsLoading ? <p className="text-secondary mb-0">A carregar amizades...</p> : null}
 
                 {!friendsLoading ? (
-                  <div className="row g-3">
-                    <div className="col-12 col-lg-4">
-                      <div className="border rounded-3 p-3 h-100">
-                        <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
-                        {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
-                        {friendUsers.length > 0 ? (
-                          <div className="d-flex flex-column gap-2">
-                            {friendUsers.map((friend) => (
-                              <div className="small" key={`friend-id-${friend.id}`}>
-                                <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
-                                {friend.email ? <span className="text-secondary"> ({friend.email})</span> : null}
-                              </div>
-                            ))}
+                  <div className="nutri-social-friends-grid">
+                    <div className="nutri-social-friend-list">
+                      <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
+                      {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
+                      {friendUsers.map((friend) => (
+                        <div className="nutri-social-friend-item" key={`friend-id-${friend.id}`}>
+                          <div>
+                            <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
+                            {friend.email ? <span>{friend.email}</span> : null}
                           </div>
-                        ) : null}
-                      </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
+                            onClick={() => handleRemoveFriend(friend.id)}
+                            disabled={friendActionLoadingId === `remove-${friend.id}`}
+                          >
+                            <UserMinus size={14} />
+                            {friendActionLoadingId === `remove-${friend.id}` ? 'A remover...' : 'Remover'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
 
-                    <div className="col-12 col-lg-4">
-                      <div className="border rounded-3 p-3 h-100">
-                        <h4 className="h6 mb-2">Pedidos recebidos ({pendingReceived.length})</h4>
-                        {pendingReceived.length === 0 ? <p className="text-secondary mb-0">Sem pedidos recebidos.</p> : null}
-                        {pendingReceived.map((request) => (
-                          <div className="d-flex justify-content-between align-items-center gap-2 mb-2" key={`request-received-${request.id}`}>
-                            <span className="small text-secondary">De #{request.requesterId}</span>
-                            <div className="d-flex gap-2">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-primary"
-                                onClick={() => handleAcceptRequest(request.id)}
-                                disabled={friendActionLoadingId === `accept-${request.id}`}
-                              >
-                                {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => handleDeclineRequest(request.id)}
-                                disabled={friendActionLoadingId === `decline-${request.id}`}
-                              >
-                                {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="col-12 col-lg-4">
-                      <div className="border rounded-3 p-3 h-100">
-                        <h4 className="h6 mb-2">Pedidos enviados ({pendingSent.length})</h4>
-                        {pendingSent.length === 0 ? <p className="text-secondary mb-0">Sem pedidos enviados pendentes.</p> : null}
-                        {pendingSent.map((request) => (
-                          <div className="d-flex justify-content-between align-items-center gap-2 mb-2" key={`request-sent-${request.id}`}>
-                            <span className="small text-secondary">Para #{request.addresseeId}</span>
+                    <div className="nutri-social-friend-list">
+                      <h4 className="h6 mb-2">Pedidos recebidos ({pendingReceived.length})</h4>
+                      {pendingReceived.length === 0 ? <p className="text-secondary mb-0">Sem pedidos recebidos.</p> : null}
+                      {pendingReceived.map((request) => (
+                        <div className="nutri-social-friend-item" key={`request-received-${request.id}`}>
+                          <span>De #{request.requesterId}</span>
+                          <div className="nutri-social-actions">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => handleAcceptRequest(request.id)}
+                              disabled={friendActionLoadingId === `accept-${request.id}`}
+                            >
+                              {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
+                            </button>
                             <button
                               type="button"
                               className="btn btn-sm btn-outline-danger"
                               onClick={() => handleDeclineRequest(request.id)}
                               disabled={friendActionLoadingId === `decline-${request.id}`}
                             >
-                              {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
+                              {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
                             </button>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="nutri-social-friend-list">
+                      <h4 className="h6 mb-2">Pedidos enviados ({pendingSent.length})</h4>
+                      {pendingSent.length === 0 ? <p className="text-secondary mb-0">Sem pedidos enviados pendentes.</p> : null}
+                      {pendingSent.map((request) => (
+                        <div className="nutri-social-friend-item" key={`request-sent-${request.id}`}>
+                          <span>Para #{request.addresseeId}</span>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDeclineRequest(request.id)}
+                            disabled={friendActionLoadingId === `decline-${request.id}`}
+                          >
+                            {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ) : null}
@@ -752,15 +921,58 @@ export default function NutriSocial() {
                     (left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
                   );
                   const draftKey = String(post.id);
+                  const isOwnPost = Number(post?.userId) === Number(currentUserId);
+                  const mealType = mealTypeFromPost(post);
+                  const mealTypeDisplay = mealTypeLabel(mealType) || 'Refeição';
+                  const createdLabel = dayHourLabel(post?.createdAt);
+                  const isEditingPost = editingPostId === draftKey;
 
                   return (
-                    <article className="card" key={post.id}>
-                      <div className="card-header d-flex justify-content-between align-items-center">
+                    <article className="card nutri-social-feed-post" key={post.id}>
+                      <div className="card-header nutri-social-post-header">
                         <div className="d-flex align-items-center gap-2">
                           <span className="avatar avatar-sm">{String(post.userId || '').slice(-2)}</span>
-                          <span className="fw-semibold">{usernameFromId(post.userId, currentUserId, userDirectory)}</span>
+                          <div className="d-flex flex-column">
+                            <span className="fw-semibold">{usernameFromId(post.userId, currentUserId, userDirectory)}</span>
+                            <small className="text-secondary d-inline-flex align-items-center gap-1">
+                              <Clock3 size={12} /> {createdLabel}
+                            </small>
+                          </div>
                         </div>
-                        <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
+
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="badge bg-indigo-lt text-indigo">{mealTypeDisplay}</span>
+                          <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
+                          {isOwnPost ? (
+                            <div className="dropdown">
+                              <button
+                                type="button"
+                                className="btn btn-outline-secondary btn-sm"
+                                onClick={() => setActivePostMenuId((previous) => (previous === draftKey ? '' : draftKey))}
+                              >
+                                •••
+                              </button>
+                              {activePostMenuId === draftKey ? (
+                                <div className="nutri-social-post-menu">
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => handleStartEditPost(post)}
+                                  >
+                                    <Pencil size={13} /> Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => handleDeletePost(post.id)}
+                                  >
+                                    <Trash2 size={13} /> Remover
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
 
                       <NutriSocialPostImage
@@ -770,7 +982,41 @@ export default function NutriSocial() {
 
                       <div className="card-body">
                         <h4 className="h5 mb-1">{post.recipeName || `Receita #${post.recipeId}`}</h4>
-                        <p className="text-secondary mb-2">{post.description || 'Sem descrição.'}</p>
+
+                        {isEditingPost ? (
+                          <div className="nutri-social-inline-edit mb-2">
+                            <textarea
+                              className="form-control"
+                              rows={2}
+                              value={editingDraft.description}
+                              onChange={(event) => setEditingDraft((previous) => ({ ...previous, description: event.target.value }))}
+                              placeholder="Descrição da publicação"
+                            />
+                            <div className="d-flex align-items-center gap-2">
+                              <label className="form-label mb-0">Classificação</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={5}
+                                className="form-control form-control-sm"
+                                value={editingDraft.rating}
+                                onChange={(event) => setEditingDraft((previous) => ({
+                                  ...previous,
+                                  rating: Math.max(1, Math.min(5, Number(event.target.value || 1))),
+                                }))}
+                                style={{ width: '84px' }}
+                              />
+                              <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSavePostEdit(post.id)}>
+                                Guardar
+                              </button>
+                              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCancelEditPost}>
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-secondary mb-2">{post.description || 'Sem descrição.'}</p>
+                        )}
 
                         <div className="nutri-social-post-actions mb-2">
                           <button
@@ -852,10 +1098,6 @@ export default function NutriSocial() {
                             ))}
                           </div>
                         ) : null}
-
-                        <div className="d-flex flex-wrap gap-2 mt-2">
-                          <span className="badge bg-secondary-lt">🕒 {prettyDate(post.createdAt)}</span>
-                        </div>
                       </div>
                     </article>
                   );
