@@ -11,7 +11,6 @@ import BotOnboarding from './pages/BotOnboarding';
 import MealPlan from './pages/MealPlan';
 import Recipes from './pages/Recipes';
 import Shopping from './pages/Shopping';
-import Progress from './pages/Progress';
 import Profile from './pages/Profile';
 import NutriSocial from './pages/NutriSocial';
 import Nutritionist from './pages/Nutritionist';
@@ -26,7 +25,6 @@ function AppRoutes() {
     '/meal-plan': <MealPlan />,
     '/recipes': <Recipes />,
     '/shopping': <Shopping />,
-    '/progress': <Progress />,
     '/profile': <Profile />,
     '/nutrisocial': <NutriSocial />,
     '/nutritionist': <Nutritionist />,
