@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   Copy,
@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { PROFILE_KEY } from '../constants/storageKeys';
-import { fetchMyProfile, updateMyProfile } from '../services/userService';
+import { fetchMyProfile, resolveProfilePictureUrl, updateMyProfile, uploadProfilePhoto } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/profile.css';
 
@@ -86,6 +86,7 @@ function mapApiToForm(apiUser, locationFallback) {
     maxWeeklyBudget: toFloatOrEmpty(profile?.budgetWeekly),
     dailyCalories: toIntOrEmpty(profile?.dailyCalories),
     streakCount: toIntOrEmpty(profile?.streakCount),
+    picturePath: String(profile?.picturePath || '').trim(),
   };
 }
 
@@ -97,6 +98,7 @@ function persistLocalProfile(formState) {
     weight: formState?.weightKg === '' ? '' : String(formState.weightKg),
     height: formState?.heightCm === '' ? '' : String(formState.heightCm),
     age: formState?.age === '' ? '' : String(formState.age),
+    picturePath: String(formState?.picturePath || '').trim(),
   };
 
   localStorage.setItem(PROFILE_KEY, JSON.stringify(payload));
@@ -120,11 +122,14 @@ export default function Profile() {
     maxWeeklyBudget: '',
     dailyCalories: '',
     streakCount: 0,
+    picturePath: '',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef(null);
 
   const handleCopyUserId = async () => {
     if (!userId) return;
@@ -146,6 +151,23 @@ export default function Profile() {
       window.setTimeout(() => setCopyStatus(''), 1800);
     }
   };
+
+  useEffect(() => {
+    const onProfilePhotoUpdated = async () => {
+      if (!token) return;
+      try {
+        const apiUser = await fetchMyProfile(token);
+        const mapped = mapApiToForm(apiUser, formState.location);
+        setFormState(mapped);
+        persistLocalProfile(mapped);
+      } catch {
+        // keep current state on transient errors
+      }
+    };
+
+    window.addEventListener('profile:photo-updated', onProfilePhotoUpdated);
+    return () => window.removeEventListener('profile:photo-updated', onProfilePhotoUpdated);
+  }, [token, formState.location]);
 
   useEffect(() => {
     let isMounted = true;
@@ -192,6 +214,8 @@ export default function Profile() {
     };
   }, [token]);
 
+  const avatarImageUrl = useMemo(() => resolveProfilePictureUrl(formState.picturePath), [formState.picturePath]);
+
   const initials = useMemo(() => {
     const parts = String(formState.name || '').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) {
@@ -202,6 +226,33 @@ export default function Profile() {
       .map((part) => part.charAt(0).toUpperCase())
       .join('');
   }, [formState.name]);
+
+  const handleUploadProfilePhoto = async (event) => {
+    const file = event.target?.files?.[0];
+    event.target.value = '';
+
+    if (!file || isUploadingPhoto) return;
+    if (!token) {
+      setSaveStatus('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    try {
+      setIsUploadingPhoto(true);
+      setSaveStatus('A enviar foto de perfil...');
+      const picturePath = await uploadProfilePhoto(token, file);
+      setFormState((previous) => ({
+        ...previous,
+        picturePath,
+      }));
+      setSaveStatus('Foto de perfil atualizada com sucesso.');
+      window.dispatchEvent(new CustomEvent('profile:photo-updated'));
+    } catch (error) {
+      setSaveStatus(error?.message || 'Não foi possível atualizar a foto de perfil.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const handleFieldChange = (event) => {
     const { name, value } = event.target;
@@ -268,8 +319,26 @@ export default function Profile() {
         <motion.section className="prof-cover" {...fade}>
           <div className="prof-cover-content">
             <div className="prof-avatar-wrap">
-              <div className="prof-avatar">{initials}</div>
-              <button className="prof-avatar-btn" type="button" aria-label="Alterar foto">
+              {avatarImageUrl ? (
+                <img src={avatarImageUrl} alt="Foto de perfil" className="prof-avatar prof-avatar-image" />
+              ) : (
+                <div className="prof-avatar">{initials}</div>
+              )}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="prof-hidden-input"
+                onChange={handleUploadProfilePhoto}
+              />
+              <button
+                className="prof-avatar-btn"
+                type="button"
+                aria-label="Alterar foto"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                title={isUploadingPhoto ? 'A enviar foto...' : 'Alterar foto'}
+              >
                 <Camera size={14} />
               </button>
               <span className="prof-streak-mobile" aria-label={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`} title={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`}>

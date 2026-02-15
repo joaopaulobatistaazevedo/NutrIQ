@@ -152,6 +152,7 @@ public class GlobalDatabase
                     goal                  VARCHAR(100),
                     daily_calories        INT,
                     budget_weekly         DOUBLE,
+                    picture_path          VARCHAR(500),
                     streak_count          INT NOT NULL DEFAULT 0,
                     last_meal_photo_date  DATE,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -160,6 +161,7 @@ public class GlobalDatabase
 
             ensureColumnExists(s, "user_profiles", "streak_count", "INT NOT NULL DEFAULT 0");
             ensureColumnExists(s, "user_profiles", "last_meal_photo_date", "DATE");
+            ensureColumnExists(s, "user_profiles", "picture_path", "VARCHAR(500)");
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_profile_restrictions (

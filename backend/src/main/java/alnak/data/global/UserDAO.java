@@ -34,7 +34,7 @@ public class UserDAO {
     private void upsertProfile(Long userId, UserProfile p) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("""
             INSERT INTO user_profiles
-              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly, streak_count, last_meal_photo_date)
+              (user_id, age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly, picture_path, streak_count, last_meal_photo_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 age                  = VALUES(age),
@@ -44,6 +44,7 @@ public class UserDAO {
                 goal                 = VALUES(goal),
                 daily_calories       = VALUES(daily_calories),
                 budget_weekly        = VALUES(budget_weekly),
+                picture_path         = VALUES(picture_path),
                 streak_count         = VALUES(streak_count),
                 last_meal_photo_date = VALUES(last_meal_photo_date)
         """)) {
@@ -55,8 +56,9 @@ public class UserDAO {
             setNullableString(ps, 6, p.getGoal() != null ? p.getGoal().name() : null);
             ps.setInt(7, p.getDailyCalories());
             ps.setDouble(8, p.getBudgetWeekly());
-            ps.setInt(9, Math.max(0, p.getStreakCount()));
-            setNullableDate(ps, 10, p.getLastMealPhotoDate());
+            setNullableString(ps, 9, p.getPicturePath());
+            ps.setInt(10, Math.max(0, p.getStreakCount()));
+            setNullableDate(ps, 11, p.getLastMealPhotoDate());
             ps.executeUpdate();
         }
     }
@@ -336,7 +338,7 @@ public class UserDAO {
 
     public Optional<UserProfile> getProfile(Long userId) {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly, streak_count, last_meal_photo_date FROM user_profiles WHERE user_id = ?")) {
+                "SELECT age, sex, height_cm, weight_kg, goal, daily_calories, budget_weekly, picture_path, streak_count, last_meal_photo_date FROM user_profiles WHERE user_id = ?")) {
             ps.setLong(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
@@ -351,6 +353,7 @@ public class UserDAO {
                 if (goal != null) p.setGoal(Goal.from(goal));
                 if (rs.getObject("daily_calories") != null) p.setDailyCalories(rs.getInt("daily_calories"));
                 if (rs.getObject("budget_weekly") != null) p.setBudgetWeekly(rs.getDouble("budget_weekly"));
+                p.setPicturePath(rs.getString("picture_path"));
                 if (rs.getObject("streak_count") != null) p.setStreakCount(rs.getInt("streak_count"));
                 Date lastPhotoDate = rs.getDate("last_meal_photo_date");
                 if (lastPhotoDate != null) p.setLastMealPhotoDate(lastPhotoDate.toLocalDate());
