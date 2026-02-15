@@ -259,6 +259,7 @@ export default function Profile() {
   };
 
   const dailyCalories = toIntOrNull(formState.dailyCalories);
+  const streakCount = Math.max(0, Number(formState.streakCount || 0));
   const goalLabel = GOAL_LABELS[formState.goal] || 'Objetivo não definido';
   const profileBio = GOAL_BIOS[formState.goal] || 'Completa o teu perfil para recomendações melhores';
 
@@ -272,15 +273,19 @@ export default function Profile() {
               <button className="prof-avatar-btn" type="button" aria-label="Alterar foto">
                 <Camera size={14} />
               </button>
-              <span className="prof-streak-mobile" aria-label={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`} title={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`}>
-                <Flame size={14} />
+              <span
+                className={`prof-streak-mobile ${streakCount > 0 ? 'has-streak' : 'is-empty'}`}
+                aria-label={`Streak ${streakCount} dias`}
+                title={`Streak ${streakCount} dias`}
+              >
+                <Flame size={16} />
               </span>
             </div>
 
             <div className="prof-id">
               <div className="prof-name-row">
                 <h1>{formState.name || 'Utilizador'}</h1>
-                <span className="prof-streak-pill"><Flame size={16} /> Streak {Math.max(0, Number(formState.streakCount || 0))} dias</span>
+                <span className="prof-streak-pill"><Flame size={16} /> Streak {streakCount} dias</span>
               </div>
               <p className="prof-location">
                 <MapPin size={14} />
