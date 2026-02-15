@@ -13,9 +13,9 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "GROQ_API_KEY")
     )
-    model_name: str = "gpt-4o-mini"
-    max_tokens: int = 600
-    temperature: float = 0.7
+    model_name: str = "gpt-4o"
+    max_tokens: int = 900
+    temperature: float = 0.4
     allowed_origins: str = "*"
     backend_api_url: str = "http://localhost:7071"
     java_service_url: str = Field(

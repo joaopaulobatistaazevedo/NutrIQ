@@ -48,6 +48,14 @@ python main.py
 - `GET /health` healthcheck
 - `POST /chat/onboarding`
 - `POST /chat/assistant`
+- `POST /chat/analyze-food-image` (estimativa calórica por imagem)
+
+## Memória duradoura (tipo cookies)
+
+- O chatbot guarda memória por `user_id` em `chatbot-service/data/user_memory.json`.
+- Esta memória inclui gostos, ingredientes não gostados, objetivo, orçamento/dias e receitas recentes.
+- A memória é persistente entre reinícios do serviço.
+- No frontend, é usado um cookie duradouro `nutriq_bot_uid` como fallback para manter identidade em convidados.
 
 ## Campos de resposta
 
@@ -59,6 +67,15 @@ python main.py
 `POST /chat/assistant`:
 - `response`
 - `meal_plan_draft` (quando pedido de planeamento é detetado)
+
+`POST /chat/analyze-food-image`:
+- `status`
+- `dish_name`
+- `estimated_kcal`
+- `macros` (`protein_g`, `carbs_g`, `fat_g`)
+- `confidence`
+- `tips`, `warnings`
+- `disclaimer`
 
 ## Exemplo onboarding
 

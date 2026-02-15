@@ -11,12 +11,14 @@ Key changes vs original:
 """
 import asyncio
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 from openai import OpenAI
 
 from config.settings import get_settings
 from models.schemas import ChatResponse, Message
 from services.goal_meal_planner import GoalMealPlannerService
+from services.user_memory_store import UserMemoryStore
 from utils.helpers import load_prompt, safe_json_loads
 
 
@@ -25,15 +27,30 @@ class OpenAIService:
         self.settings = get_settings()
         self.client = OpenAI(api_key=self.settings.openai_api_key) if self.settings.openai_api_key else None
         self.goal_planner = GoalMealPlannerService()
+        self._memory_store = UserMemoryStore(
+            file_path=Path(__file__).resolve().parents[1] / "data" / "user_memory.json",
+        )
 
     # ──────────────────────────────────────────────────────────────────────
     # Onboarding
     # ──────────────────────────────────────────────────────────────────────
 
     async def onboarding_chat(
-        self, user_message: str, history: List[Message]
+        self,
+        user_message: str,
+        history: List[Message],
+        user_id: str = "anonymous",
+        user_context: Optional[Dict[str, Any]] = None,
     ) -> ChatResponse:
         system_prompt = load_prompt("prompts/onboarding.txt")
+
+        memory = self._ensure_user_memory(user_id)
+        if user_context:
+            memory.update({
+                "goal": user_context.get("goal") or memory.get("goal"),
+                "favorite_foods": user_context.get("favorite_foods") or memory.get("favorite_foods") or [],
+                "disliked_ingredients": user_context.get("disliked_ingredients") or memory.get("disliked_ingredients") or [],
+            })
 
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend({"role": item.role, "content": item.content} for item in history)
@@ -57,6 +74,7 @@ class OpenAIService:
             bot_response = (
                 "Perfeito! Já tenho o necessário para preparar o teu plano semanal de refeições 🎯"
             )
+            self._update_memory_from_preferences(user_id, extracted_preferences)
 
         return ChatResponse(
             response=bot_response,
@@ -74,13 +92,35 @@ class OpenAIService:
         user_context: Optional[Dict[str, Any]],
         history: Optional[List[Message]] = None,
         auth_token: Optional[str] = None,
+        user_id: str = "anonymous",
     ) -> ChatResponse:
-        pending_edit_request = bool((user_context or {}).get("pending_edit_request"))
+        memory = self._ensure_user_memory(user_id)
+        merged_context = dict(user_context or {})
+        if memory:
+            merged_context.setdefault("favorite_foods", memory.get("favorite_foods") or [])
+            merged_context.setdefault("disliked_ingredients", memory.get("disliked_ingredients") or [])
+            if memory.get("goal") and not merged_context.get("goal"):
+                merged_context["goal"] = memory["goal"]
+            if memory.get("max_weekly_budget") is not None and merged_context.get("max_weekly_budget") in (None, ""):
+                merged_context["max_weekly_budget"] = memory.get("max_weekly_budget")
+            if memory.get("planning_days") is not None and merged_context.get("planning_days") in (None, ""):
+                merged_context["planning_days"] = memory.get("planning_days")
+
+        recent_recipe_ids = set(self._to_recipe_ids(memory.get("recent_recipe_ids") or []))
+        recent_recipe_ids.update(self._extract_recipe_ids_from_context(merged_context))
+        if recent_recipe_ids:
+            merged_context["recent_recipe_ids"] = sorted(recent_recipe_ids)
+
+        coach_metrics = self._build_coaching_metrics(merged_context)
+        if coach_metrics:
+            merged_context["coach_metrics"] = coach_metrics
+
+        pending_edit_request = bool(merged_context.get("pending_edit_request"))
         planning_request = self._looks_like_meal_plan_request(user_message) or pending_edit_request
 
         system_prompt = load_prompt("prompts/assistant.txt")
-        if user_context:
-            system_prompt += f"\n\nContexto do utilizador:\n{user_context}"
+        if merged_context:
+            system_prompt += f"\n\nContexto do utilizador:\n{merged_context}"
 
         messages = [{"role": "system", "content": system_prompt}]
         if history:
@@ -93,7 +133,7 @@ class OpenAIService:
 
         if planning_request:
             constraints = await self._extract_meal_plan_constraints(messages)
-            meal_plan_draft = self._build_meal_plan_draft(constraints, user_context)
+            meal_plan_draft = self._build_meal_plan_draft(constraints, merged_context, memory)
             missing = meal_plan_draft.get("missing_required", [])
 
             if missing:
@@ -138,6 +178,10 @@ class OpenAIService:
                         "Não foi possível gerar o plano neste momento. "
                         "Tenta novamente dentro de instantes."
                     )
+
+        self._update_memory_from_context(user_id, merged_context)
+        if meal_plan and meal_plan.get("status") == "generated":
+            self._update_memory_from_plan(user_id, meal_plan)
 
         return ChatResponse(
             response=bot_response,
@@ -195,35 +239,45 @@ class OpenAIService:
     def _is_onboarding_complete(self, preferences: Dict[str, Any]) -> bool:
         if not preferences:
             return False
-        required = ["favorite_foods", "max_weekly_budget", "planning_days"]
+        required = ["favorite_foods", "planning_days"]
         return all(preferences.get(key) not in (None, "", []) for key in required)
 
     def _looks_like_meal_plan_request(self, text: str) -> bool:
-        # "boa semana" ou "o que comeste esta semana". Agora exige keywords
-        # mais específicas ligadas a intenção de planeamento.
         lower = text.lower()
         strong_keywords = [
             "meal plan", "plano de refeições", "planeamento semanal",
             "planear refeições", "planear a semana", "gerar plano",
             "fazer plano", "criar plano", "quero um plano", "novo plano",
+            "plano alimentar", "organiza a minha semana", "plano da semana",
+            "com base no histórico", "com base no historico", "com base no que ja sabes",
+            "com base no que já sabes", "usar o meu histórico", "usar o meu historico",
         ]
-        # Combinações fracas: só disparam se acompanhadas de verbo de ação
-        weak_keywords = ["plano", "menu", "receitas para a semana"]
-        action_verbs = ["quero", "preciso", "faz", "gera", "cria", "prepara", "monta"]
+        weak_keywords = ["plano", "menu", "receitas para a semana", "refeições", "refeicoes"]
+        action_verbs = ["quero", "preciso", "faz", "gera", "cria", "prepara", "monta", "atualiza", "edita"]
 
         if any(kw in lower for kw in strong_keywords):
             return True
         if any(kw in lower for kw in weak_keywords):
             return any(v in lower for v in action_verbs)
+
+        history_tokens = ["histórico", "historico", "anteriores", "últimos", "ultimos"]
+        if any(token in lower for token in history_tokens) and any(v in lower for v in action_verbs):
+            return True
+
         return False
 
     def _build_meal_plan_draft(
         self,
         constraints: Dict[str, Any],
         user_context: Optional[Dict[str, Any]],
+        memory: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         merged = dict(user_context or {})
         merged.update({k: v for k, v in constraints.items() if v not in (None, "")})
+        if memory:
+            for key in ("goal", "max_weekly_budget", "planning_days"):
+                if merged.get(key) in (None, "") and memory.get(key) not in (None, ""):
+                    merged[key] = memory.get(key)
 
         planning_days = merged.get("planning_days")
         try:
@@ -231,15 +285,15 @@ class OpenAIService:
                 planning_days = int(planning_days)
         except (TypeError, ValueError):
             planning_days = None
+        if planning_days is None:
+            planning_days = 7
+        planning_days = max(1, min(planning_days, 7))
 
         max_budget = merged.get("max_weekly_budget")
         goal = merged.get("goal", "maintain")
-
-        missing_required = []
-        if max_budget in (None, ""):
-            missing_required.append("preço máximo semanal")
-        if planning_days in (None, ""):
-            missing_required.append("número de dias a planear")
+        if goal in (None, ""):
+            goal = "maintain"
+        recent_recipe_ids = sorted(self._to_recipe_ids(merged.get("recent_recipe_ids") or []))
 
         return {
             "status": "ready_for_generation",
@@ -254,9 +308,251 @@ class OpenAIService:
                 "requested_extra_ingredients": merged.get("requested_extra_ingredients", []),
                 "restrictions": merged.get("restrictions", []),
                 "allergens": merged.get("allergens", []),
+                "exclude_recipe_ids": recent_recipe_ids,
             },
-            "missing_required": missing_required,
+            "missing_required": [],
             "notes": "Critérios prontos. Preços do supermercado serão consultados antes da geração.",
+        }
+
+    def _ensure_user_memory(self, user_id: str) -> Dict[str, Any]:
+        return self._memory_store.get(user_id)
+
+    def _update_memory_from_preferences(self, user_id: str, preferences: Dict[str, Any]) -> None:
+        if not isinstance(preferences, dict):
+            return
+        memory = self._ensure_user_memory(user_id)
+        for key in ("favorite_foods", "disliked_ingredients"):
+            values = preferences.get(key)
+            if isinstance(values, list):
+                memory[key] = self._merge_unique_text(memory.get(key) or [], values)
+
+        for key in ("goal", "planning_days", "max_weekly_budget"):
+            value = preferences.get(key)
+            if value not in (None, ""):
+                memory[key] = value
+        self._memory_store.upsert(user_id, memory)
+
+    def _update_memory_from_context(self, user_id: str, context: Dict[str, Any]) -> None:
+        if not isinstance(context, dict):
+            return
+        memory = self._ensure_user_memory(user_id)
+        for key in ("favorite_foods", "disliked_ingredients"):
+            values = context.get(key)
+            if isinstance(values, list):
+                memory[key] = self._merge_unique_text(memory.get(key) or [], values)
+        for key in ("goal", "planning_days", "max_weekly_budget"):
+            value = context.get(key)
+            if value not in (None, ""):
+                memory[key] = value
+        self._memory_store.upsert(user_id, memory)
+
+    def _update_memory_from_plan(self, user_id: str, meal_plan: Dict[str, Any]) -> None:
+        memory = self._ensure_user_memory(user_id)
+        recipe_ids = self._extract_recipe_ids_from_plan(meal_plan)
+        if not recipe_ids:
+            return
+        historical = self._to_recipe_ids(memory.get("recent_recipe_ids") or [])
+        combined = list(dict.fromkeys(historical + recipe_ids))
+        memory["recent_recipe_ids"] = combined[-60:]
+        self._memory_store.upsert(user_id, memory)
+
+    async def analyze_food_image(
+        self,
+        image_base64: str,
+        mime_type: str = "image/jpeg",
+        user_message: str = "",
+    ) -> Dict[str, Any]:
+        if self.client is None:
+            raise RuntimeError("OPENAI_API_KEY não configurada no chatbot-service/.env")
+
+        cleaned_b64 = (image_base64 or "").strip()
+        if not cleaned_b64:
+            return {
+                "status": "error",
+                "message": "Imagem inválida.",
+            }
+
+        data_url = f"data:{mime_type};base64,{cleaned_b64}"
+        instruction = (
+            "Analisa esta imagem de comida e devolve APENAS JSON válido com este formato: "
+            "{\"dish_name\": string, \"estimated_kcal\": number, \"portion_description\": string, "
+            "\"kcal_range\": {\"min\": number, \"max\": number}, "
+            "\"macros\": {\"protein_g\": number, \"carbs_g\": number, \"fat_g\": number}, "
+            "\"confidence\": \"low\"|\"medium\"|\"high\", \"tips\": [string], \"warnings\": [string]}. "
+            "A estimativa deve ser para 1 prato na imagem (não por 100g). "
+            "Se houver incerteza, usa confidence low/medium e explica em warnings."
+        )
+        user_text = user_message.strip() or "Quero saber calorias deste prato."
+
+        response = await asyncio.to_thread(
+            self.client.chat.completions.create,
+            model=self.settings.model_name,
+            temperature=0.2,
+            max_tokens=450,
+            messages=[
+                {"role": "system", "content": instruction},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                },
+            ],
+        )
+
+        content = response.choices[0].message.content or ""
+        parsed = safe_json_loads(content)
+        if not parsed:
+            return {
+                "status": "error",
+                "message": "Não foi possível interpretar a imagem de forma fiável.",
+            }
+
+        kcal = parsed.get("estimated_kcal")
+        try:
+            kcal_value = max(0.0, float(kcal))
+        except (TypeError, ValueError):
+            kcal_value = 0.0
+
+        macros = parsed.get("macros") if isinstance(parsed.get("macros"), dict) else {}
+        protein_g = _safe_number(macros.get("protein_g"))
+        carbs_g = _safe_number(macros.get("carbs_g"))
+        fat_g = _safe_number(macros.get("fat_g"))
+
+        macro_kcal = round((protein_g * 4.0) + (carbs_g * 4.0) + (fat_g * 9.0), 0)
+        warnings = [str(x) for x in (parsed.get("warnings") or []) if str(x).strip()][:4]
+
+        confidence = _normalize_confidence(parsed.get("confidence"))
+        kcal_value = _sanitize_kcal(kcal_value, macro_kcal, confidence, warnings)
+
+        raw_range = parsed.get("kcal_range") if isinstance(parsed.get("kcal_range"), dict) else {}
+        range_min = _safe_number(raw_range.get("min"))
+        range_max = _safe_number(raw_range.get("max"))
+        if range_min <= 0 or range_max <= 0 or range_min > range_max:
+            spread = 0.08 if confidence == "high" else (0.12 if confidence == "medium" else 0.18)
+            range_min = max(80.0, round(kcal_value * (1.0 - spread), 0))
+            range_max = min(2200.0, round(kcal_value * (1.0 + spread), 0))
+
+        result = {
+            "status": "ok",
+            "dish_name": str(parsed.get("dish_name") or "Prato identificado").strip() or "Prato identificado",
+            "estimated_kcal": round(kcal_value, 0),
+            "portion_description": str(parsed.get("portion_description") or "1 prato médio").strip() or "1 prato médio",
+            "kcal_range": {
+                "min": round(range_min, 0),
+                "max": round(range_max, 0),
+            },
+            "macros": {
+                "protein_g": protein_g,
+                "carbs_g": carbs_g,
+                "fat_g": fat_g,
+            },
+            "confidence": confidence,
+            "tips": [str(x) for x in (parsed.get("tips") or []) if str(x).strip()][:4],
+            "warnings": warnings,
+            "disclaimer": "Estimativa por visão computacional; não substitui avaliação clínica ou rótulo nutricional oficial.",
+        }
+        return result
+
+    def _extract_recipe_ids_from_context(self, context: Dict[str, Any]) -> List[int]:
+        ids: List[int] = []
+        for key in ("active_meal_plan", "meal_plan", "last_meal_plan"):
+            plan = context.get(key)
+            if isinstance(plan, dict):
+                ids.extend(self._extract_recipe_ids_from_plan(plan))
+        return self._to_recipe_ids(ids)
+
+    def _extract_recipe_ids_from_plan(self, meal_plan: Dict[str, Any]) -> List[int]:
+        ids: List[int] = []
+        for day in meal_plan.get("days") or []:
+            if not isinstance(day, dict):
+                continue
+            for meal in day.get("meals") or []:
+                if not isinstance(meal, dict):
+                    continue
+                raw = meal.get("recipe_id", meal.get("recipeId"))
+                parsed = self._parse_positive_int(raw)
+                if parsed is not None:
+                    ids.append(parsed)
+        return self._to_recipe_ids(ids)
+
+    def _to_recipe_ids(self, values: List[Any]) -> List[int]:
+        result: List[int] = []
+        seen: set[int] = set()
+        for value in values:
+            parsed = self._parse_positive_int(value)
+            if parsed is None or parsed in seen:
+                continue
+            seen.add(parsed)
+            result.append(parsed)
+        return result
+
+    def _parse_positive_int(self, value: Any) -> Optional[int]:
+        if isinstance(value, int):
+            return value if value > 0 else None
+        if isinstance(value, str) and value.isdigit():
+            parsed = int(value)
+            return parsed if parsed > 0 else None
+        return None
+
+    def _merge_unique_text(self, current: List[Any], incoming: List[Any]) -> List[str]:
+        merged: List[str] = []
+        seen: set[str] = set()
+        for value in [*(current or []), *(incoming or [])]:
+            if not isinstance(value, str):
+                continue
+            cleaned = value.strip()
+            if not cleaned:
+                continue
+            key = cleaned.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(cleaned)
+        return merged
+
+    def _build_coaching_metrics(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        weight_kg = _first_float(context, ["weight_kg", "body_weight_kg", "weight"])
+        height_cm = _first_float(context, ["height_cm", "height"])
+        age_years = _first_float(context, ["age"])
+        sex = str(context.get("sex") or "").strip().lower()
+
+        if weight_kg <= 0:
+            return {}
+
+        goal = str(context.get("goal") or "maintain").strip() or "maintain"
+        profile = {
+            "lose_weight": {"protein": 1.8, "calorie_delta": -400},
+            "gain_weight": {"protein": 1.6, "calorie_delta": 350},
+            "gain_muscle": {"protein": 2.0, "calorie_delta": 250},
+            "maintain": {"protein": 1.4, "calorie_delta": 0},
+        }.get(goal, {"protein": 1.4, "calorie_delta": 0})
+
+        protein_target_g = round(weight_kg * float(profile["protein"]), 0)
+        hydration_l = round(max(1.8, weight_kg * 0.033), 1)
+
+        bmi = 0.0
+        bmi_class = "n/a"
+        if height_cm > 0:
+            meters = height_cm / 100.0
+            bmi = round(weight_kg / max(meters * meters, 0.01), 1)
+            bmi_class = _bmi_classification(bmi)
+
+        tdee = _first_float(context, ["tdee"])
+        if tdee <= 0 and height_cm > 0 and age_years > 0:
+            bmr = _mifflin_st_jeor(weight_kg, height_cm, age_years, sex)
+            tdee = round(bmr * 1.4, 0)
+
+        kcal_target = round(max(1200.0, tdee + float(profile["calorie_delta"])), 0) if tdee > 0 else 0.0
+
+        return {
+            "bmi": bmi if bmi > 0 else None,
+            "bmi_class": bmi_class,
+            "protein_target_g_day": protein_target_g,
+            "hydration_target_l_day": hydration_l,
+            "estimated_tdee": tdee if tdee > 0 else None,
+            "estimated_kcal_target": kcal_target if kcal_target > 0 else None,
         }
 
 
@@ -271,3 +567,69 @@ def _goal_label(goal: str) -> str:
         "maintain": "manter a forma",
         "gain_muscle": "ganhar massa muscular",
     }.get(goal, goal)
+
+
+def _safe_number(value: Any) -> float:
+    try:
+        return round(max(0.0, float(value)), 1)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _normalize_confidence(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"high", "medium", "low"}:
+        return normalized
+    return "low"
+
+
+def _first_float(payload: Dict[str, Any], keys: List[str]) -> float:
+    for key in keys:
+        value = payload.get(key)
+        try:
+            parsed = float(value)
+            if parsed > 0:
+                return parsed
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def _bmi_classification(bmi: float) -> str:
+    if bmi <= 0:
+        return "n/a"
+    if bmi < 18.5:
+        return "baixo peso"
+    if bmi < 25:
+        return "peso adequado"
+    if bmi < 30:
+        return "excesso de peso"
+    return "obesidade"
+
+
+def _mifflin_st_jeor(weight_kg: float, height_cm: float, age_years: float, sex: str) -> float:
+    base = (10.0 * weight_kg) + (6.25 * height_cm) - (5.0 * age_years)
+    if sex.startswith("f"):
+        return base - 161.0
+    return base + 5.0
+
+
+def _sanitize_kcal(kcal_value: float, macro_kcal: float, confidence: str, warnings: List[str]) -> float:
+    if kcal_value <= 0 and macro_kcal > 0:
+        warnings.append("Calorias estimadas por macros devido a baixa confiança da leitura.")
+        return max(80.0, min(2200.0, macro_kcal))
+
+    if kcal_value < 80.0 or kcal_value > 2200.0:
+        if macro_kcal > 0:
+            warnings.append("Valor calórico ajustado com base nos macronutrientes estimados.")
+            return max(80.0, min(2200.0, macro_kcal))
+
+        warnings.append("Valor calórico fora do intervalo habitual para 1 prato; usa como aproximação.")
+        return max(80.0, min(2200.0, kcal_value))
+
+    if confidence == "low" and macro_kcal > 0:
+        blended = (kcal_value * 0.6) + (macro_kcal * 0.4)
+        warnings.append("Confiança baixa: calorias suavizadas com base nos macronutrientes.")
+        return max(80.0, min(2200.0, blended))
+
+    return kcal_value

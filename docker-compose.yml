@@ -61,6 +61,7 @@ services:
       - "${CHATBOT_HOST_PORT:-8000}:8000"
     volumes:
       - ./.run-batista/logs:/logs
+      - chatbot_data:/app/data
     command:
       [
         "sh",
@@ -153,3 +154,4 @@ volumes:
   mysql_data:
   backend_sqlite_data:
   frontend_node_modules:
+  chatbot_data:

@@ -67,11 +67,10 @@ class GoalMealPlannerService:
                 logger.info("Cached %d priced recipes from Java service", len(priced))
                 return len(priced)
         except Exception as exc:
-            logger.warning("Java service unavailable – falling back to scraper: %s", exc)
+            logger.warning("Java service unavailable; planner will use backend-only mode: %s", exc)
 
-        # Fallback: wrap old scraper recipes as PricedRecipes with default cost
-        self._cached_priced_recipes = self._load_fallback_recipes()
-        return len(self._cached_priced_recipes)
+        self._cached_priced_recipes = []
+        return 0
 
     def generate_goal_plan(self, constraints: dict[str, Any]) -> dict[str, Any]:
         """
@@ -108,10 +107,17 @@ class GoalMealPlannerService:
             constraints.get("requested_extra_ingredients"),
         )
         disliked = _flat_tokens(constraints.get("disliked_ingredients"))
+        exclude_recipe_ids = _flat_recipe_ids(constraints.get("exclude_recipe_ids"))
 
         recipes = self._get_recipes()
         if not recipes:
-            return _empty_plan(planning_days, goal, disliked, liked, "Sem receitas disponíveis.")
+            return _empty_plan(
+                planning_days,
+                goal,
+                disliked,
+                liked,
+                "Sem receitas disponíveis no backend neste momento.",
+            )
 
         # Filter disliked + dietary restrictions / allergens
         allowed = _filter_recipes(
@@ -124,6 +130,13 @@ class GoalMealPlannerService:
             logger.warning("All recipes filtered out – relaxing disliked filter")
             allowed = recipes  # last resort
 
+        if exclude_recipe_ids:
+            filtered = [r for r in allowed if str(r.id) not in exclude_recipe_ids]
+            if filtered:
+                allowed = filtered
+            else:
+                logger.info("Exclusion list removed all recipes; ignoring previous-plan exclusions")
+
         # Run genetic algorithm
         try:
             ga = MealPlanGA(
@@ -135,6 +148,7 @@ class GoalMealPlannerService:
                 max_weekly_budget=max_budget,
                 tdee=tdee,
                 body_weight_kg=body_weight_kg,
+                excluded_recipe_ids=list(exclude_recipe_ids),
             )
             best_slots = ga.run()
         except Exception as exc:
@@ -333,6 +347,23 @@ def _flat_tokens(*lists: Any) -> list[str]:
         elif isinstance(lst, list):
             out.extend(str(x).lower().strip() for x in lst if x)
     return [t for t in out if t]
+
+
+def _flat_recipe_ids(values: Any) -> set[str]:
+    result: set[str] = set()
+    if isinstance(values, (int, str)):
+        values = [values]
+    if not isinstance(values, list):
+        return result
+
+    for value in values:
+        if isinstance(value, int) and value > 0:
+            result.add(str(value))
+        elif isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned.isdigit() and int(cleaned) > 0:
+                result.add(cleaned)
+    return result
 
 
 def _filter_recipes(
