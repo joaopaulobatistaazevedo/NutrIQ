@@ -747,3 +747,42 @@
     font-size: 16px;
   }
 }
+
+
+.nutri-social-comments-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.nutri-social-comments-modal {
+  width: min(680px, 100%);
+  max-height: min(78vh, 760px);
+  background: var(--app-surface-1, #ffffff);
+  border: 1px solid var(--app-border-1);
+  border-radius: 14px;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nutri-social-comments-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--app-border-1);
+  background: var(--app-surface-2);
+}
+
+.nutri-social-comments-modal-body {
+  padding: 12px;
+  overflow-y: auto;
+}

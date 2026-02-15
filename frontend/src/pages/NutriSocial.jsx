@@ -277,6 +277,7 @@ export default function NutriSocial() {
   const [activePostMenuId, setActivePostMenuId] = useState('');
   const [editingPostId, setEditingPostId] = useState('');
   const [editingDraft, setEditingDraft] = useState({ description: '', rating: 5 });
+  const [expandedCommentsPostId, setExpandedCommentsPostId] = useState('');
 
   const hydratePostInteractions = useCallback(async (posts) => {
     if (!token) {
@@ -600,6 +601,54 @@ export default function NutriSocial() {
     const key = String(postId || '').trim();
     return interactionsByPost[key] || { kudosByUser: {}, comments: [] };
   };
+
+  const handleOpenCommentsModal = (postId) => {
+    const key = String(postId || '').trim();
+    if (!key) return;
+    setExpandedCommentsPostId(key);
+  };
+
+  const handleCloseCommentsModal = () => {
+    setExpandedCommentsPostId('');
+  };
+
+  const expandedCommentsPost = useMemo(
+    () => activePostList.find((post) => String(post?.id) === expandedCommentsPostId) || null,
+    [activePostList, expandedCommentsPostId],
+  );
+
+  const expandedComments = useMemo(() => {
+    if (!expandedCommentsPostId) {
+      return [];
+    }
+
+    const interaction = interactionsByPost[expandedCommentsPostId] || { comments: [] };
+    const comments = Array.isArray(interaction.comments) ? interaction.comments : [];
+
+    return [...comments]
+      .map((comment) => ({
+        ...comment,
+        createdAt: normalizeDateTimeValue(comment?.createdAt, comment?.created_at, comment?.currentTime, comment?.current_time),
+      }))
+      .sort((left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime());
+  }, [expandedCommentsPostId, interactionsByPost]);
+
+  useEffect(() => {
+    if (!expandedCommentsPostId) {
+      return undefined;
+    }
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setExpandedCommentsPostId('');
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [expandedCommentsPostId]);
 
   const handleSendFriendRequest = async (event) => {
     event.preventDefault();
@@ -1463,9 +1512,14 @@ export default function NutriSocial() {
                             <ThumbsUp size={14} />
                             Kudos {kudosCount}
                           </button>
-                          <span className="badge bg-secondary-lt">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                            onClick={() => handleOpenCommentsModal(post.id)}
+                            aria-label={`Ver todos os comentários (${sortedComments.length})`}
+                          >
                             <MessageCircle size={13} /> {sortedComments.length} comentários
-                          </span>
+                          </button>
                         </div>
 
                         {kudosCount > 0 ? (
@@ -1565,6 +1619,47 @@ export default function NutriSocial() {
               </div>
             </div>
             </section>
+          ) : null}
+
+          {expandedCommentsPostId ? (
+            <div
+              className="nutri-social-comments-modal-backdrop"
+              onClick={handleCloseCommentsModal}
+              role="presentation"
+            >
+              <div
+                className="nutri-social-comments-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Todos os comentários"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="nutri-social-comments-modal-header">
+                  <h4 className="h6 mb-0">
+                    Comentários · {expandedCommentsPost?.recipeName || `Receita #${expandedCommentsPost?.recipeId || expandedCommentsPostId}`}
+                  </h4>
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleCloseCommentsModal}>
+                    Fechar
+                  </button>
+                </div>
+
+                <div className="nutri-social-comments-modal-body">
+                  {expandedComments.length === 0 ? (
+                    <p className="text-secondary mb-0">Sem comentários para mostrar.</p>
+                  ) : (
+                    <div className="nutri-social-comment-list">
+                      {expandedComments.map((comment) => (
+                        <div className="nutri-social-comment-item" key={`modal-comment-${expandedCommentsPostId}-${comment.id}`}>
+                          <strong>{usernameFromId(comment.userId, currentUserId, userDirectory)}</strong>
+                          <span>{comment.text}</span>
+                          <small>{prettyDate(comment.createdAt)}</small>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : null}
 
           {activeTab === 'meal' ? (
