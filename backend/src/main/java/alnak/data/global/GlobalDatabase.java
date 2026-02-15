@@ -131,6 +131,18 @@ public class GlobalDatabase
             """);
 
             s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id          INT PRIMARY KEY AUTO_INCREMENT,
+                    user_id     INT          NOT NULL,
+                    token_hash  CHAR(64)     NOT NULL UNIQUE,
+                    expires_at  DATETIME     NOT NULL,
+                    used_at     DATETIME,
+                    created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_profiles (
                     user_id               INT PRIMARY KEY,
                     age                   INT,
@@ -283,6 +295,8 @@ public class GlobalDatabase
 
             // ── Indexes ───────────────────────────────────────────
             createIndexIfMissing(s, "CREATE INDEX idx_users_email      ON users(email)");
+            createIndexIfMissing(s, "CREATE INDEX idx_prt_user_id      ON password_reset_tokens(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_prt_expires_at   ON password_reset_tokens(expires_at)");
             createIndexIfMissing(s, "CREATE INDEX idx_friendships_addr ON friendships(addressee_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_user       ON posts(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_recipe     ON posts(recipe_id)");

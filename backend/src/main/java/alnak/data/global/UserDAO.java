@@ -13,8 +13,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -171,6 +173,93 @@ public class UserDAO {
                 }
                 return users;
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void createPasswordResetToken(Long userId, String tokenHash, LocalDateTime expiresAt) {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+                VALUES (?, ?, ?)
+                """)) {
+            ps.setLong(1, userId);
+            ps.setString(2, tokenHash);
+            ps.setTimestamp(3, Timestamp.valueOf(expiresAt));
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Optional<Long> consumePasswordResetToken(String tokenHash) {
+        try {
+            conn.setAutoCommit(false);
+            try {
+                Long userId = null;
+                try (PreparedStatement select = conn.prepareStatement("""
+                        SELECT id, user_id
+                        FROM password_reset_tokens
+                        WHERE token_hash = ?
+                          AND used_at IS NULL
+                          AND expires_at > NOW()
+                        FOR UPDATE
+                        """)) {
+                    select.setString(1, tokenHash);
+                    try (ResultSet rs = select.executeQuery()) {
+                        if (rs.next()) {
+                            userId = rs.getLong("user_id");
+                            long tokenId = rs.getLong("id");
+                            try (PreparedStatement update = conn.prepareStatement("""
+                                    UPDATE password_reset_tokens
+                                    SET used_at = NOW()
+                                    WHERE id = ?
+                                    """)) {
+                                update.setLong(1, tokenId);
+                                update.executeUpdate();
+                            }
+                        }
+                    }
+                }
+                conn.commit();
+                return Optional.ofNullable(userId);
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void updatePasswordHash(Long userId, String passwordHash) {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                UPDATE users
+                SET password_hash = ?
+                WHERE id = ?
+                """)) {
+            ps.setString(1, passwordHash);
+            ps.setLong(2, userId);
+            int updated = ps.executeUpdate();
+            if (updated == 0) {
+                throw new IllegalArgumentException("Utilizador inválido para atualização de password.");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void invalidateUnusedPasswordResetTokens(Long userId) {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                UPDATE password_reset_tokens
+                SET used_at = NOW()
+                WHERE user_id = ?
+                  AND used_at IS NULL
+                """)) {
+            ps.setLong(1, userId);
+            ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

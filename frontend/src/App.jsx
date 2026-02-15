@@ -5,6 +5,7 @@ import PublicOnlyRoute from './components/PublicOnlyRoute';
 import { PRIVATE_PATHS } from './config/navigation';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import BotOnboarding from './pages/BotOnboarding';
 import MealPlan from './pages/MealPlan';
@@ -36,6 +37,7 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/login" />} />
       <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
       <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/welcome-bot" element={<BotOnboarding />} />
 
       {PRIVATE_PATHS.map((path) => (
