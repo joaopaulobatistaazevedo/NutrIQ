@@ -148,6 +148,11 @@ function toUiPlan(plan) {
     };
   });
 
+  const totalMeals = days.reduce((sum, day) => sum + (Array.isArray(day.meals) ? day.meals.length : 0), 0);
+  if (totalMeals <= 0) {
+    return null;
+  }
+
   return {
     status: 'generated',
     source: 'backend_active_plan',

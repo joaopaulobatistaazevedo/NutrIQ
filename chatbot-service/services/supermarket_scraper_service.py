@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 from urllib import error, request
 from urllib.parse import urljoin
@@ -85,6 +86,9 @@ class PricedRecipe:
 
     @classmethod
     def from_dto(cls, dto: dict[str, Any], cost_per_serving: float = 0.0) -> "PricedRecipe":
+        description = str(dto.get("description") or "")
+        metadata = _parse_recipe_description(description)
+
         nutrition = dto.get("nutritionalInfo") or {}
         ingredients_raw = dto.get("ingredients") or []
         ingredients = []
@@ -95,12 +99,14 @@ class PricedRecipe:
                     ingredients.append(str(name))
             elif isinstance(item, str):
                 ingredients.append(item)
+        if not ingredients and metadata["ingredients"]:
+            ingredients = metadata["ingredients"]
 
         return cls(
             id=str(dto.get("id", "")),
             title=str(dto.get("title") or dto.get("name") or ""),
-            url=str(dto.get("url", "")),
-            source=str(dto.get("source", "backend")),
+            url=str(dto.get("url") or metadata["url"] or ""),
+            source=str(dto.get("source") or metadata["source"] or "backend"),
             calories_per_serving=_to_float(dto.get("calories_per_serving") or nutrition.get("calories")),
             protein_g=_to_float(dto.get("protein_g") or nutrition.get("proteinG")),
             fat_g=_to_float(dto.get("fat_g") or nutrition.get("fatG")),
@@ -236,3 +242,32 @@ def _to_int(val: Any) -> int | None:
         return int(val) if val is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _parse_recipe_description(raw_description: str) -> dict[str, Any]:
+    text = str(raw_description or "").strip()
+    if not text:
+        return {"source": "", "url": "", "ingredients": []}
+
+    source = ""
+    source_match = re.search(r"\bFonte\s*:\s*([^|]+)", text, flags=re.IGNORECASE)
+    if source_match:
+        source = source_match.group(1).strip()
+
+    url = ""
+    url_match = re.search(r"\bURL\s*:\s*(https?://\S+)", text, flags=re.IGNORECASE)
+    if url_match:
+        url = url_match.group(1).strip()
+        url = url.rstrip("|;, ")
+
+    ingredients: list[str] = []
+    ingredients_match = re.search(r"\bIngredientes?\s*:\s*(.+)$", text, flags=re.IGNORECASE)
+    if ingredients_match:
+        chunk = ingredients_match.group(1).strip()
+        chunk = chunk.split("|", 1)[0].strip()
+        for token in re.split(r"[;,]", chunk):
+            cleaned = str(token or "").strip()
+            if cleaned:
+                ingredients.append(cleaned)
+
+    return {"source": source, "url": url, "ingredients": ingredients}

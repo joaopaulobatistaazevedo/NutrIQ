@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, Circle, Minus, Plus, ShoppingCart, Store, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -9,6 +9,7 @@ import {
   listIngredientPrices,
   listLatestPrices,
 } from '../services/priceService';
+import { generateShoppingCartFromMealPlan } from '../services/chatbotService';
 import { fetchPersistedShoppingCart, savePersistedShoppingCart } from '../services/shoppingCartService';
 import { PROFILE_KEY, WEEKLY_PLAN_KEY, CART_GENERATE_REQUEST_KEY } from '../constants/storageKeys';
 import { resolveAccountId, scopedKey } from '../utils/accountScope';
@@ -35,6 +36,244 @@ function slugify(value) {
 
 function normalizeIngredientKey(value) {
   return slugify(value || '').replace(/_/g, ' ').trim();
+}
+
+function cleanIngredientLabel(rawValue) {
+  let value = String(rawValue || '').trim();
+  if (!value) return '';
+
+  value = value.replace(/\([^)]*\)/g, ' ');
+  value = value.replace(/q\.?b\.?/gi, ' ');
+  value = value.replace(/^[-\u2022*\s]+/, '');
+  value = value.replace(
+    /^\s*(?:\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*(?:(?:kg|g|gr|gramas?|ml|l|dl|cl|un|unid(?:ade)?s?|dentes?|colher(?:es)?(?:\s+de\s+(?:sopa|cha|chá))?|chávenas?|xícaras?|xicaras?)\b)?\s*/i,
+    '',
+  );
+  value = value.replace(/\s+/g, ' ').trim();
+  value = value.replace(/^[,.;:-]+|[,.;:-]+$/g, '').trim();
+  return value;
+}
+
+function extractDemandFromRecipes(recipes) {
+  const demand = new Map();
+
+  recipes.forEach((recipe) => {
+    const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+    ingredients.forEach((ingredient) => {
+      const ingredientName = cleanIngredientLabel(ingredient?.ingredientName);
+      if (!ingredientName) return;
+
+      const key = normalizeIngredientKey(ingredientName);
+      if (!key) return;
+
+      const quantityRaw = Number(ingredient?.quantity);
+      const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? quantityRaw : 1;
+      const current = demand.get(key) || { ingredientName, quantity: 0 };
+
+      demand.set(key, {
+        ingredientName: current.ingredientName,
+        quantity: current.quantity + quantity,
+      });
+    });
+  });
+
+  return demand;
+}
+
+function extractDemandFromRecipeDescriptions(recipes) {
+  const demand = new Map();
+
+  recipes.forEach((recipe) => {
+    const description = String(recipe?.description || '').trim();
+    if (!description) return;
+
+    const match = description.match(/\bingredientes?\s*:\s*(.+)$/i);
+    if (!match) return;
+
+    const chunk = String(match[1] || '').split('|')[0].trim();
+    if (!chunk) return;
+
+    chunk.split(/[;,]/).forEach((token) => {
+      const ingredientName = cleanIngredientLabel(token);
+      if (!ingredientName) return;
+      const key = normalizeIngredientKey(ingredientName);
+      if (!key) return;
+
+      const current = demand.get(key) || { ingredientName, quantity: 0 };
+      demand.set(key, {
+        ingredientName: current.ingredientName,
+        quantity: current.quantity + 1,
+      });
+    });
+  });
+
+  return demand;
+}
+
+function extractDemandFromPlanPreview(plan) {
+  const demand = new Map();
+  const days = Array.isArray(plan?.days) ? plan.days : [];
+
+  days.forEach((day) => {
+    const meals = Array.isArray(day?.meals) ? day.meals : [];
+    meals.forEach((meal) => {
+      const preview = Array.isArray(meal?.ingredients_preview) ? meal.ingredients_preview : [];
+      preview.forEach((rawValue) => {
+        const ingredientName = cleanIngredientLabel(rawValue);
+        if (!ingredientName) return;
+        const key = normalizeIngredientKey(ingredientName);
+        if (!key) return;
+
+        const current = demand.get(key) || { ingredientName, quantity: 0 };
+        demand.set(key, {
+          ingredientName: current.ingredientName,
+          quantity: current.quantity + 1,
+        });
+      });
+    });
+  });
+
+  return demand;
+}
+
+function mergeDemandMaps(...maps) {
+  const merged = new Map();
+
+  maps.forEach((map) => {
+    if (!(map instanceof Map)) return;
+    map.forEach((value, key) => {
+      if (!key || !value) return;
+      const previous = merged.get(key) || {
+        ingredientName: value.ingredientName || key,
+        quantity: 0,
+      };
+      merged.set(key, {
+        ingredientName: previous.ingredientName,
+        quantity: Number(previous.quantity || 0) + Number(value.quantity || 0),
+      });
+    });
+  });
+
+  return merged;
+}
+
+function buildGeneratedLists(prices, ingredientDemand) {
+  const bestByMarket = new Map();
+
+  prices.forEach((entry) => {
+    const marketName = String(entry?.supermarket || '').trim();
+    if (!marketName) return;
+
+    const ingredientKey = normalizeIngredientKey(
+      String(entry?.ingredientNormalized || entry?.ingredientName || '').trim(),
+    );
+    if (!ingredientKey || !ingredientDemand.has(ingredientKey)) return;
+
+    const price = Number(entry?.price);
+    if (!Number.isFinite(price) || price <= 0) return;
+
+    if (!bestByMarket.has(marketName)) {
+      bestByMarket.set(marketName, new Map());
+    }
+
+    const marketMap = bestByMarket.get(marketName);
+    const previous = marketMap.get(ingredientKey);
+    if (!previous || price < Number(previous.price || 0)) {
+      marketMap.set(ingredientKey, entry);
+    }
+  });
+
+  const marketEntries = Array.from(bestByMarket.entries());
+  const demandKeys = Array.from(ingredientDemand.keys());
+
+  const lists = {};
+  const comparison = [];
+  let bestMarketKey = '';
+  let bestMarketTotal = Number.POSITIVE_INFINITY;
+  let colorIndex = 0;
+
+  marketEntries.forEach(([marketName, marketMap]) => {
+    let subtotal = 0;
+    let coveredIngredients = 0;
+
+    const items = demandKeys
+      .map((ingredientKey, index) => {
+        const found = marketMap.get(ingredientKey);
+        if (!found) return null;
+
+        coveredIngredients += 1;
+        const normalized = normalizePriceItem(found, index);
+        const demand = ingredientDemand.get(ingredientKey);
+        const quantity = Math.max(1, Math.ceil(Number(demand?.quantity || 1)));
+        subtotal += normalized.unitPrice * quantity;
+
+        return {
+          ...normalized,
+          ingredientName: demand?.ingredientName || normalized.ingredientName,
+          quantity,
+        };
+      })
+      .filter(Boolean);
+
+    const marketKey = slugify(marketName) || `market_${colorIndex}`;
+    lists[marketKey] = {
+      name: marketName,
+      accentClass: CARD_ACCENTS[colorIndex % CARD_ACCENTS.length],
+      items,
+    };
+
+    comparison.push({
+      marketKey,
+      supermarket: marketName,
+      total: subtotal,
+      missingCount: Math.max(0, demandKeys.length - coveredIngredients),
+      coveredCount: coveredIngredients,
+      totalIngredients: demandKeys.length,
+    });
+
+    if (coveredIngredients === demandKeys.length && subtotal < bestMarketTotal) {
+      bestMarketTotal = subtotal;
+      bestMarketKey = marketKey;
+    }
+
+    colorIndex += 1;
+  });
+
+  comparison.sort((a, b) => a.total - b.total);
+
+  if (!bestMarketKey && comparison.length) {
+    bestMarketKey = comparison[0].marketKey;
+    bestMarketTotal = comparison[0].total;
+  }
+
+  const bestOverall = demandKeys.reduce((sum, ingredientKey) => {
+    let ingredientBest = Number.POSITIVE_INFINITY;
+    const quantity = Math.max(1, Math.ceil(Number(ingredientDemand.get(ingredientKey)?.quantity || 1)));
+
+    marketEntries.forEach(([, marketMap]) => {
+      const found = marketMap.get(ingredientKey);
+      if (!found) return;
+      const amount = Number(found.price || 0);
+      if (Number.isFinite(amount) && amount > 0 && amount < ingredientBest) {
+        ingredientBest = amount;
+      }
+    });
+
+    return sum + (Number.isFinite(ingredientBest) ? ingredientBest * quantity : 0);
+  }, 0);
+
+  const missingIngredients = demandKeys.filter(
+    (ingredientKey) => !marketEntries.some(([, marketMap]) => marketMap.has(ingredientKey)),
+  );
+
+  return {
+    lists,
+    bestMarketKey,
+    bestMarketTotal: Number.isFinite(bestMarketTotal) ? bestMarketTotal : 0,
+    comparison,
+    optimizedTotal: bestOverall,
+    missingIngredients,
+  };
 }
 
 function parseStorage(key, fallback) {
@@ -138,32 +377,6 @@ function itemImageFor(item) {
   return `https://picsum.photos/seed/${seed}/300/300`;
 }
 
-function extractDemandFromRecipes(recipes) {
-  const demand = new Map();
-
-  recipes.forEach((recipe) => {
-    const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
-    ingredients.forEach((ingredient) => {
-      const rawName = String(ingredient?.ingredientName || '').trim();
-      if (!rawName) return;
-
-      const key = normalizeIngredientKey(rawName);
-      if (!key) return;
-
-      const quantityRaw = Number(ingredient?.quantity);
-      const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? quantityRaw : 1;
-      const current = demand.get(key) || { ingredientName: rawName, quantity: 0 };
-
-      demand.set(key, {
-        ingredientName: current.ingredientName,
-        quantity: current.quantity + quantity,
-      });
-    });
-  });
-
-  return demand;
-}
-
 function planSignature(plan) {
   const days = Array.isArray(plan?.days) ? plan.days : [];
   return days
@@ -177,127 +390,6 @@ function planSignature(plan) {
     })
     .join('#');
 }
-
-function buildGeneratedLists(prices, ingredientDemand) {
-  const bestByMarket = new Map();
-
-  prices.forEach((entry) => {
-    const marketName = String(entry?.supermarket || '').trim();
-    if (!marketName) return;
-
-    const ingredientKey = normalizeIngredientKey(
-      String(entry?.ingredientNormalized || entry?.ingredientName || '').trim(),
-    );
-    if (!ingredientKey || !ingredientDemand.has(ingredientKey)) return;
-
-    const price = Number(entry?.price);
-    if (!Number.isFinite(price) || price <= 0) return;
-
-    if (!bestByMarket.has(marketName)) {
-      bestByMarket.set(marketName, new Map());
-    }
-
-    const marketMap = bestByMarket.get(marketName);
-    const previous = marketMap.get(ingredientKey);
-    if (!previous || price < Number(previous.price || 0)) {
-      marketMap.set(ingredientKey, entry);
-    }
-  });
-
-  const marketEntries = Array.from(bestByMarket.entries());
-  const demandKeys = Array.from(ingredientDemand.keys());
-
-  const lists = {};
-  const comparison = [];
-  let bestMarketKey = '';
-  let bestMarketTotal = Number.POSITIVE_INFINITY;
-  let colorIndex = 0;
-
-  marketEntries.forEach(([marketName, marketMap]) => {
-    let subtotal = 0;
-    let coveredIngredients = 0;
-
-    const items = demandKeys
-      .map((ingredientKey, index) => {
-        const found = marketMap.get(ingredientKey);
-        if (!found) return null;
-
-        coveredIngredients += 1;
-        const normalized = normalizePriceItem(found, index);
-        const demand = ingredientDemand.get(ingredientKey);
-        const quantity = Math.max(1, Math.ceil(Number(demand?.quantity || 1)));
-        subtotal += normalized.unitPrice * quantity;
-
-        return {
-          ...normalized,
-          ingredientName: demand?.ingredientName || normalized.ingredientName,
-          quantity,
-        };
-      })
-      .filter(Boolean);
-
-    const marketKey = slugify(marketName) || `market_${colorIndex}`;
-    lists[marketKey] = {
-      name: marketName,
-      accentClass: CARD_ACCENTS[colorIndex % CARD_ACCENTS.length],
-      items,
-    };
-
-    comparison.push({
-      marketKey,
-      supermarket: marketName,
-      total: subtotal,
-      missingCount: Math.max(0, demandKeys.length - coveredIngredients),
-      coveredCount: coveredIngredients,
-      totalIngredients: demandKeys.length,
-    });
-
-    if (coveredIngredients === demandKeys.length && subtotal < bestMarketTotal) {
-      bestMarketTotal = subtotal;
-      bestMarketKey = marketKey;
-    }
-
-    colorIndex += 1;
-  });
-
-  comparison.sort((a, b) => a.total - b.total);
-
-  if (!bestMarketKey && comparison.length) {
-    bestMarketKey = comparison[0].marketKey;
-    bestMarketTotal = comparison[0].total;
-  }
-
-  const bestOverall = demandKeys.reduce((sum, ingredientKey) => {
-    let ingredientBest = Number.POSITIVE_INFINITY;
-
-    marketEntries.forEach(([, marketMap]) => {
-      const found = marketMap.get(ingredientKey);
-      if (!found) return;
-      const amount = Number(found.price || 0);
-      if (Number.isFinite(amount) && amount > 0 && amount < ingredientBest) {
-        ingredientBest = amount;
-      }
-    });
-
-    const quantity = Math.max(1, Math.ceil(Number(ingredientDemand.get(ingredientKey)?.quantity || 1)));
-    return sum + (Number.isFinite(ingredientBest) ? ingredientBest * quantity : 0);
-  }, 0);
-
-  const missingIngredients = demandKeys.filter(
-    (ingredientKey) => !marketEntries.some(([, marketMap]) => marketMap.has(ingredientKey)),
-  );
-
-  return {
-    lists,
-    bestMarketKey,
-    bestMarketTotal: Number.isFinite(bestMarketTotal) ? bestMarketTotal : 0,
-    comparison,
-    optimizedTotal: bestOverall,
-    missingIngredients,
-  };
-}
-
-
 
 function isPersistedCartSnapshot(payload) {
   return !!(payload && typeof payload === 'object' && payload.lists && typeof payload.lists === 'object');
@@ -367,6 +459,7 @@ export default function Shopping() {
   const [isGeneratingCart, setIsGeneratingCart] = useState(false);
   const [cartSource, setCartSource] = useState('manual');
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState('');
+  const generateCartRef = useRef(null);
 
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
@@ -396,83 +489,129 @@ export default function Shopping() {
     }
 
     setIsGeneratingCart(true);
-    setGenerationStatus('A gerar carrinho com base no plano...');
+    setGenerationStatus('A recolher preços reais no supermercado e a gerar carrinho...');
 
     try {
-      const recipeIds = Array.from(
-        new Set(
-          (currentPlan.days || [])
-            .flatMap((day) => day?.meals || [])
-            .map((meal) => Number(meal?.recipe_id || meal?.recipeId || 0))
-            .filter((id) => Number.isInteger(id) && id > 0),
-        ),
-      );
+      const generatedCart = await generateShoppingCartFromMealPlan(currentPlan);
+      const applied = applyCartSnapshotToState(generatedCart, {
+        setLists,
+        setComparison,
+        setOptimizedTotal,
+        setCartSource,
+        setLastGeneratedSignature,
+        setActiveListId,
+      });
 
-      if (!recipeIds.length) {
-        throw new Error('Plano sem receitas identificáveis para construir carrinho.');
+      if (!applied) {
+        throw new Error('Resposta inválida ao gerar carrinho.');
       }
 
-      const [recipes, prices] = await Promise.all([
-        Promise.all(recipeIds.map((recipeId) => fetchRecipeById(recipeId).catch(() => null))),
-        listLatestPrices(),
-      ]);
+      const missingIngredients = Array.isArray(generatedCart?.missingIngredients)
+        ? generatedCart.missingIngredients
+        : [];
 
-      const validRecipes = recipes.filter(Boolean);
-      if (!validRecipes.length) {
-        throw new Error('Não foi possível carregar as receitas do plano para extrair ingredientes.');
-      }
-
-      const demand = extractDemandFromRecipes(validRecipes);
-      if (!demand.size) {
-        throw new Error('As receitas do plano não têm ingredientes suficientes para gerar carrinho.');
-      }
-
-      const generated = buildGeneratedLists(prices, demand);
-      if (!Object.keys(generated.lists).length) {
-        throw new Error('Não há preços disponíveis para os ingredientes do teu plano.');
-      }
-
-      const generatedSignature = planSignature(currentPlan);
-      const selectedListId = generated.bestMarketKey || Object.keys(generated.lists)[0] || '';
-
-      setLists(generated.lists);
-      setComparison(generated.comparison);
-      setOptimizedTotal(generated.optimizedTotal);
-      setActiveListId(selectedListId);
-      setCartSource('meal-plan');
-      setLastGeneratedSignature(generatedSignature);
-
-      try {
-        await savePersistedShoppingCart(
-          buildCartSnapshot({
-            lists: generated.lists,
-            activeListId: selectedListId,
-            comparison: generated.comparison,
-            optimizedTotal: generated.optimizedTotal,
-            cartSource: 'meal-plan',
-            lastGeneratedSignature: generatedSignature,
-          }),
-        );
-      } catch { /* empty */ }
-
-      if (generated.missingIngredients.length) {
+      if (missingIngredients.length) {
         setGenerationStatus(
-          `Carrinho gerado com lacunas: ${generated.missingIngredients.length} ingredientes sem preços importados.`,
+          `Carrinho gerado com lacunas: ${missingIngredients.length} ingredientes sem preços importados.`,
         );
       } else {
-        const winning = generated.comparison.find((entry) => entry.marketKey === generated.bestMarketKey);
+        const generatedComparison = Array.isArray(generatedCart?.comparison) ? generatedCart.comparison : [];
+        const bestMarketKey = String(generatedCart?.activeListId || '');
+        const winning = generatedComparison.find((entry) => entry.marketKey === bestMarketKey)
+          || generatedComparison[0];
+        const total = Number(winning?.total || 0);
         setGenerationStatus(
-          `Carrinho gerado no supermercado mais barato: ${winning?.supermarket || 'N/D'} (${formatCurrency(
-            generated.bestMarketTotal,
-          )}).`,
+          `Carrinho gerado com todos os ingredientes do plano: ${winning?.supermarket || 'N/D'} (${formatCurrency(total)}).`,
         );
       }
     } catch (error) {
-      setGenerationStatus(error.message || 'Não foi possível gerar o carrinho automaticamente.');
+      const errorText = String(error?.message || '').toLowerCase();
+      const shouldFallbackLocal =
+        errorText.includes('not found')
+        || errorText.includes('404')
+        || errorText.includes('405');
+
+      if (!shouldFallbackLocal) {
+        setGenerationStatus(error.message || 'Não foi possível gerar o carrinho automaticamente.');
+        return;
+      }
+
+      try {
+        const recipeIds = Array.from(
+          new Set(
+            (currentPlan.days || [])
+              .flatMap((day) => day?.meals || [])
+              .map((meal) => Number(meal?.recipe_id || meal?.recipeId || 0))
+              .filter((id) => Number.isInteger(id) && id > 0),
+          ),
+        );
+
+        if (!recipeIds.length) {
+          throw new Error('Plano sem receitas identificáveis para construir carrinho.');
+        }
+
+        const [recipes, prices] = await Promise.all([
+          Promise.all(recipeIds.map((recipeId) => fetchRecipeById(recipeId).catch(() => null))),
+          listLatestPrices(),
+        ]);
+
+        const validRecipes = recipes.filter(Boolean);
+        const demand = mergeDemandMaps(
+          extractDemandFromRecipes(validRecipes),
+          extractDemandFromRecipeDescriptions(validRecipes),
+          extractDemandFromPlanPreview(currentPlan),
+        );
+
+        if (!demand.size) {
+          throw new Error('As receitas do plano não têm ingredientes suficientes para gerar carrinho.');
+        }
+
+        const generated = buildGeneratedLists(prices, demand);
+        if (!Object.keys(generated.lists).length) {
+          throw new Error('Não há preços disponíveis para os ingredientes do teu plano.');
+        }
+
+        const generatedSignature = planSignature(currentPlan);
+        const selectedListId = generated.bestMarketKey || Object.keys(generated.lists)[0] || '';
+
+        setLists(generated.lists);
+        setComparison(generated.comparison);
+        setOptimizedTotal(generated.optimizedTotal);
+        setActiveListId(selectedListId);
+        setCartSource('meal-plan');
+        setLastGeneratedSignature(generatedSignature);
+
+        try {
+          await savePersistedShoppingCart(
+            buildCartSnapshot({
+              lists: generated.lists,
+              activeListId: selectedListId,
+              comparison: generated.comparison,
+              optimizedTotal: generated.optimizedTotal,
+              cartSource: 'meal-plan',
+              lastGeneratedSignature: generatedSignature,
+            }),
+          );
+        } catch {
+          // Persistência é best-effort no fallback local.
+        }
+
+        setGenerationStatus(
+          'Carrinho gerado em modo local (fallback) porque o endpoint de geração ainda não está disponível.',
+        );
+      } catch (fallbackError) {
+        setGenerationStatus(
+          fallbackError.message || 'Não foi possível gerar o carrinho automaticamente.',
+        );
+      }
     } finally {
       setIsGeneratingCart(false);
     }
   }, [accountId, weeklyPlan]);
+
+  useEffect(() => {
+    generateCartRef.current = generateCartFromMealPlan;
+  }, [generateCartFromMealPlan]);
 
   useEffect(() => {
     let cancelled = false;
@@ -525,7 +664,11 @@ export default function Shopping() {
 
     const syncPlan = () => {
       const next = parseStorage(storageKey, null);
-      setWeeklyPlan(next);
+      setWeeklyPlan((previous) => {
+        const previousSerialized = JSON.stringify(previous ?? null);
+        const nextSerialized = JSON.stringify(next ?? null);
+        return previousSerialized === nextSerialized ? previous : next;
+      });
     };
 
     const onPlanUpdated = (event) => {
@@ -542,7 +685,7 @@ export default function Shopping() {
 
       if (event.key === CART_GENERATE_REQUEST_KEY && event.newValue) {
         localStorage.removeItem(CART_GENERATE_REQUEST_KEY);
-        void generateCartFromMealPlan();
+        void generateCartRef.current?.();
       }
     };
 
@@ -574,7 +717,7 @@ export default function Shopping() {
 
     if (localStorage.getItem(CART_GENERATE_REQUEST_KEY)) {
       localStorage.removeItem(CART_GENERATE_REQUEST_KEY);
-      void generateCartFromMealPlan();
+      void generateCartRef.current?.();
     }
 
     return () => {
@@ -582,7 +725,7 @@ export default function Shopping() {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('nutribot:shopping-cart-updated', onShoppingCartUpdated);
     };
-  }, [accountId, generateCartFromMealPlan]);
+  }, [accountId]);
 
   useEffect(() => {
     if (cartSource !== 'meal-plan') {

@@ -1,27 +1,85 @@
 {
   "meals": [
     {
-      "name": "Omelete de queijo",
+      "name": "Pequeno almoco proteico",
       "ingredients": [
-        {"name": "ovos", "quantity": 6, "unit": "un"},
-        {"name": "queijo ralado", "quantity": 120, "unit": "g"},
-        {"name": "cebola", "quantity": 1, "unit": "un"}
+        { "name": "ovos", "quantity": 8, "unit": "un" },
+        { "name": "aveia", "quantity": 500, "unit": "g" },
+        { "name": "leite", "quantity": 2, "unit": "l" },
+        { "name": "banana", "quantity": 8, "unit": "un" }
       ]
     },
     {
-      "name": "Massa ao tomate",
+      "name": "Iogurte bowl com fruta",
       "ingredients": [
-        {"name": "massa", "quantity": 500, "unit": "g"},
-        {"name": "tomate", "quantity": 4, "unit": "un"},
-        {"name": "alho", "quantity": 3, "unit": "dente"}
+        { "name": "iogurte natural", "quantity": 8, "unit": "un" },
+        { "name": "morangos", "quantity": 800, "unit": "g" },
+        { "name": "granola", "quantity": 400, "unit": "g" },
+        { "name": "mel", "quantity": 250, "unit": "g" }
       ]
     },
     {
-      "name": "Salada",
+      "name": "Frango com arroz integral",
       "ingredients": [
-        {"name": "alface", "quantity": 1, "unit": "un"},
-        {"name": "tomate", "quantity": 2, "unit": "un"},
-        {"name": "azeite", "quantity": 50, "unit": "ml"}
+        { "name": "peito de frango", "quantity": 1800, "unit": "g" },
+        { "name": "arroz integral", "quantity": 1200, "unit": "g" },
+        { "name": "brocolos", "quantity": 900, "unit": "g" },
+        { "name": "cenoura", "quantity": 8, "unit": "un" },
+        { "name": "alho", "quantity": 2, "unit": "un" },
+        { "name": "azeite", "quantity": 200, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Salmao com batata doce",
+      "ingredients": [
+        { "name": "salmao", "quantity": 1400, "unit": "g" },
+        { "name": "batata doce", "quantity": 2000, "unit": "g" },
+        { "name": "azeite", "quantity": 120, "unit": "ml" }
+      ]
+    },
+    {
+      "name": "Salada de atum completa",
+      "ingredients": [
+        { "name": "atum em lata", "quantity": 8, "unit": "un" },
+        { "name": "alface", "quantity": 3, "unit": "un" },
+        { "name": "tomate", "quantity": 10, "unit": "un" },
+        { "name": "pepino", "quantity": 4, "unit": "un" }
+      ]
+    },
+    {
+      "name": "Massa integral a bolonhesa de peru",
+      "ingredients": [
+        { "name": "massa integral", "quantity": 1200, "unit": "g" },
+        { "name": "carne picada de peru", "quantity": 1200, "unit": "g" },
+        { "name": "tomate", "quantity": 8, "unit": "un" },
+        { "name": "cebola", "quantity": 6, "unit": "un" },
+        { "name": "alho", "quantity": 2, "unit": "un" },
+        { "name": "queijo ralado", "quantity": 300, "unit": "g" }
+      ]
+    },
+    {
+      "name": "Sandes integral de queijo fresco",
+      "ingredients": [
+        { "name": "pao integral", "quantity": 3, "unit": "un" },
+        { "name": "queijo fresco", "quantity": 8, "unit": "un" },
+        { "name": "abacate", "quantity": 5, "unit": "un" }
+      ]
+    },
+    {
+      "name": "Snack de fruta e frutos secos",
+      "ingredients": [
+        { "name": "maca", "quantity": 8, "unit": "un" },
+        { "name": "pera", "quantity": 8, "unit": "un" },
+        { "name": "laranja", "quantity": 8, "unit": "un" }
+      ]
+    },
+    {
+      "name": "Wrap de ovos e espinafres",
+      "ingredients": [
+        { "name": "ovos", "quantity": 8, "unit": "un" },
+        { "name": "espinafres", "quantity": 500, "unit": "g" },
+        { "name": "queijo ralado", "quantity": 200, "unit": "g" },
+        { "name": "manteiga", "quantity": 250, "unit": "g" }
       ]
     }
   ]

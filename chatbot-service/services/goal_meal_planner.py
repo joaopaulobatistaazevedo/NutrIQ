@@ -270,7 +270,8 @@ def _build_days_payload(
                 "carbs_g": ms.recipe.carbs_g,
                 "cost_per_serving_eur": round(ms.recipe.cost_per_serving, 2),
                 "duration_minutes": ms.recipe.total_time_minutes,
-                "ingredients_preview": ms.recipe.ingredients[:5],
+                "ingredients": ms.recipe.ingredients,
+                "ingredients_preview": ms.recipe.ingredients,
             }
             for ms in sorted(day_slots, key=lambda s: SLOTS.index(s.slot) if s.slot in SLOTS else 99)
         ]

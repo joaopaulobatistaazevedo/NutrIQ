@@ -4,7 +4,6 @@ import { X, Send, HeartHandshake, Trash2 } from 'lucide-react';
 import { sendAssistantMessage, sendOnboardingMessage } from '../services/chatbotService';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import {
-  CART_GENERATE_REQUEST_KEY,
   CHAT_CONTEXT_KEY,
   CHAT_HISTORY_KEY,
   CHAT_MESSAGES_KEY,
@@ -264,7 +263,6 @@ export default function ChatWidget() {
           return;
         }
 
-        localStorage.setItem(CART_GENERATE_REQUEST_KEY, String(Date.now()));
         window.dispatchEvent(
           new CustomEvent('nutribot:shopping-cart-updated', {
             detail: {
@@ -280,11 +278,51 @@ export default function ChatWidget() {
           return;
         }
 
+        const countMeals = (plan) => {
+          if (!plan || !Array.isArray(plan.days)) {
+            return 0;
+          }
+          return plan.days.reduce((total, day) => {
+            if (!day || !Array.isArray(day.meals)) {
+              return total;
+            }
+            return total + day.meals.length;
+          }, 0);
+        };
+
+        const countPreviewIngredients = (plan) => {
+          if (!plan || !Array.isArray(plan.days)) {
+            return 0;
+          }
+          return plan.days.reduce((total, day) => {
+            if (!day || !Array.isArray(day.meals)) {
+              return total;
+            }
+            return total + day.meals.reduce((dayTotal, meal) => {
+              const preview = Array.isArray(meal?.ingredients_preview) ? meal.ingredients_preview : [];
+              return dayTotal + preview.length;
+            }, 0);
+          }, 0);
+        };
+
         let planToStore = planPayload;
+        const localMealCount = countMeals(planPayload);
+        const localWeekStart = String(planPayload?.week_start || '').trim();
+        const localPreviewCount = countPreviewIngredients(planPayload);
 
         try {
           const backendPlan = await fetchActiveMealPlan();
-          if (backendPlan) {
+          const backendMealCount = countMeals(backendPlan);
+          const backendWeekStart = String(backendPlan?.week_start || '').trim();
+          const backendPreviewCount = countPreviewIngredients(backendPlan);
+          const sameWeek = Boolean(localWeekStart && backendWeekStart && localWeekStart === backendWeekStart);
+          const backendHasComparableDetail = backendPreviewCount >= localPreviewCount;
+
+          if (
+            backendPlan
+            && backendMealCount > 0
+            && (localMealCount <= 0 || (sameWeek && backendHasComparableDetail))
+          ) {
             planToStore = backendPlan;
           }
         } catch {

@@ -75,3 +75,31 @@ export async function sendAssistantMessage({
     throw new Error(normalizeError(error));
   }
 }
+
+export async function generateShoppingCartFromMealPlan(mealPlan = null) {
+  const payload = mealPlan && typeof mealPlan === 'object'
+    ? { meal_plan: mealPlan }
+    : {};
+
+  const requestConfig = {
+    headers: buildAuthHeaders(),
+    timeout: 600000,
+  };
+
+  try {
+    const { data } = await client.post('/chat/shopping-cart/generate', payload, requestConfig);
+    return data;
+  } catch (error) {
+    const status = Number(error?.response?.status || 0);
+    if (status === 404 || status === 405) {
+      try {
+        const { data } = await client.post('/shopping-cart/generate', payload, requestConfig);
+        return data;
+      } catch (fallbackError) {
+        throw new Error(normalizeError(fallbackError));
+      }
+    }
+
+    throw new Error(normalizeError(error));
+  }
+}

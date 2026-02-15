@@ -1,0 +1,64 @@
+{
+  "meals": [
+    {
+      "name": "Omelete de queijo",
+      "ingredients": [
+        {
+          "name": "ovos",
+          "quantity": 6,
+          "unit": "un"
+        },
+        {
+          "name": "queijo ralado",
+          "quantity": 120,
+          "unit": "g"
+        },
+        {
+          "name": "cebola",
+          "quantity": 1,
+          "unit": "un"
+        }
+      ]
+    },
+    {
+      "name": "Massa ao tomate",
+      "ingredients": [
+        {
+          "name": "massa",
+          "quantity": 500,
+          "unit": "g"
+        },
+        {
+          "name": "tomate",
+          "quantity": 4,
+          "unit": "un"
+        },
+        {
+          "name": "alho",
+          "quantity": 3,
+          "unit": "dente"
+        }
+      ]
+    },
+    {
+      "name": "Salada",
+      "ingredients": [
+        {
+          "name": "alface",
+          "quantity": 1,
+          "unit": "un"
+        },
+        {
+          "name": "tomate",
+          "quantity": 2,
+          "unit": "un"
+        },
+        {
+          "name": "azeite",
+          "quantity": 50,
+          "unit": "ml"
+        }
+      ]
+    }
+  ]
+}

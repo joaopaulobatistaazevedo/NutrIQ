@@ -12,6 +12,12 @@ from .models import MarketConfig
 
 PRICE_RE = re.compile(r"(?<!\d)(\d{1,4}(?:[.,]\d{1,2})?)(?!\d)")
 CURRENCY_CONTEXT_RE = re.compile(r"(€|eur)", re.IGNORECASE)
+UNIT_PRICE_SUFFIX_RE = re.compile(
+    r"^\s*(?:€|eur)?\s*/\s*(?:kg|g|gr|l|ml|cl|dl|un)\b",
+    re.IGNORECASE,
+)
+DIRECT_CURRENCY_SUFFIX_RE = re.compile(r"^\s*(?:€|eur)\b", re.IGNORECASE)
+PER_UNIT_TEXT_RE = re.compile(r"\bpor\s*(?:kg|g|gr|l|ml|cl|dl|un)\b", re.IGNORECASE)
 CALORIES_RE = re.compile(
     r"(?<!\d)(\d{1,4}(?:[.,]\d{1,2})?)\s*(?:\([^)]+\)\s*)?"
     r"(?:kcal|quilocalorias?|kilocalorias?|calorias?)\b",
@@ -194,7 +200,8 @@ def extract_products_from_selectors(
 
     results: list[dict[str, Any]] = []
     seen: set[tuple[str | None, float | None, str | None]] = set()
-    elements = soup.select(config.result_selector)
+    hard_limit = max(1, int(limit))
+    elements = soup.select(config.result_selector, limit=hard_limit * 2)
     if not elements:
         return []
 
@@ -835,8 +842,18 @@ def _parse_price_with_confidence(text: str) -> tuple[float, float] | None:
         window_start = max(0, match.start() - 8)
         window_end = min(len(candidate), match.end() + 8)
         context = candidate[window_start:window_end]
+        suffix = candidate[match.end(): min(len(candidate), match.end() + 24)]
         if CURRENCY_CONTEXT_RE.search(context):
             score += 5.0
+
+        # Avoid selecting metrics such as "7,96 €/Kg" when a final shelf price
+        # (e.g. "1,99 €") is present in the same snippet.
+        if UNIT_PRICE_SUFFIX_RE.search(suffix):
+            score -= 8.0
+        elif PER_UNIT_TEXT_RE.search(suffix):
+            score -= 4.5
+        elif DIRECT_CURRENCY_SUFFIX_RE.search(suffix):
+            score += 2.5
 
         has_decimal = bool(re.search(r"[.,]\d{1,2}$", raw_number))
         if has_decimal:
