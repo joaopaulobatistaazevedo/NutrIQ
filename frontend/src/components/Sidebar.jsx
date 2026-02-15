@@ -24,7 +24,7 @@ export default function Sidebar() {
   const location = useLocation();
   const role = getUserRole();
   const navItems = useMemo(() => getMainNavItems(role), [role]);
-  const { pendingFriendRequestCount } = useSocialNotifications();
+  const { pendingSocialNotificationCount } = useSocialNotifications();
   const [showNutriSocialPopup, setShowNutriSocialPopup] = useState(false);
   const [popupCount, setPopupCount] = useState(0);
   const previousCountRef = useRef(0);
@@ -38,7 +38,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     const previous = Number(previousCountRef.current || 0);
-    const current = Number(pendingFriendRequestCount || 0);
+    const current = Number(pendingSocialNotificationCount || 0);
     previousCountRef.current = current;
 
     if (current > previous && current > 0) {
@@ -58,7 +58,7 @@ export default function Sidebar() {
     }
 
     return undefined;
-  }, [pendingFriendRequestCount]);
+  }, [pendingSocialNotificationCount]);
 
   return (
     <div className="sidebar">
@@ -69,7 +69,7 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isNutriSocial = item.path === '/nutrisocial';
-          const count = isNutriSocial ? pendingFriendRequestCount : 0;
+          const count = isNutriSocial ? pendingSocialNotificationCount : 0;
 
           return (
             <button
@@ -93,8 +93,8 @@ export default function Sidebar() {
               {isNutriSocial && showNutriSocialPopup && (
                 <span className="sidebar-nutrisocial-popup" role="status" aria-live="polite">
                   {popupCount > 1
-                    ? `${popupCount} pedidos de amizade novos`
-                    : '1 pedido de amizade novo'}
+                    ? `${popupCount} convites novos`
+                    : '1 convite novo'}
                 </span>
               )}
             </button>
