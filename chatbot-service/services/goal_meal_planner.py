@@ -95,6 +95,8 @@ class GoalMealPlannerService:
         requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
         planning_days = requested_planning_days
         week_start = _resolve_week_start(constraints)
+        today = date.today()
+        planning_start = max(today, week_start)
         week_offset = _safe_int(constraints.get("week_offset"), default=0, lo=0, hi=52)
         max_budget = _safe_float(constraints.get("max_weekly_budget"), default=0.0)
         tdee = _safe_float(constraints.get("tdee"), default=2200.0)
@@ -162,6 +164,7 @@ class GoalMealPlannerService:
                 liked,
                 "Sem receitas disponíveis no backend neste momento.",
                 week_start=week_start,
+                planning_start=planning_start,
             )
 
         # Filter disliked + dietary restrictions / allergens
@@ -206,9 +209,9 @@ class GoalMealPlannerService:
                 liked,
                 f"Erro no algoritmo: {exc}",
                 week_start=week_start,
+                planning_start=planning_start,
             )
 
-        planning_start = week_start
         days_payload = _build_days_payload(best_slots, planning_days, planning_start)
         total_cost = sum(ms.recipe.cost_per_serving for ms in best_slots)
         goal_profile = GOAL_PROFILES[goal]
@@ -371,12 +374,13 @@ def _empty_plan(
     liked: list[str],
     reason: str,
     week_start: date,
+    planning_start: date,
 ) -> dict[str, Any]:
     return {
         "status": "empty",
         "goal": goal,
         "planning_days": planning_days,
-        "planning_start": week_start.isoformat(),
+        "planning_start": planning_start.isoformat(),
         "week_start": week_start.isoformat(),
         "excluded_ingredients": disliked,
         "liked_ingredients": liked,
