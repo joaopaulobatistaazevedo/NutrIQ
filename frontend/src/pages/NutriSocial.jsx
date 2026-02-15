@@ -138,6 +138,18 @@ function NutriSocialPostImage({ src, alt }) {
   );
 }
 
+function normalizeDateTimeValue(...values) {
+  for (const value of values) {
+    const candidate = String(value || '').trim();
+    if (!candidate) continue;
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
 function prettyDate(value) {
   if (!value) return 'agora';
   const parsed = new Date(value);
@@ -306,7 +318,14 @@ export default function NutriSocial() {
         fetchPendingSentRequests(token),
       ]);
 
-      const normalizedFeed = (Array.isArray(feed) ? feed : []).filter((post) => !isInvalidLegacyBlobPath(post));
+      const normalizedFeed = (Array.isArray(feed) ? feed : [])
+        .filter((post) => !isInvalidLegacyBlobPath(post))
+        .map((post) => ({
+          ...post,
+          userId: Number(post?.userId || post?.user_id || 0),
+          createdAt: normalizeDateTimeValue(post?.createdAt, post?.created_at, post?.currentTime, post?.current_time),
+          currentTime: normalizeDateTimeValue(post?.currentTime, post?.current_time, post?.createdAt, post?.created_at),
+        }));
       setFeedPosts((previous) => {
         if (silent) {
           const previousIds = new Set(previous.map((post) => String(post?.id || '')));
@@ -539,8 +558,18 @@ export default function NutriSocial() {
   );
 
   const visibleFeedPosts = useMemo(
-    () => feedPosts.filter((post) => friendIds.includes(Number(post?.userId))),
+    () => feedPosts.filter((post) => friendIds.includes(Number(post?.userId)) && Number(post?.userId) !== Number(currentUserId)),
     [feedPosts, friendIds],
+  );
+
+  const profilePosts = useMemo(
+    () => feedPosts.filter((post) => Number(post?.userId) === Number(currentUserId)),
+    [feedPosts, currentUserId],
+  );
+
+  const activePostList = useMemo(
+    () => (activeTab === 'profile' ? profilePosts : visibleFeedPosts),
+    [activeTab, profilePosts, visibleFeedPosts],
   );
 
   const getPostInteraction = (postId) => {
@@ -916,11 +945,20 @@ export default function NutriSocial() {
                 >
                   Registar Refeição
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'profile'}
+                  className={`nutri-social-tab ${activeTab === 'profile' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('profile')}
+                >
+                  Perfil
+                </button>
               </div>
             </div>
           </nav>
 
-          {activeTab === 'feed' ? (
+          {activeTab === 'feed' || activeTab === 'profile' ? (
             <div className="card mb-3">
               <div className="card-body py-3">
                 <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
@@ -1151,7 +1189,7 @@ export default function NutriSocial() {
           {activeTab === 'feed' ? (
             <section className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
-              <h3 className="card-title m-0">Feed NutriSocial</h3>
+              <h3 className="card-title m-0">{activeTab === 'profile' ? 'Perfil · As tuas publicações' : 'Feed NutriSocial'}</h3>
               <div className="d-flex align-items-center gap-2">
                 <span className="badge">Utilizador #{currentUserId || '—'}</span>
               </div>
@@ -1160,18 +1198,27 @@ export default function NutriSocial() {
               {feedLoading ? <p className="text-secondary mb-2">A carregar feed...</p> : null}
               {!feedLoading && feedError ? <p className="text-danger mb-2">{feedError}</p> : null}
               {!feedLoading && !feedError && feedStatus ? <p className="text-success mb-2">{feedStatus}</p> : null}
-              {!feedLoading && !feedError && visibleFeedPosts.length === 0 ? <p className="text-secondary mb-0">Ainda não existem partilhas no teu feed.</p> : null}
+              {!feedLoading && !feedError && activePostList.length === 0 ? (
+                <p className="text-secondary mb-0">
+                  {activeTab === 'profile'
+                    ? 'Ainda não tens publicações no teu perfil.'
+                    : 'Ainda não existem partilhas no teu feed.'}
+                </p>
+              ) : null}
 
               <div className="d-grid gap-3">
-                {visibleFeedPosts.map((post) => {
+                {activePostList.map((post) => {
                   const interaction = getPostInteraction(post.id);
                   const kudosCount = Object.keys(interaction.kudosByUser || {}).length;
                   const hasKudoFromMe = Boolean(interaction.kudosByUser?.[String(currentUserId)]);
                   const comments = Array.isArray(interaction.comments) ? interaction.comments : [];
                   const imageSrc = normalizePostImage(post);
-                  const sortedComments = [...comments].sort(
-                    (left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
-                  );
+                  const sortedComments = [...comments]
+                    .map((comment) => ({
+                      ...comment,
+                      createdAt: normalizeDateTimeValue(comment?.createdAt, comment?.created_at, comment?.currentTime, comment?.current_time),
+                    }))
+                    .sort((left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime());
                   const draftKey = String(post.id);
                   const isOwnPost = Number(post?.userId) === Number(currentUserId);
                   const mealType = mealTypeFromPost(post);
