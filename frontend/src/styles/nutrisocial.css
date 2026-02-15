@@ -786,3 +786,374 @@
   padding: 12px;
   overflow-y: auto;
 }
+
+.nutri-social-friends-shell {
+  border: 1px solid var(--app-border-1);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.nutri-social-friends-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.nutri-social-friends-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--app-border-1);
+}
+
+.nutri-social-friends-header h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.nutri-social-friends-header p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--app-text-muted);
+}
+
+.nutri-social-active-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.nutri-social-search-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--app-border-1);
+  border-radius: 14px;
+  background: var(--app-surface-2);
+  padding: 14px;
+}
+
+.nutri-social-search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--app-border-1);
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0 10px;
+}
+
+.nutri-social-search-input-wrap svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.nutri-social-search-input-wrap input {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 0;
+}
+
+.nutri-social-search-input-wrap:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.nutri-social-search-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.nutri-social-subtabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nutri-social-subtab {
+  border: 1px solid var(--app-border-1);
+  background: #ffffff;
+  color: var(--app-text-main);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.nutri-social-subtab.is-active {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  color: #075985;
+}
+
+.nutri-social-subtab-badge {
+  border: 1px solid #bfdbfe;
+  background: #ffffff;
+  border-radius: 999px;
+  min-width: 24px;
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.nutri-social-toast {
+  border-radius: 10px;
+  border: 1px solid var(--app-border-1);
+  background: #f8fafc;
+  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nutri-social-toast.is-success {
+  border-color: #bbf7d0;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.nutri-social-toast.is-error {
+  border-color: #fecaca;
+  color: #991b1b;
+  background: #fff1f2;
+}
+
+.nutri-social-loading-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--app-text-muted);
+}
+
+.nutri-social-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.nutri-social-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-social-filter-chip {
+  border: 1px solid var(--app-border-1);
+  background: #ffffff;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--app-text-main);
+  padding: 7px 12px;
+}
+
+.nutri-social-filter-chip.is-active {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  color: #0c4a6e;
+}
+
+.nutri-social-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutri-social-sort label {
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+
+.nutri-social-friends-card-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.nutri-social-friend-card {
+  border: 1px solid var(--app-border-1);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.nutri-social-friend-card:hover {
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.nutri-social-friend-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nutri-social-friend-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+}
+
+.nutri-social-friend-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.nutri-social-friend-meta strong {
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.nutri-social-friend-meta span {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nutri-social-remove-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.nutri-social-remove-btn:hover {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.nutri-social-requests-panel {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.nutri-social-request-card {
+  border: 1px solid var(--app-border-1);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--app-surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nutri-social-request-card h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.nutri-social-request-card h2 span {
+  font-size: 14px;
+  color: var(--app-text-muted);
+}
+
+.nutri-social-empty-state {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  min-height: 170px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  color: #64748b;
+}
+
+.nutri-social-empty-state h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.nutri-social-empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.nutri-social-empty-state.compact {
+  min-height: 120px;
+}
+
+.nutri-social-section-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--app-border-1);
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .nutri-social-subtabs {
+    grid-template-columns: 1fr;
+  }
+
+  .nutri-social-search-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .nutri-social-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nutri-social-sort {
+    justify-content: space-between;
+  }
+
+  .nutri-social-friend-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nutri-social-remove-btn {
+    width: 100%;
+  }
+
+  .nutri-social-friends-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

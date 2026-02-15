@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock3, Flame, MessageCircle, Pencil, Send, ThumbsUp, Trash2, UserMinus, UserPlus } from 'lucide-react';
+import { CheckCircle2, Clock3, Flame, MessageCircle, Pencil, Search, Send, ThumbsUp, Trash2, UserMinus, UserPlus, Users, XCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
@@ -260,6 +260,10 @@ export default function NutriSocial() {
   const [friendSuggestions, setFriendSuggestions] = useState([]);
   const [selectedFriendId, setSelectedFriendId] = useState('');
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [friendsPanelTab, setFriendsPanelTab] = useState('friends');
+  const [friendFilter, setFriendFilter] = useState('all');
+  const [friendSort, setFriendSort] = useState('az');
+  const [friendToast, setFriendToast] = useState(null);
   const [activeTab, setActiveTab] = useState('feed');
   const [communities, setCommunities] = useState([]);
   const [communityNameDraft, setCommunityNameDraft] = useState('');
@@ -528,6 +532,22 @@ export default function NutriSocial() {
     };
   }, [activeTab, friendSearchQuery, token]);
 
+  useEffect(() => {
+    if (!friendStatus) return;
+    setFriendToast({ type: "success", message: friendStatus, id: Date.now() });
+  }, [friendStatus]);
+
+  useEffect(() => {
+    if (!friendError) return;
+    setFriendToast({ type: "error", message: friendError, id: Date.now() });
+  }, [friendError]);
+
+  useEffect(() => {
+    if (!friendToast) return undefined;
+    const timeout = setTimeout(() => setFriendToast(null), 3600);
+    return () => clearTimeout(timeout);
+  }, [friendToast]);
+
   const userDirectory = useMemo(() => {
     const map = new Map();
 
@@ -581,6 +601,43 @@ export default function NutriSocial() {
     () => friendSuggestions.find((item) => Number(item?.id) === Number(selectedFriendId)) || null,
     [friendSuggestions, selectedFriendId],
   );
+
+  const isFriendOnline = (friend) => {
+    if (friend?.isOnline === true || friend?.online === true) return true;
+    const status = String(friend?.status || friend?.presence || '').trim().toUpperCase();
+    return status === "ONLINE" || status === "ACTIVE" || status === "AVAILABLE";
+  };
+
+  const onlineFriendsCount = useMemo(
+    () => friendUsers.filter((friend) => isFriendOnline(friend)).length,
+    [friendUsers],
+  );
+
+  const activeFriendsCount = onlineFriendsCount > 0 ? onlineFriendsCount : friendUsers.length;
+
+  const sortedFilteredFriends = useMemo(() => {
+    const normalized = [...friendUsers];
+
+    const filtered = normalized.filter((friend) => {
+      if (friendFilter === "online") {
+        return isFriendOnline(friend);
+      }
+      return true;
+    });
+
+    filtered.sort((left, right) => {
+      const leftName = String(left?.name || "").trim().toLocaleLowerCase("pt-PT");
+      const rightName = String(right?.name || "").trim().toLocaleLowerCase("pt-PT");
+      if (friendSort === "za") {
+        return rightName.localeCompare(leftName, "pt-PT");
+      }
+      return leftName.localeCompare(rightName, "pt-PT");
+    });
+
+    return filtered;
+  }, [friendUsers, friendFilter, friendSort]);
+
+  const pendingRequestsCount = pendingReceived.length + pendingSent.length;
 
   const visibleFeedPosts = useMemo(
     () => feedPosts.filter((post) => friendIds.includes(Number(post?.userId)) && Number(post?.userId) !== Number(currentUserId)),
@@ -1112,15 +1169,23 @@ export default function NutriSocial() {
           ) : null}
 
           {activeTab === 'friends' ? (
-            <section className="card mb-3">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <h3 className="card-title m-0">Rede de amigos</h3>
-              </div>
+            <section className="card mb-3 nutri-social-friends-shell">
+              <div className="card-body nutri-social-friends-body">
+                <header className="nutri-social-friends-header">
+                  <div>
+                    <h1>Rede de Amigos</h1>
+                    <p>Organiza amizades, pedidos e comunidades num só lugar.</p>
+                  </div>
+                  <div className="nutri-social-active-counter" title="Amigos ativos">
+                    <Users size={16} />
+                    <span>{activeFriendsCount} ativos</span>
+                  </div>
+                </header>
 
-              <div className="card-body">
-                <form className="row g-2 mb-3" onSubmit={handleSendFriendRequest}>
-                  <div className="col">
-                    <label className="form-label">Procurar por nome</label>
+                <form className="nutri-social-search-card" onSubmit={handleSendFriendRequest}>
+                  <label className="form-label mb-1">Adicionar novo amigo</label>
+                  <div className="nutri-social-search-input-wrap">
+                    <Search size={16} aria-hidden="true" />
                     <input
                       className="form-control"
                       type="text"
@@ -1130,14 +1195,12 @@ export default function NutriSocial() {
                         setFriendError('');
                         setFriendStatus('');
                       }}
-                      placeholder="Ex: joao"
+                      placeholder="Procura por nome ou email para enviar pedido"
                     />
-                    <div className="form-text">
-                      Escreve pelo menos 2 caracteres para pesquisar utilizadores.
-                    </div>
                   </div>
-                  <div className="col-12">
-                    <label className="form-label">Resultados</label>
+                  <small className="text-secondary">Escreve pelo menos 2 caracteres para pesquisar.</small>
+
+                  <div className="nutri-social-search-actions">
                     <select
                       className="form-select"
                       value={selectedFriendId}
@@ -1147,16 +1210,16 @@ export default function NutriSocial() {
                       <option value="">Seleciona um utilizador</option>
                       {friendSuggestions.map((suggestion) => (
                         <option key={`friend-suggestion-${suggestion.id}`} value={suggestion.id}>
-                          {suggestion.name || `Utilizador #${suggestion.id}`} {suggestion.email ? `(${suggestion.email})` : ''} - {relationStatusLabel(suggestion.relationStatus)}
+                          {suggestion.name || `Utilizador #${suggestion.id}`}
+                          {suggestion.email ? ` (${suggestion.email})` : ''}
+                          {` · ${relationStatusLabel(suggestion.relationStatus)}`}
                         </option>
                       ))}
                     </select>
-                    {isSearchingUsers ? <div className="form-text">A pesquisar utilizadores...</div> : null}
-                  </div>
-                  <div className="col-auto d-flex align-items-end">
+
                     <button
                       type="submit"
-                      className="btn btn-primary d-inline-flex align-items-center gap-2"
+                      className="nutri-social-submit"
                       disabled={
                         friendActionLoadingId === 'send'
                         || !selectedFriendSuggestion
@@ -1167,86 +1230,206 @@ export default function NutriSocial() {
                       {friendActionLoadingId === 'send' ? 'A enviar...' : 'Adicionar amigo'}
                     </button>
                   </div>
+                  {isSearchingUsers ? <small className="text-secondary">A pesquisar utilizadores...</small> : null}
                 </form>
 
-                {friendStatus ? <p className="text-secondary mb-2">{friendStatus}</p> : null}
-                {friendError ? <p className="text-danger mb-2">{friendError}</p> : null}
-                {friendsLoading ? <p className="text-secondary mb-0">A carregar amizades...</p> : null}
+                <div className="nutri-social-subtabs" role="tablist" aria-label="Gestão social">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={friendsPanelTab === 'friends'}
+                    className={`nutri-social-subtab ${friendsPanelTab === 'friends' ? 'is-active' : ''}`}
+                    onClick={() => setFriendsPanelTab('friends')}
+                  >
+                    Amigos <span className="nutri-social-subtab-badge">{friendUsers.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={friendsPanelTab === 'requests'}
+                    className={`nutri-social-subtab ${friendsPanelTab === 'requests' ? 'is-active' : ''}`}
+                    onClick={() => setFriendsPanelTab('requests')}
+                  >
+                    Pedidos <span className="nutri-social-subtab-badge">{pendingRequestsCount}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={friendsPanelTab === 'communities'}
+                    className={`nutri-social-subtab ${friendsPanelTab === 'communities' ? 'is-active' : ''}`}
+                    onClick={() => setFriendsPanelTab('communities')}
+                  >
+                    Comunidades <span className="nutri-social-subtab-badge">{communities.length}</span>
+                  </button>
+                </div>
 
-                {!friendsLoading ? (
-                  <>
-                    <div className="nutri-social-friends-grid">
-                    <div className="nutri-social-friend-list">
-                      <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
-                      {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
-                      {friendUsers.map((friend) => (
-                        <div className="nutri-social-friend-item" key={`friend-id-${friend.id}`}>
-                          <div>
-                            <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
-                            {friend.email ? <span>{friend.email}</span> : null}
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
-                            onClick={() => handleRemoveFriend(friend.id)}
-                            disabled={friendActionLoadingId === `remove-${friend.id}`}
-                          >
-                            <UserMinus size={14} />
-                            {friendActionLoadingId === `remove-${friend.id}` ? 'A remover...' : 'Remover'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="nutri-social-friend-list">
-                      <h4 className="h6 mb-2">Pedidos recebidos ({pendingReceived.length})</h4>
-                      {pendingReceived.length === 0 ? <p className="text-secondary mb-0">Sem pedidos recebidos.</p> : null}
-                      {pendingReceived.map((request) => (
-                        <div className="nutri-social-friend-item" key={`request-received-${request.id}`}>
-                          <span>De #{request.requesterId}</span>
-                          <div className="nutri-social-actions">
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => handleAcceptRequest(request.id)}
-                              disabled={friendActionLoadingId === `accept-${request.id}`}
-                            >
-                              {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDeclineRequest(request.id)}
-                              disabled={friendActionLoadingId === `decline-${request.id}`}
-                            >
-                              {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="nutri-social-friend-list">
-                      <h4 className="h6 mb-2">Pedidos enviados ({pendingSent.length})</h4>
-                      {pendingSent.length === 0 ? <p className="text-secondary mb-0">Sem pedidos enviados pendentes.</p> : null}
-                      {pendingSent.map((request) => (
-                        <div className="nutri-social-friend-item" key={`request-sent-${request.id}`}>
-                          <span>Para #{request.addresseeId}</span>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDeclineRequest(request.id)}
-                            disabled={friendActionLoadingId === `decline-${request.id}`}
-                          >
-                            {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                {friendToast ? (
+                  <div className={`nutri-social-toast ${friendToast.type === 'error' ? 'is-error' : 'is-success'}`} role="status" aria-live="polite">
+                    {friendToast.type === 'error' ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                    <span>{friendToast.message}</span>
                   </div>
+                ) : null}
 
-                  <section className="nutri-social-friend-community mt-3">
-                    <h4 className="h6 mb-2">Comunidades</h4>
+                {friendsLoading ? (
+                  <div className="nutri-social-loading-state">
+                    <div className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" />
+                    <span>A carregar dados da rede...</span>
+                  </div>
+                ) : null}
+
+                {!friendsLoading && friendsPanelTab === 'friends' ? (
+                  <section className="nutri-social-friends-panel" aria-label="Lista de amigos">
+                    <div className="nutri-social-toolbar">
+                      <div className="nutri-social-filters">
+                        <button
+                          type="button"
+                          className={`nutri-social-filter-chip ${friendFilter === 'all' ? 'is-active' : ''}`}
+                          onClick={() => setFriendFilter('all')}
+                        >
+                          Todos
+                        </button>
+                        <button
+                          type="button"
+                          className={`nutri-social-filter-chip ${friendFilter === 'online' ? 'is-active' : ''}`}
+                          onClick={() => setFriendFilter('online')}
+                        >
+                          Online
+                        </button>
+                      </div>
+
+                      <div className="nutri-social-sort">
+                        <label htmlFor="friend-sort-select">Ordenar</label>
+                        <select
+                          id="friend-sort-select"
+                          className="form-select form-select-sm"
+                          value={friendSort}
+                          onChange={(event) => setFriendSort(event.target.value)}
+                        >
+                          <option value="az">A → Z</option>
+                          <option value="za">Z → A</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {sortedFilteredFriends.length === 0 ? (
+                      <div className="nutri-social-empty-state">
+                        <Users size={34} />
+                        <h2>{friendFilter === 'online' ? 'Sem amigos online' : 'Ainda sem amigos'}</h2>
+                        <p>{friendFilter === 'online' ? 'Nenhum amigo está ativo agora.' : 'Usa a pesquisa acima para começar a tua rede.'}</p>
+                        <button
+                          type="button"
+                          className="nutri-social-secondary-btn"
+                          onClick={() => {
+                            setFriendFilter('all');
+                            setFriendSearchQuery('');
+                          }}
+                        >
+                          Ver todos
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="nutri-social-friends-card-grid">
+                        {sortedFilteredFriends.map((friend) => (
+                          <article className="nutri-social-friend-card" key={`friend-id-${friend.id}`}>
+                            <div className="nutri-social-friend-main">
+                              <img
+                                src={avatarForUser(friend.id, userDirectory)}
+                                alt={friend.name || `Utilizador #${friend.id}`}
+                                className="nutri-social-friend-avatar"
+                                loading="lazy"
+                              />
+                              <div className="nutri-social-friend-meta">
+                                <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
+                                <span>{friend.email || 'Sem email público'}</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="nutri-social-remove-btn"
+                              onClick={() => handleRemoveFriend(friend.id)}
+                              disabled={friendActionLoadingId === `remove-${friend.id}`}
+                            >
+                              {friendActionLoadingId === `remove-${friend.id}` ? 'A remover...' : 'Remover'}
+                            </button>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ) : null}
+
+                {!friendsLoading && friendsPanelTab === 'requests' ? (
+                  <section className="nutri-social-requests-panel" aria-label="Pedidos de amizade">
+                    <article className="nutri-social-request-card">
+                      <h2>Pedidos recebidos <span>({pendingReceived.length})</span></h2>
+                      {pendingReceived.length === 0 ? (
+                        <div className="nutri-social-empty-state compact">
+                          <MessageCircle size={28} />
+                          <p>Sem pedidos recebidos neste momento.</p>
+                        </div>
+                      ) : (
+                        pendingReceived.map((request) => {
+                          const requesterName = userDirectory.get(Number(request.requesterId))?.name || `Utilizador #${request.requesterId}`;
+                          return (
+                            <div className="nutri-social-friend-item" key={`request-received-${request.id}`}>
+                              <span>{requesterName}</span>
+                              <div className="nutri-social-actions">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => handleAcceptRequest(request.id)}
+                                  disabled={friendActionLoadingId === `accept-${request.id}`}
+                                >
+                                  {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger"
+                                  onClick={() => handleDeclineRequest(request.id)}
+                                  disabled={friendActionLoadingId === `decline-${request.id}`}
+                                >
+                                  {friendActionLoadingId === `decline-${request.id}` ? 'A recusar...' : 'Recusar'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </article>
+
+                    <article className="nutri-social-request-card">
+                      <h2>Pedidos enviados <span>({pendingSent.length})</span></h2>
+                      {pendingSent.length === 0 ? (
+                        <div className="nutri-social-empty-state compact">
+                          <MessageCircle size={28} />
+                          <p>Sem pedidos enviados pendentes.</p>
+                        </div>
+                      ) : (
+                        pendingSent.map((request) => {
+                          const addresseeName = userDirectory.get(Number(request.addresseeId))?.name || `Utilizador #${request.addresseeId}`;
+                          return (
+                            <div className="nutri-social-friend-item" key={`request-sent-${request.id}`}>
+                              <span>{addresseeName}</span>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => handleDeclineRequest(request.id)}
+                                disabled={friendActionLoadingId === `decline-${request.id}`}
+                              >
+                                {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </article>
+                  </section>
+                ) : null}
+
+                {!friendsLoading && friendsPanelTab === 'communities' ? (
+                  <section className="nutri-social-friend-community">
+                    <div className="nutri-social-section-divider" />
+                    <h2 className="h6 mb-2">Comunidades</h2>
                     <form className="row g-2 mb-3" onSubmit={handleCreateCommunity}>
                       <div className="col">
                         <input
@@ -1258,13 +1441,21 @@ export default function NutriSocial() {
                         />
                       </div>
                       <div className="col-auto">
-                        <button type="submit" className="btn btn-primary btn-sm" disabled={friendActionLoadingId === 'community-create'}>{friendActionLoadingId === 'community-create' ? 'A criar...' : 'Criar comunidade'}</button>
+                        <button type="submit" className="nutri-social-submit" disabled={friendActionLoadingId === 'community-create'}>
+                          <Users size={14} />
+                          {friendActionLoadingId === 'community-create' ? 'A criar...' : 'Criar comunidade'}
+                        </button>
                       </div>
                     </form>
 
                     <div className="mb-3">
                       <h5 className="h6 mb-2">Convites para ti ({pendingCommunityInvites.length})</h5>
-                      {pendingCommunityInvites.length === 0 ? <p className="text-secondary mb-0">Sem convites pendentes.</p> : null}
+                      {pendingCommunityInvites.length === 0 ? (
+                        <div className="nutri-social-empty-state compact">
+                          <Users size={28} />
+                          <p>Sem convites pendentes.</p>
+                        </div>
+                      ) : null}
                       {pendingCommunityInvites.map((invite) => (
                         <div className="nutri-social-friend-item" key={`community-pending-${invite.communityId}`}>
                           <span>{invite.communityName || `Comunidade #${invite.communityId}`} · por {invite.inviterName || `#${invite.inviterId}`}</span>
@@ -1290,83 +1481,88 @@ export default function NutriSocial() {
                       ))}
                     </div>
 
-                    {communities.length === 0 ? <p className="text-secondary mb-0">Ainda não tens comunidades.</p> : null}
+                    {communities.length === 0 ? (
+                      <div className="nutri-social-empty-state compact">
+                        <Users size={28} />
+                        <p>Ainda não tens comunidades.</p>
+                      </div>
+                    ) : null}
+
                     {communities.map((community) => {
                       const isOwnerCommunity = Number(community.ownerUserId) === Number(currentUserId);
                       return (
-                      <article className="nutri-social-community-item" key={community.id}>
-                        <div className="row g-2 align-items-center">
-                          <div className="col-12 col-md-5">
-                            <label className="form-label mb-1">Nome</label>
-                            <input
-                              className="form-control form-control-sm"
-                              type="text"
-                              value={community.name}
-                              onBlur={(event) => handleRenameCommunity(community.id, event.target.value)}
-                              disabled={!isOwnerCommunity}
-                            />
-                          </div>
-                          <div className="col-12 col-md-5">
-                            <label className="form-label mb-1">Convidar amigo</label>
-                            <select
-                              className="form-select form-select-sm"
-                              value={communityInviteDraftById[community.id] || ''}
-                              onChange={(event) => setCommunityInviteDraftById((previous) => ({
-                                ...previous,
-                                [community.id]: event.target.value,
-                              }))}
-                              disabled={friendUsers.length === 0 || !isOwnerCommunity}
-                            >
-                              <option value="">Seleciona um amigo</option>
-                              {friendUsers.map((friend) => (
-                                <option key={`community-invite-${community.id}-${friend.id}`} value={friend.id}>
-                                  {friend.name || `Utilizador #${friend.id}`}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-12 col-md-2 d-grid">
-                            <button
-                              type="button"
-                              className="btn btn-outline-primary btn-sm"
-                              onClick={() => handleInviteFriendToCommunity(community.id)}
-                              disabled={!isOwnerCommunity || friendActionLoadingId === `community-invite-${community.id}`}
-                            >
-                              {friendActionLoadingId === `community-invite-${community.id}` ? 'A enviar...' : 'Convidar'}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="nutri-social-community-members mt-2">
-                          <small className="text-secondary">Membros:</small>
-                          <div className="nutri-social-id-cloud">
-                            {community.memberIds.length === 0 ? (
-                              <span>Sem amigos convidados</span>
-                            ) : (
-                              community.memberIds.map((memberId) => {
-                                const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
-                                return <span key={`community-${community.id}-member-${memberId}`}>{member?.name || `#${memberId}`}</span>;
-                              })
-                            )}
-                          </div>
-                        </div>
-
-                        {Array.isArray(community.pendingInviteUserIds) && community.pendingInviteUserIds.length > 0 ? (
-                          <div className="nutri-social-community-members mt-2">
-                            <small className="text-secondary">Convites pendentes:</small>
-                            <div className="nutri-social-id-cloud">
-                              {community.pendingInviteUserIds.map((memberId) => {
-                                const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
-                                return <span key={`community-${community.id}-pending-${memberId}`}>{member?.name || `#${memberId}`}</span>;
-                              })}
+                        <article className="nutri-social-community-item" key={community.id}>
+                          <div className="row g-2 align-items-center">
+                            <div className="col-12 col-md-5">
+                              <label className="form-label mb-1">Nome</label>
+                              <input
+                                className="form-control form-control-sm"
+                                type="text"
+                                value={community.name}
+                                onBlur={(event) => handleRenameCommunity(community.id, event.target.value)}
+                                disabled={!isOwnerCommunity}
+                              />
+                            </div>
+                            <div className="col-12 col-md-5">
+                              <label className="form-label mb-1">Convidar amigo</label>
+                              <select
+                                className="form-select form-select-sm"
+                                value={communityInviteDraftById[community.id] || ''}
+                                onChange={(event) => setCommunityInviteDraftById((previous) => ({
+                                  ...previous,
+                                  [community.id]: event.target.value,
+                                }))}
+                                disabled={friendUsers.length === 0 || !isOwnerCommunity}
+                              >
+                                <option value="">Seleciona um amigo</option>
+                                {friendUsers.map((friend) => (
+                                  <option key={`community-invite-${community.id}-${friend.id}`} value={friend.id}>
+                                    {friend.name || `Utilizador #${friend.id}`}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="col-12 col-md-2 d-grid">
+                              <button
+                                type="button"
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={() => handleInviteFriendToCommunity(community.id)}
+                                disabled={!isOwnerCommunity || friendActionLoadingId === `community-invite-${community.id}`}
+                              >
+                                {friendActionLoadingId === `community-invite-${community.id}` ? 'A enviar...' : 'Convidar'}
+                              </button>
                             </div>
                           </div>
-                        ) : null}
-                      </article>
-                    );
+
+                          <div className="nutri-social-community-members mt-2">
+                            <small className="text-secondary">Membros:</small>
+                            <div className="nutri-social-id-cloud">
+                              {community.memberIds.length === 0 ? (
+                                <span>Sem amigos convidados</span>
+                              ) : (
+                                community.memberIds.map((memberId) => {
+                                  const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
+                                  return <span key={`community-${community.id}-member-${memberId}`}>{member?.name || `#${memberId}`}</span>;
+                                })
+                              )}
+                            </div>
+                          </div>
+
+                          {Array.isArray(community.pendingInviteUserIds) && community.pendingInviteUserIds.length > 0 ? (
+                            <div className="nutri-social-community-members mt-2">
+                              <small className="text-secondary">Convites pendentes:</small>
+                              <div className="nutri-social-id-cloud">
+                                {community.pendingInviteUserIds.map((memberId) => {
+                                  const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
+                                  return <span key={`community-${community.id}-pending-${memberId}`}>{member?.name || `#${memberId}`}</span>;
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+                        </article>
+                      );
                     })}
                   </section>
-                  </>
                 ) : null}
               </div>
             </section>
