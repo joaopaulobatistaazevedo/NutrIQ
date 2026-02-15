@@ -306,3 +306,69 @@
     display: none;
   }
 }
+
+.sidebar-hidden-input {
+  display: none;
+}
+
+.sidebar-invite-sources {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+}
+
+.sidebar-source-chip {
+  border: 1px solid rgba(244, 114, 182, 0.5);
+  background: rgba(244, 114, 182, 0.14);
+  color: #fdf2f8;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+}
+
+.sidebar-profile-actions {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.sidebar-profile-camera-btn {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sidebar-profile-camera-btn:hover {
+  border-color: rgba(52, 211, 153, 0.65);
+  color: #6ee7b7;
+}
+
+.sidebar-profile-camera-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sidebar-upload-status {
+  color: rgba(226, 232, 240, 0.86);
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0 0 8px;
+}
+
+@media (max-width: 1024px) {
+  .sidebar-profile-actions,
+  .sidebar-invite-sources,
+  .sidebar-upload-status {
+    display: none;
+  }
+}

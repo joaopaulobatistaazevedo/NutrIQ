@@ -15,6 +15,7 @@ public class UpdateProfileRequest {
     private Set<Restriction> restrictions;
     private Set<String> allergens;
     private Double maxWeeklyBudget;
+    private String picturePath;
 
     public Integer getAge() {
         return age;
@@ -78,5 +79,13 @@ public class UpdateProfileRequest {
 
     public void setMaxWeeklyBudget(Double maxWeeklyBudget) {
         this.maxWeeklyBudget = maxWeeklyBudget;
+    }
+
+    public String getPicturePath() {
+        return picturePath;
+    }
+
+    public void setPicturePath(String picturePath) {
+        this.picturePath = picturePath;
     }
 }

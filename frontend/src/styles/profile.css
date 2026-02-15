@@ -841,3 +841,13 @@
     font-size: 12px;
   }
 }
+
+.prof-hidden-input {
+  display: none;
+}
+
+.prof-avatar-image {
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: #0f172a;
+}

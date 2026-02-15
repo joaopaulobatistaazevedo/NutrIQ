@@ -15,6 +15,7 @@ public class UserProfile {
     private double budgetWeekly;
     private int streakCount;
     private LocalDate lastMealPhotoDate;
+    private String picturePath;
     private Set<Restriction> restrictions = EnumSet.noneOf(Restriction.class);
     private Set<Allergen> allergens       = EnumSet.noneOf(Allergen.class);
 
@@ -74,6 +75,8 @@ public class UserProfile {
     public void setStreakCount(int streakCount)       { this.streakCount = Math.max(streakCount, 0); }
     public LocalDate getLastMealPhotoDate()           { return lastMealPhotoDate; }
     public void setLastMealPhotoDate(LocalDate date)  { this.lastMealPhotoDate = date; }
+    public String getPicturePath()                    { return picturePath; }
+    public void setPicturePath(String picturePath)    { this.picturePath = picturePath; }
     public Set<Restriction> getRestrictions()         { return restrictions; }
     public void setRestrictions(Set<Restriction> r)   {
         this.restrictions = EnumSet.noneOf(Restriction.class);

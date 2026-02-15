@@ -61,6 +61,9 @@ public class UserService {
         if (request.getMaxWeeklyBudget() != null) {
             profile.setMaxWeeklyBudget(request.getMaxWeeklyBudget());
         }
+        if (request.getPicturePath() != null) {
+            profile.setPicturePath(request.getPicturePath().trim());
+        }
 
         if (canCalculateCalories(profile)) {
             profile.calculateDailyCalories();
