@@ -17,8 +17,10 @@ import alnak.data.global.UserDAO;
 import alnak.data.local.IngredientMarketPriceDAO;
 import alnak.data.local.RecipeDAO;
 import alnak.data.local.ShoppingCartSnapshotDAO;
+import alnak.dto.ForgotPasswordRequest;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
+import alnak.dto.ResetPasswordRequest;
 import alnak.dto.UpdateProfileRequest;
 import alnak.services.AuthService;
 import alnak.services.MealPlanService;
@@ -107,10 +109,15 @@ public class Main {
 
 
         app.post("/api/auth/forgot-password", ctx -> {
-            Map<String, Object> payload = ctx.bodyAsClass(Map.class);
-            Object emailValue = payload.get("email");
-            String email = emailValue == null ? null : emailValue.toString();
-            ctx.json(authController.forgotPassword(email));
+            ForgotPasswordRequest request = ctx.bodyAsClass(ForgotPasswordRequest.class);
+            ctx.json(authController.forgotPassword(request == null ? null : request.getEmail()));
+        });
+
+        app.post("/api/auth/reset-password", ctx -> {
+            ResetPasswordRequest request = ctx.bodyAsClass(ResetPasswordRequest.class);
+            String token = request == null ? null : request.getToken();
+            String newPassword = request == null ? null : request.getNewPassword();
+            ctx.json(authController.resetPassword(token, newPassword));
         });
 
         // ── User routes ───────────────────────────────────────────

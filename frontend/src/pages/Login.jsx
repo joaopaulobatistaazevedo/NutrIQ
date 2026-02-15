@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { getStoredRoleForEmail, setAuthSession } from '../utils/authSession';
-import { loginUser } from '../services/authService';
+import { loginUser, requestPasswordReset } from '../services/authService';
 import { fetchMyProfile } from '../services/userService';
 import { PROFILE_KEY } from '../constants/storageKeys';
 import '../styles/auth.css';
@@ -94,7 +94,7 @@ export default function Login() {
     }
   };
 
-  const handleForgotSubmit = (e) => {
+  const handleForgotSubmit = async (e) => {
     e.preventDefault();
 
     const trimmedEmail = email.trim();
@@ -105,7 +105,17 @@ export default function Login() {
     }
 
     setErrorMessage('');
-    setInfoMessage('Email enviado para redefinir a password.');
+    setInfoMessage('');
+    setIsSubmitting(true);
+
+    try {
+      const response = await requestPasswordReset({ email: trimmedEmail });
+      setInfoMessage(response?.message || 'Se o email existir, enviámos instruções para recuperar a password.');
+    } catch (error) {
+      setErrorMessage(error.message || 'Não foi possível enviar o email de recuperação.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const switchToForgotMode = () => {
@@ -155,7 +165,9 @@ export default function Login() {
 
             {isForgotMode ? (
               <>
-                <button type="submit" className="auth-submit">Enviar email de reset</button>
+                <button type="submit" className="auth-submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'A enviar...' : 'Enviar email de reset'}
+                </button>
                 <button type="button" className="auth-forgot" onClick={switchToLoginMode}>Voltar ao login</button>
               </>
             ) : (

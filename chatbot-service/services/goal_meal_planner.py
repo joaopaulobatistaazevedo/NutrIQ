@@ -49,13 +49,14 @@ class GoalMealPlannerService:
 
     def scrape_and_cache_prices(self, auth_token: str | None = None) -> int:
         """
-        Called BEFORE generate_goal_plan so prices are fresh.
+        Always fetches fresh prices from the Java service before plan generation.
+        The cache is intentionally invalidated on every call so that every plan
+        recalculation reflects current supermarket availability and prices.
         Returns the number of priced recipes fetched.
-
-        The chatbot service should call this right after detecting a
-        meal-plan request, so the user sees "a recolher preços..." feedback
-        while this runs, then the GA fires.
         """
+        # Always clear the cache — stale prices must not be reused across recalcs
+        self._cached_priced_recipes = None
+
         try:
             svc = SupermarketScraperService(
                 java_base_url=self.settings.java_service_url,
@@ -64,11 +65,13 @@ class GoalMealPlannerService:
             priced = svc.fetch_priced_recipes()
             if priced:
                 self._cached_priced_recipes = priced
-                logger.info("Cached %d priced recipes from Java service", len(priced))
+                logger.info("Refreshed supermarket cache: %d priced recipes", len(priced))
                 return len(priced)
+            logger.warning("Java service returned empty recipe list; falling back to last-known data")
         except Exception as exc:
-            logger.warning("Java service unavailable; planner will use backend-only mode: %s", exc)
+            logger.warning("Java service unavailable; planner will use fallback mode: %s", exc)
 
+        # Keep cache empty so _get_recipes falls back to local data
         self._cached_priced_recipes = []
         return 0
 
@@ -85,13 +88,12 @@ class GoalMealPlannerService:
           requested_extra_ingredients: list[str]
           restrictions         : list[str]
           allergens            : list[str]
-          goal                 : str  ← NEW  ("lose_weight"|"gain_weight"|"maintain"|"gain_muscle")
+          goal                 : str  ("lose_weight"|"gain_weight"|"maintain"|"gain_muscle")
+          calories_offset      : int  (positive = overate; negative = skipped meals / ate less)
         """
         goal = _normalise_goal(constraints.get("goal"))
         requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
-        today = date.today()
-        days_remaining_this_week = 7 - today.weekday()
-        planning_days = max(1, min(requested_planning_days, days_remaining_this_week))
+        planning_days = requested_planning_days
         max_budget = _safe_float(constraints.get("max_weekly_budget"), default=0.0)
         tdee = _safe_float(constraints.get("tdee"), default=2200.0)
         body_weight_kg = _safe_float(
@@ -100,6 +102,46 @@ class GoalMealPlannerService:
             or constraints.get("weight"),
             default=70.0,
         )
+
+        # ── Goal-aware calorie offset ────────────────────────────────────
+        # calories_offset > 0  = user ate extra calories (overate)
+        # calories_offset < 0  = user ate fewer calories (skipped a meal, etc.)
+        #
+        # How to respond depends on the user's goal:
+        #   lose_weight / maintain + overate   → distribute a small deficit over the week
+        #   lose_weight / maintain + ate less  → keep targets normal (don't under-eat further)
+        #   gain_weight / gain_muscle + overate→ keep targets normal (surplus is fine)
+        #   gain_weight / gain_muscle + ate less → distribute a small extra surplus over the week
+        raw_offset = _safe_float(constraints.get("calories_offset"), default=0.0)
+        calories_offset = int(round(raw_offset))
+
+        calorie_adjustment_per_day = 0.0
+        adjustment_reason = ""
+
+        if calories_offset != 0 and planning_days > 0:
+            spread_days = min(planning_days, 4)  # spread the correction over max 4 days
+            daily_correction = calories_offset / spread_days
+
+            if calories_offset > 0:
+                # User overate
+                if goal in ("lose_weight", "maintain"):
+                    # Gently reduce upcoming meals to compensate — capped at -200 kcal/day
+                    calorie_adjustment_per_day = -min(abs(daily_correction), 200.0)
+                    adjustment_reason = "compensação de excesso calórico"
+                else:
+                    # gain_weight / gain_muscle: extra food is welcome, keep target
+                    calorie_adjustment_per_day = 0.0
+                    adjustment_reason = ""
+            else:
+                # User ate less (skipped meal, small portions, etc.)
+                if goal in ("gain_weight", "gain_muscle"):
+                    # Add extra calories to help reach the surplus — capped at +250 kcal/day
+                    calorie_adjustment_per_day = min(abs(daily_correction), 250.0)
+                    adjustment_reason = "compensação de défice calórico para objetivo de ganho"
+                else:
+                    # lose_weight / maintain + ate less: don't reduce further, keep target
+                    calorie_adjustment_per_day = 0.0
+                    adjustment_reason = ""
 
         liked = _flat_tokens(
             constraints.get("favorite_foods"),
@@ -149,18 +191,20 @@ class GoalMealPlannerService:
                 tdee=tdee,
                 body_weight_kg=body_weight_kg,
                 excluded_recipe_ids=list(exclude_recipe_ids),
+                calorie_adjustment_per_day=calorie_adjustment_per_day,
             )
             best_slots = ga.run()
         except Exception as exc:
             logger.error("GA failed: %s", exc)
             return _empty_plan(planning_days, goal, disliked, liked, f"Erro no algoritmo: {exc}")
 
+        today = date.today()
         days_payload = _build_days_payload(best_slots, planning_days, today)
         total_cost = sum(ms.recipe.cost_per_serving for ms in best_slots)
         goal_profile = GOAL_PROFILES[goal]
-        goal_daily_calories = max(1200.0, tdee + float(goal_profile.get("calorie_delta", 0.0)))
+        goal_daily_calories = max(1200.0, tdee + float(goal_profile.get("calorie_delta", 0.0)) + calorie_adjustment_per_day)
 
-        return {
+        plan = {
             "status": "generated",
             "goal": goal,
             "goal_daily_calories": round(goal_daily_calories, 0),
@@ -180,6 +224,16 @@ class GoalMealPlannerService:
                 f"Custo estimado: €{total_cost:.2f}."
             ),
         }
+
+        if calories_offset != 0 and calorie_adjustment_per_day != 0.0:
+            plan["calorie_adjustment_applied"] = round(calorie_adjustment_per_day, 0)
+            plan["calorie_adjustment_reason"] = adjustment_reason
+        elif calories_offset != 0:
+            # Offset present but no adjustment made (e.g. gain user who overate)
+            plan["calorie_adjustment_applied"] = 0.0
+            plan["calorie_adjustment_reason"] = "ajuste não necessário para o objetivo actual"
+
+        return plan
 
     # ──────────────────────────────────────────────────────────────────────
     # Internal helpers

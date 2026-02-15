@@ -68,3 +68,17 @@ export async function requestPasswordReset({ email }) {
     throw new Error(normalizeError(error));
   }
 }
+
+export async function resetPassword({ token, newPassword }) {
+  try {
+    const { data } = await client.post('/api/auth/reset-password', { token, newPassword });
+    return {
+      message:
+        typeof data?.message === 'string' && data.message.trim()
+          ? data.message.trim()
+          : 'Password atualizada com sucesso.',
+    };
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}

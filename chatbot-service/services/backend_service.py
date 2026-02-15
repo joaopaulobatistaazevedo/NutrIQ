@@ -14,9 +14,6 @@ from config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
-logger = logging.getLogger(__name__)
-
-
 class BackendService:
     CARD_ACCENTS = ["is-pingo", "is-continente", "is-lidl"]
     FRESH_TOKENS = {

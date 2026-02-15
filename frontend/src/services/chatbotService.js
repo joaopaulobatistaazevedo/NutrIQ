@@ -5,7 +5,8 @@ const API_BASE_URL = import.meta.env.VITE_CHATBOT_API_URL || 'http://localhost:8
 const BOT_COOKIE_KEY = 'nutriq_bot_uid';
 const BOT_COOKIE_TTL_DAYS = 365;
 
-const client = createJsonClient(API_BASE_URL, 20000);
+// Chat responses may take longer when the model generates plans/carts.
+const client = createJsonClient(API_BASE_URL, 120000);
 
 const mapHistory = (messages = []) =>
   messages
