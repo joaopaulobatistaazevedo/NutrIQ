@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sun } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Moon, Sun } from 'lucide-react';
 import Layout from '../components/Layout';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { CART_GENERATE_REQUEST_KEY, PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
