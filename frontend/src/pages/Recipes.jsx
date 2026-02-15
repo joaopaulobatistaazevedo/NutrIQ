@@ -128,6 +128,51 @@ function formatIngredient(ingredient) {
   return notes ? `${base} — ${notes}` : base;
 }
 
+function stringListFromValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          return String(item.name || item.label || item.value || '').trim();
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return String(value || '').trim();
+}
+
+function recipeIngredientsText(recipe) {
+  if (Array.isArray(recipe?.ingredients) && recipe.ingredients.length > 0) {
+    return recipe.ingredients
+      .map((ingredient) => formatIngredient(ingredient))
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return String(recipe?.ingredientsText || recipe?.ingredients || '').trim();
+}
+
+function recipeStepsText(recipe) {
+  if (Array.isArray(recipe?.steps) && recipe.steps.length > 0) {
+    return [...recipe.steps]
+      .sort((a, b) => Number(a?.stepOrder || 0) - Number(b?.stepOrder || 0))
+      .map((step, index) => {
+        const text = typeof step === 'string'
+          ? step
+          : String(step?.instruction || step?.description || step?.text || '').trim();
+        return text || `Passo ${index + 1}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return String(recipe?.instructions || recipe?.stepsText || '').trim();
+}
+
 function CategoryCarousel({ category, onOpenNutritionistRecipe }) {
   const trackRef = useRef(null);
 
@@ -246,6 +291,29 @@ export default function Recipes() {
     photoFile: null,
     photoPreview: '',
   });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: '',
+    recipeId: '',
+    title: '',
+    message: '',
+    confirmLabel: 'Confirmar',
+    tone: 'primary',
+  });
+  const [editRecipeDialog, setEditRecipeDialog] = useState({
+    open: false,
+    id: '',
+    name: '',
+    ingredients: '',
+    steps: '',
+    utensils: '',
+    allergens: '',
+    visibility: 'private',
+    image: '',
+    sourceUrl: '',
+  });
+  const [editNotice, setEditNotice] = useState('');
+  const [showDeleteConfirmInEdit, setShowDeleteConfirmInEdit] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -271,6 +339,10 @@ export default function Recipes() {
             image: recipeImageFor(recipe),
             visibility: index === 0 ? 'private' : 'public',
             sourceUrl: extractSourceUrl(recipe),
+            ingredients: recipeIngredientsText(recipe),
+            steps: recipeStepsText(recipe),
+            utensils: stringListFromValue(recipe?.utensils),
+            allergens: stringListFromValue(recipe?.allergens),
           }));
         });
       } catch (loadError) {
@@ -384,26 +456,189 @@ export default function Recipes() {
     });
   };
 
-  const toggleMyRecipeVisibility = (recipeId) => {
-    setMyRecipes((previous) => previous.map((recipe) => {
-      if (recipe.id !== recipeId) {
-        return recipe;
-      }
-      return {
-        ...recipe,
-        visibility: recipe.visibility === 'private' ? 'public' : 'private',
-      };
+  const openConfirmDialog = ({ type, recipeId, title, message, confirmLabel, tone = 'primary' }) => {
+    setConfirmDialog({
+      open: true,
+      type,
+      recipeId,
+      title,
+      message,
+      confirmLabel,
+      tone,
+    });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog((previous) => ({
+      ...previous,
+      open: false,
     }));
+  };
+
+  const openEditRecipeDialog = (recipe) => {
+    if (!recipe?.id) return;
+
+    setEditNotice('');
+    setShowDeleteConfirmInEdit(false);
+    setEditRecipeDialog({
+      open: true,
+      id: recipe.id,
+      name: String(recipe.name || '').trim(),
+      ingredients: String(recipe.ingredients || '').trim(),
+      steps: String(recipe.steps || recipe.description || '').trim(),
+      utensils: String(recipe.utensils || '').trim(),
+      allergens: String(recipe.allergens || '').trim(),
+      visibility: recipe.visibility === 'public' ? 'public' : 'private',
+      image: String(recipe.image || '').trim(),
+      sourceUrl: String(recipe.sourceUrl || '').trim(),
+    });
+  };
+
+  const closeEditRecipeDialog = () => {
+    setEditRecipeDialog((previous) => ({
+      ...previous,
+      open: false,
+      id: '',
+    }));
+    setEditNotice('');
+    setShowDeleteConfirmInEdit(false);
+  };
+
+  const updateEditRecipeField = (field) => (event) => {
+    const value = event?.target?.value ?? '';
+    setEditNotice('');
+    setEditRecipeDialog((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const toggleMyRecipeVisibility = (recipeId) => {
+    const targetRecipe = myRecipes.find((recipe) => recipe.id === recipeId);
+    if (!targetRecipe) {
+      return;
+    }
+
+    if (targetRecipe.visibility === 'private') {
+      openConfirmDialog({
+        type: 'publish',
+        recipeId,
+        title: 'Publicar receita',
+        message: 'Tem a certeza que pretende pôr esta receita pública?',
+        confirmLabel: 'Sim, publicar',
+        tone: 'primary',
+      });
+      return;
+    }
+
+    setMyRecipes((previous) => previous.map((recipe) => (
+      recipe.id === recipeId
+        ? { ...recipe, visibility: 'private' }
+        : recipe
+    )));
+  };
+
+  const handleConfirmDialog = () => {
+    if (!confirmDialog.recipeId) {
+      closeConfirmDialog();
+      return;
+    }
+
+    if (confirmDialog.type === 'publish') {
+      setMyRecipes((previous) => previous.map((recipe) => (
+        recipe.id === confirmDialog.recipeId
+          ? { ...recipe, visibility: 'public' }
+          : recipe
+      )));
+    }
+
+    closeConfirmDialog();
+  };
+
+  const saveEditedRecipe = (event) => {
+    event.preventDefault();
+
+    const requiredFields = [
+      { key: 'name', label: 'nome da receita' },
+      { key: 'ingredients', label: 'ingredientes' },
+      { key: 'steps', label: 'passos' },
+      { key: 'allergens', label: 'alergénios' },
+      { key: 'utensils', label: 'utensílios' },
+    ];
+
+    const missing = requiredFields
+      .filter((field) => !String(editRecipeDialog[field.key] || '').trim())
+      .map((field) => field.label);
+
+    if (missing.length > 0) {
+      setEditNotice(`Falta preencher: ${missing.join(', ')}.`);
+      return;
+    }
+
+    if (!editRecipeDialog.id) {
+      closeEditRecipeDialog();
+      return;
+    }
+
+    setMyRecipes((previous) => previous.map((recipe) => (
+      recipe.id === editRecipeDialog.id
+        ? {
+          ...recipe,
+          name: String(editRecipeDialog.name || '').trim(),
+          ingredients: String(editRecipeDialog.ingredients || '').trim(),
+          steps: String(editRecipeDialog.steps || '').trim(),
+          utensils: String(editRecipeDialog.utensils || '').trim(),
+          allergens: String(editRecipeDialog.allergens || '').trim(),
+          visibility: editRecipeDialog.visibility === 'public' ? 'public' : 'private',
+          image: String(editRecipeDialog.image || '').trim() || recipe.image,
+          sourceUrl: String(editRecipeDialog.sourceUrl || '').trim(),
+          description: String(editRecipeDialog.steps || '').trim() || recipe.description,
+        }
+        : recipe
+    )));
+
+    closeEditRecipeDialog();
+  };
+
+  const requestDeleteFromEditDialog = () => {
+    setShowDeleteConfirmInEdit(true);
+  };
+
+  const cancelDeleteFromEditDialog = () => {
+    setShowDeleteConfirmInEdit(false);
+  };
+
+  const confirmDeleteFromEditDialog = () => {
+    if (!editRecipeDialog.id) {
+      closeEditRecipeDialog();
+      return;
+    }
+
+    setMyRecipes((previous) => previous.filter((recipe) => recipe.id !== editRecipeDialog.id));
+    closeEditRecipeDialog();
   };
 
   const handleCreateSubmit = (event) => {
     event.preventDefault();
 
-    const recipeName = String(recipeDraft.name || '').trim();
-    if (!recipeName) {
-      setCreateNotice('Indica pelo menos o nome da receita.');
+    const requiredFields = [
+      { key: 'name', label: 'nome da receita' },
+      { key: 'ingredients', label: 'ingredientes' },
+      { key: 'steps', label: 'passos' },
+      { key: 'allergens', label: 'alergénios' },
+      { key: 'utensils', label: 'utensílios' },
+    ];
+
+    const missing = requiredFields
+      .filter((field) => !String(recipeDraft[field.key] || '').trim())
+      .map((field) => field.label);
+
+    if (missing.length > 0) {
+      setCreateNotice(`Falta preencher: ${missing.join(', ')}.`);
       return;
     }
+
+    const recipeName = String(recipeDraft.name || '').trim();
 
     const cardImage = recipeDraft.photoFile
       ? URL.createObjectURL(recipeDraft.photoFile)
@@ -416,6 +651,10 @@ export default function Recipes() {
       image: cardImage || 'https://placehold.co/900x560/e2e8f0/475569?text=Receita+Criada',
       visibility: recipeDraft.visibility === 'public' ? 'public' : 'private',
       sourceUrl: '',
+      ingredients: String(recipeDraft.ingredients || '').trim(),
+      steps: String(recipeDraft.steps || '').trim(),
+      utensils: String(recipeDraft.utensils || '').trim(),
+      allergens: String(recipeDraft.allergens || '').trim(),
     };
 
     setMyRecipes((previous) => [createdRecipe, ...previous]);
@@ -516,6 +755,7 @@ export default function Recipes() {
                       placeholder="Ex: Massa de atum e espinafres"
                       value={recipeDraft.name}
                       onChange={updateDraftField('name')}
+                      required
                     />
                   </div>
 
@@ -528,6 +768,7 @@ export default function Recipes() {
                       placeholder={'Ex: 200g massa\n150g atum\n1 chávena espinafres'}
                       value={recipeDraft.ingredients}
                       onChange={updateDraftField('ingredients')}
+                      required
                     />
                   </div>
 
@@ -540,6 +781,7 @@ export default function Recipes() {
                       placeholder={'Ex: 1) Cozer a massa\n2) Saltear espinafres\n3) Misturar com atum'}
                       value={recipeDraft.steps}
                       onChange={updateDraftField('steps')}
+                      required
                     />
                   </div>
 
@@ -552,6 +794,7 @@ export default function Recipes() {
                       placeholder={'Ex: Panela\nFrigideira\nEscorredor'}
                       value={recipeDraft.utensils}
                       onChange={updateDraftField('utensils')}
+                      required
                     />
                   </div>
 
@@ -564,6 +807,7 @@ export default function Recipes() {
                       placeholder={'Ex: Glúten\nPeixe\nLactose'}
                       value={recipeDraft.allergens}
                       onChange={updateDraftField('allergens')}
+                      required
                     />
                   </div>
 
@@ -672,6 +916,13 @@ export default function Recipes() {
                             >
                               {isPrivate ? 'Tornar pública' : 'Tornar privada'}
                             </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => openEditRecipeDialog(recipe)}
+                            >
+                              Editar receita
+                            </button>
                           </div>
                         </div>
                       </article>
@@ -683,6 +934,163 @@ export default function Recipes() {
           ) : null}
         </div>
       </div>
+
+      {confirmDialog.open ? (
+        <div
+          className="recipes-confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={confirmDialog.title || 'Confirmar ação'}
+          onClick={closeConfirmDialog}
+        >
+          <div className="recipes-confirm-card" onClick={(event) => event.stopPropagation()}>
+            <h4>{confirmDialog.title || 'Confirmar ação'}</h4>
+            <p>{confirmDialog.message}</p>
+            <div className="recipes-confirm-actions">
+              <button type="button" className="btn btn-outline-secondary" onClick={closeConfirmDialog}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={`btn ${confirmDialog.tone === 'danger' ? 'btn-danger' : 'btn-primary'}`}
+                onClick={handleConfirmDialog}
+              >
+                {confirmDialog.confirmLabel || 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editRecipeDialog.open ? (
+        <div
+          className="recipes-edit-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar receita"
+          onClick={closeEditRecipeDialog}
+        >
+          <div className="recipes-edit-card" onClick={(event) => event.stopPropagation()}>
+            <header className="recipes-edit-head">
+              <h4>Editar receita</h4>
+              <button type="button" className="recipes-edit-close" onClick={closeEditRecipeDialog} aria-label="Fechar edição">
+                <X size={16} />
+              </button>
+            </header>
+
+            <form className="recipes-edit-form" onSubmit={saveEditedRecipe}>
+              <div className="recipes-edit-field">
+                <label htmlFor="edit-recipe-name">Nome da receita</label>
+                <input
+                  id="edit-recipe-name"
+                  type="text"
+                  className="form-control"
+                  value={editRecipeDialog.name}
+                  onChange={updateEditRecipeField('name')}
+                />
+              </div>
+
+              <div className="recipes-edit-field">
+                <label htmlFor="edit-recipe-visibility">Visibilidade</label>
+                <select
+                  id="edit-recipe-visibility"
+                  className="form-control"
+                  value={editRecipeDialog.visibility}
+                  onChange={updateEditRecipeField('visibility')}
+                >
+                  <option value="private">Privada</option>
+                  <option value="public">Pública</option>
+                </select>
+              </div>
+
+              <div className="recipes-edit-field recipes-edit-field-full">
+                <label htmlFor="edit-recipe-ingredients">Ingredientes</label>
+                <textarea
+                  id="edit-recipe-ingredients"
+                  rows={4}
+                  className="form-control"
+                  value={editRecipeDialog.ingredients}
+                  onChange={updateEditRecipeField('ingredients')}
+                />
+              </div>
+
+              <div className="recipes-edit-field recipes-edit-field-full">
+                <label htmlFor="edit-recipe-steps">Passos</label>
+                <textarea
+                  id="edit-recipe-steps"
+                  rows={4}
+                  className="form-control"
+                  value={editRecipeDialog.steps}
+                  onChange={updateEditRecipeField('steps')}
+                />
+              </div>
+
+              <div className="recipes-edit-field">
+                <label htmlFor="edit-recipe-utensils">Utensílios recomendados</label>
+                <input
+                  id="edit-recipe-utensils"
+                  type="text"
+                  className="form-control"
+                  value={editRecipeDialog.utensils}
+                  onChange={updateEditRecipeField('utensils')}
+                />
+              </div>
+
+              <div className="recipes-edit-field">
+                <label htmlFor="edit-recipe-allergens">Alergénios</label>
+                <input
+                  id="edit-recipe-allergens"
+                  type="text"
+                  className="form-control"
+                  value={editRecipeDialog.allergens}
+                  onChange={updateEditRecipeField('allergens')}
+                />
+              </div>
+
+              <div className="recipes-edit-field recipes-edit-field-full">
+                <label htmlFor="edit-recipe-image">Imagem (URL)</label>
+                <input
+                  id="edit-recipe-image"
+                  type="url"
+                  className="form-control"
+                  placeholder="https://..."
+                  value={editRecipeDialog.image}
+                  onChange={updateEditRecipeField('image')}
+                />
+              </div>
+
+              {editNotice ? (
+                <div className="alert alert-info recipes-edit-notice" role="status">
+                  {editNotice}
+                </div>
+              ) : null}
+
+              {showDeleteConfirmInEdit ? (
+                <div className="recipes-edit-delete-confirm" role="alert">
+                  <p>Tem a certeza que quer apagar esta receita?</p>
+                  <div className="recipes-edit-delete-actions">
+                    <button type="button" className="btn btn-outline-secondary" onClick={cancelDeleteFromEditDialog}>
+                      Cancelar
+                    </button>
+                    <button type="button" className="btn btn-danger" onClick={confirmDeleteFromEditDialog}>
+                      Sim, apagar
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="recipes-edit-actions">
+                <button type="button" className="btn btn-outline-danger" onClick={requestDeleteFromEditDialog}>
+                  Eliminar receita
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {selectedNutritionistRecipe ? (
         <div className="recipe-summary-overlay" role="dialog" aria-modal="true" aria-label="Resumo da receita" onClick={closeNutritionistModal}>
@@ -747,3 +1155,4 @@ export default function Recipes() {
     </Layout>
   );
 }
+
