@@ -405,9 +405,7 @@ export default function ChatWidget() {
   }, []);
 
   useEffect(() => {
-    const isMobileViewport = window.matchMedia('(max-width: 1024px)').matches;
-
-    if (isOpen && isMobileViewport) {
+    if (isOpen) {
       document.body.classList.add('chat-open');
     } else {
       document.body.classList.remove('chat-open');

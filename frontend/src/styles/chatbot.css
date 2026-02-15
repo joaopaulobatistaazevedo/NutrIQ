@@ -383,17 +383,18 @@
   .chat-profile-grid {
     grid-template-columns: 1fr;
   }
+
+  body.chat-open {
+    overflow: hidden;
+  }
+
+  body.chat-open .sidebar {
+    pointer-events: none;
+    opacity: 0.2;
+    filter: saturate(0.6);
+  }
 }
 
-body.chat-open {
-  overflow: hidden;
-}
-
-body.chat-open .sidebar {
-  pointer-events: none;
-  opacity: 0.2;
-  filter: saturate(0.6);
-}
 
 .chat-message.is-typing {
   opacity: 0.8;
