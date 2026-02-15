@@ -266,6 +266,9 @@ export async function fetchCommunities(token) {
     });
     return Array.isArray(data) ? data : [];
   } catch (error) {
+    if (Number(error?.response?.status || 0) === 404) {
+      return [];
+    }
     throw new Error(normalizeError(error));
   }
 }
@@ -340,6 +343,9 @@ export async function fetchPendingCommunityInvites(token) {
     });
     return Array.isArray(data) ? data : [];
   } catch (error) {
+    if (Number(error?.response?.status || 0) === 404) {
+      return [];
+    }
     throw new Error(normalizeError(error));
   }
 }

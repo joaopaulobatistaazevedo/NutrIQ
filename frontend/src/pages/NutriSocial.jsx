@@ -1007,8 +1007,7 @@ export default function NutriSocial() {
                 title="Feed"
                 aria-label="Feed"
               >
-                  <span aria-hidden="true">🏠</span>
-                  <span className="visually-hidden">Feed</span>
+                  Feed
                 </button>
                 <button
                   type="button"
@@ -1019,8 +1018,7 @@ export default function NutriSocial() {
                 title="Amigos"
                 aria-label="Amigos"
               >
-                  <span aria-hidden="true">👥</span>
-                  <span className="visually-hidden">Amigos</span>
+                  Amigos
                 </button>
                 <button
                   type="button"
@@ -1031,8 +1029,7 @@ export default function NutriSocial() {
                 title="Registar Refeição"
                 aria-label="Registar Refeição"
               >
-                  <span aria-hidden="true">➕</span>
-                  <span className="visually-hidden">Registar Refeição</span>
+                  Registar Refeição
                 </button>
                 <button
                   type="button"
@@ -1043,8 +1040,7 @@ export default function NutriSocial() {
                 title="Perfil"
                 aria-label="Perfil"
               >
-                  <span aria-hidden="true">👤</span>
-                  <span className="visually-hidden">Perfil</span>
+                  Perfil
                 </button>
               </div>
             </div>
