@@ -114,6 +114,39 @@ public class SocialDTOs {
             String relationStatus
     ) {}
 
+    // ── Kudo & Comment DTOs ───────────────────────────────────────
+
+    /** Body for POST /api/social/posts/{id}/comments */
+    public record AddCommentRequest(String text) {}
+
+    public record CommentResponse(
+            long id,
+            long postId,
+            long userId,
+            String text,
+            LocalDateTime createdAt
+    ) {
+        public static CommentResponse from(alnak.business_logic.entities.PostComment c) {
+            return new CommentResponse(c.getId(), c.getPostId(), c.getUserId(),
+                    c.getText(), c.getCreatedAt());
+        }
+
+        public static List<CommentResponse> fromList(
+                List<alnak.business_logic.entities.PostComment> list) {
+            return list.stream().map(CommentResponse::from).toList();
+        }
+    }
+
+    /** Response after toggling a kudo. */
+    public record KudoToggleResponse(long postId, boolean added, Map<Long, String> kudosByUser) {}
+
+    /** Full interactions snapshot for one post — returned by GET /api/social/posts/{id}/interactions */
+    public record PostInteractionsResponse(
+            long postId,
+            Map<Long, String> kudosByUser,
+            List<CommentResponse> comments
+    ) {}
+
     // ── Feed ──────────────────────────────────────────────────────
 
     public record FeedResponse(
