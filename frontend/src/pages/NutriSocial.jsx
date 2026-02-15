@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Flame, MessageCircle, Send, ThumbsUp, UserPlus, Users, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -8,9 +8,10 @@ import {
   declineFriendRequest,
   fetchFriends,
   fetchNutriSocialFeed,
+  fetchPostInteractionsMap,
   fetchPendingReceivedRequests,
   fetchPendingSentRequests,
-  getPostInteractions,
+  resolveNutriSocialImageUrl,
   searchUsersForFriendRequest,
   sendFriendRequest,
   togglePostKudo,
@@ -19,10 +20,104 @@ import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/nutrisocial.css';
 
+const FALLBACK_POST_IMAGE = 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
+
 function normalizePostImage(post) {
-  const image = String(post?.picturePath || '').trim();
-  if (image) return image;
-  return 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
+  const candidates = [
+    post?.picturePath,
+    post?.picture_path,
+  ];
+
+  for (const candidate of candidates) {
+    const resolved = resolveNutriSocialImageUrl(candidate);
+    if (resolved && !resolved.startsWith('blob:')) {
+      return resolved;
+    }
+  }
+
+  return FALLBACK_POST_IMAGE;
+}
+
+function isInvalidLegacyBlobPath(post) {
+  const value = String(post?.picturePath || post?.picture_path || '').trim().toLowerCase();
+  return value.startsWith('blob:');
+}
+
+function isTunnelHostImage(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    const host = String(parsed.host || '').toLowerCase();
+    return host.endsWith('.loca.lt') || host.includes('ngrok');
+  } catch {
+    return false;
+  }
+}
+
+function NutriSocialPostImage({ src, alt }) {
+  const [displaySrc, setDisplaySrc] = useState(src || FALLBACK_POST_IMAGE);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = '';
+
+    const imageSrc = String(src || '').trim();
+    if (!imageSrc) {
+      setDisplaySrc(FALLBACK_POST_IMAGE);
+      return () => {};
+    }
+
+    if (!isTunnelHostImage(imageSrc)) {
+      setDisplaySrc(imageSrc);
+      return () => {};
+    }
+
+    // ngrok/loca.lt may require a custom header; <img> cannot send it,
+    // so fetch as blob and render a local object URL.
+    const loadThroughFetch = async () => {
+      try {
+        const response = await fetch(imageSrc, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`Image fetch failed: ${response.status}`);
+        }
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setDisplaySrc(objectUrl);
+        }
+      } catch {
+        if (!cancelled) {
+          setDisplaySrc(FALLBACK_POST_IMAGE);
+        }
+      }
+    };
+
+    void loadThroughFetch();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [src]);
+
+  return (
+    <img
+      src={displaySrc || FALLBACK_POST_IMAGE}
+      alt={alt}
+      className="nutri-social-feed-image"
+      loading="lazy"
+      onError={(event) => {
+        if (event.currentTarget.src !== FALLBACK_POST_IMAGE) {
+          event.currentTarget.src = FALLBACK_POST_IMAGE;
+        }
+      }}
+    />
+  );
 }
 
 function prettyDate(value) {
@@ -70,6 +165,7 @@ export default function NutriSocial() {
   const [currentUserName, setCurrentUserName] = useState('');
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState('');
+  const [feedStatus, setFeedStatus] = useState('');
 
   const [friendsLoading, setFriendsLoading] = useState(true);
   const [friendActionLoadingId, setFriendActionLoadingId] = useState('');
@@ -89,7 +185,34 @@ export default function NutriSocial() {
   const [interactionsByPost, setInteractionsByPost] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
 
-  const loadData = async () => {
+  const hydratePostInteractions = useCallback(async (posts) => {
+    if (!token) {
+      setInteractionsByPost({});
+      return;
+    }
+
+    const postIds = (Array.isArray(posts) ? posts : [])
+      .map((post) => post?.id)
+      .filter(Boolean);
+
+    if (postIds.length === 0) {
+      setInteractionsByPost({});
+      return;
+    }
+
+    try {
+      const interactionsMap = await fetchPostInteractionsMap(token, postIds);
+      setInteractionsByPost(interactionsMap);
+    } catch {
+      // keep previous interactions if fetch fails
+    }
+  }, [token]);
+
+  const announceFriendRequestRefresh = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('nutrisocial:force-refresh'));
+  }, []);
+
+  const loadData = useCallback(async ({ silent = false } = {}) => {
     if (!token) {
       setFeedLoading(false);
       setFriendsLoading(false);
@@ -97,9 +220,11 @@ export default function NutriSocial() {
       return;
     }
 
-    setFeedLoading(true);
-    setFriendsLoading(true);
-    setFeedError('');
+    if (!silent) {
+      setFeedLoading(true);
+      setFriendsLoading(true);
+      setFeedError('');
+    }
 
     try {
       const [feed, profile, friends, receivedRequests, sentRequests] = await Promise.all([
@@ -110,7 +235,21 @@ export default function NutriSocial() {
         fetchPendingSentRequests(token),
       ]);
 
-      setFeedPosts(Array.isArray(feed) ? feed : []);
+      const normalizedFeed = (Array.isArray(feed) ? feed : []).filter((post) => !isInvalidLegacyBlobPath(post));
+      setFeedPosts((previous) => {
+        if (silent) {
+          const previousIds = new Set(previous.map((post) => String(post?.id || '')));
+          const newPosts = normalizedFeed.filter((post) => !previousIds.has(String(post?.id || '')));
+          if (newPosts.length > 0) {
+            setFeedStatus(
+              newPosts.length === 1
+                ? 'Tens 1 nova publicação no feed.'
+                : `Tens ${newPosts.length} novas publicações no feed.`,
+            );
+          }
+        }
+        return normalizedFeed;
+      });
       setStreakCount(Math.max(0, Number(profile?.profile?.streakCount || 0)));
       setCurrentUserName(String(profile?.name || sessionName || '').trim());
       const friendIdsFromApi = Array.isArray(friends?.friendIds) ? friends.friendIds : [];
@@ -131,22 +270,57 @@ export default function NutriSocial() {
       );
       setPendingReceived(Array.isArray(receivedRequests) ? receivedRequests : []);
       setPendingSent(Array.isArray(sentRequests) ? sentRequests : []);
+      announceFriendRequestRefresh();
+      void hydratePostInteractions(normalizedFeed);
     } catch (error) {
-      setFeedError(error?.message || 'Não foi possível carregar o NutriSocial.');
+      if (!silent) {
+        setFeedError(error?.message || 'Não foi possível carregar o NutriSocial.');
+      }
     } finally {
-      setFeedLoading(false);
-      setFriendsLoading(false);
+      if (!silent) {
+        setFeedLoading(false);
+        setFriendsLoading(false);
+      }
     }
-  };
+  }, [announceFriendRequestRefresh, hydratePostInteractions, sessionName, token]);
 
   useEffect(() => {
     void loadData();
-  }, [token]);
+  }, [loadData]);
 
   useEffect(() => {
-    const postIds = feedPosts.map((post) => post?.id).filter(Boolean);
-    setInteractionsByPost(getPostInteractions(postIds));
-  }, [feedPosts]);
+    if (!token) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      void loadData({ silent: true });
+    }, 15000);
+
+    const onFocus = () => {
+      void loadData({ silent: true });
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        void loadData({ silent: true });
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [loadData, token]);
+
+  useEffect(() => {
+    if (!feedStatus) return undefined;
+    const timeout = setTimeout(() => setFeedStatus(''), 5000);
+    return () => clearTimeout(timeout);
+  }, [feedStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,20 +496,33 @@ export default function NutriSocial() {
     }
   };
 
-  const handleToggleKudo = (postId) => {
+  const handleToggleKudo = async (postId) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
     try {
-      const updated = togglePostKudo(postId, currentUserId);
+      const updated = await togglePostKudo(token, postId);
       setInteractionsByPost((previous) => ({
         ...previous,
-        [String(postId)]: updated,
+        [String(postId)]: {
+          ...(previous[String(postId)] || { comments: [] }),
+          kudosByUser: updated.kudosByUser || {},
+        },
       }));
     } catch (error) {
       setFeedError(error?.message || 'Não foi possível atualizar o kudo.');
     }
   };
 
-  const handleCommentSubmit = (event, postId) => {
+  const handleCommentSubmit = async (event, postId) => {
     event.preventDefault();
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
     const key = String(postId);
     const draft = String(commentDrafts[key] || '').trim();
 
@@ -344,10 +531,13 @@ export default function NutriSocial() {
     }
 
     try {
-      const updated = addPostComment(postId, currentUserId, draft);
+      const newComment = await addPostComment(token, postId, draft);
       setInteractionsByPost((previous) => ({
         ...previous,
-        [key]: updated,
+        [key]: {
+          ...(previous[key] || { kudosByUser: {} }),
+          comments: [...(previous[key]?.comments || []), newComment].slice(-40),
+        },
       }));
       setCommentDrafts((previous) => ({
         ...previous,
@@ -548,6 +738,7 @@ export default function NutriSocial() {
             <div className="card-body">
               {feedLoading ? <p className="text-secondary mb-2">A carregar feed...</p> : null}
               {!feedLoading && feedError ? <p className="text-danger mb-2">{feedError}</p> : null}
+              {!feedLoading && !feedError && feedStatus ? <p className="text-success mb-2">{feedStatus}</p> : null}
               {!feedLoading && !feedError && feedPosts.length === 0 ? <p className="text-secondary mb-0">Ainda não existem partilhas no teu feed.</p> : null}
 
               <div className="d-grid gap-3">
@@ -556,6 +747,10 @@ export default function NutriSocial() {
                   const kudosCount = Object.keys(interaction.kudosByUser || {}).length;
                   const hasKudoFromMe = Boolean(interaction.kudosByUser?.[String(currentUserId)]);
                   const comments = Array.isArray(interaction.comments) ? interaction.comments : [];
+                  const imageSrc = normalizePostImage(post);
+                  const sortedComments = [...comments].sort(
+                    (left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime(),
+                  );
                   const draftKey = String(post.id);
 
                   return (
@@ -568,7 +763,10 @@ export default function NutriSocial() {
                         <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
                       </div>
 
-                      <img src={normalizePostImage(post)} alt={post.description || post.recipeName || 'Refeição partilhada'} className="nutri-social-feed-image" />
+                      <NutriSocialPostImage
+                        src={imageSrc}
+                        alt={post.description || post.recipeName || 'Refeição partilhada'}
+                      />
 
                       <div className="card-body">
                         <h4 className="h5 mb-1">{post.recipeName || `Receita #${post.recipeId}`}</h4>
@@ -584,7 +782,7 @@ export default function NutriSocial() {
                             Kudos {kudosCount}
                           </button>
                           <span className="badge bg-secondary-lt">
-                            <MessageCircle size={13} /> {comments.length} comentários
+                            <MessageCircle size={13} /> {sortedComments.length} comentários
                           </span>
                         </div>
 
@@ -643,9 +841,9 @@ export default function NutriSocial() {
                           </button>
                         </form>
 
-                        {comments.length > 0 ? (
+                        {sortedComments.length > 0 ? (
                           <div className="nutri-social-comment-list mt-2">
-                            {comments.slice(0, 4).map((comment) => (
+                            {sortedComments.slice(0, 4).map((comment) => (
                               <div className="nutri-social-comment-item" key={comment.id}>
                                 <strong>{usernameFromId(comment.userId, currentUserId, userDirectory)}</strong>
                                 <span>{comment.text}</span>

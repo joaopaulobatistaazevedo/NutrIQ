@@ -6,7 +6,7 @@ import Layout from '../components/Layout';
 import { listLatestPrices } from '../services/priceService';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { fetchRecipeById, fetchRecipes } from '../services/recipeService';
-import { registerMealPhoto } from '../services/nutriSocialService';
+import { registerMealPhoto, uploadSocialPostImage } from '../services/nutriSocialService';
 import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/progress.css';
@@ -136,6 +136,7 @@ export default function Progress() {
   const [submitStatus, setSubmitStatus] = useState('');
   const [photoPath, setPhotoPath] = useState('');
   const [photoPreview, setPhotoPreview] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
   const [description, setDescription] = useState('');
   const [shareOnNutriSocial, setShareOnNutriSocial] = useState(true);
   const [selectedRecipeId, setSelectedRecipeId] = useState('');
@@ -302,6 +303,7 @@ export default function Progress() {
     const preview = buildPreviewFromFile(file);
     setPhotoPreview(preview);
     setPhotoPath(preview);
+    setPhotoFile(file);
     setSubmitStatus('');
   };
 
@@ -329,8 +331,15 @@ export default function Progress() {
     setSubmitStatus('');
 
     try {
+      let finalPicturePath = cleanPhotoPath;
+      if (photoFile instanceof File) {
+        finalPicturePath = await uploadSocialPostImage(token, photoFile);
+      } else if (cleanPhotoPath.startsWith('blob:')) {
+        throw new Error('A foto selecionada expirou. Escolhe novamente a imagem antes de submeter.');
+      }
+
       const payload = {
-        picturePath: cleanPhotoPath,
+        picturePath: finalPicturePath,
         description: String(description || '').trim() || null,
         shareOnNutriSocial,
         recipeId: shareOnNutriSocial ? Number(selectedRecipeId) : null,
@@ -350,6 +359,12 @@ export default function Progress() {
       setDescription('');
       setSelectedRecipeId('');
       setRating(5);
+      setPhotoFile(null);
+      setPhotoPath('');
+      if (photoPreview && photoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(photoPreview);
+      }
+      setPhotoPreview('');
     } catch (error) {
       setSubmitStatus(error?.message || 'Não foi possível registar a foto.');
     } finally {

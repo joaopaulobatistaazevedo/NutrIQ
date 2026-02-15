@@ -257,11 +257,38 @@ public class GlobalDatabase
                 )
             """);
 
+            // ── Post interactions (kudos + comments) ─────────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS post_kudos (
+                    post_id    INT       NOT NULL,
+                    user_id    INT       NOT NULL,
+                    created_at DATETIME  DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (post_id, user_id),
+                    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS post_comments (
+                    id         INT PRIMARY KEY AUTO_INCREMENT,
+                    post_id    INT         NOT NULL,
+                    user_id    INT         NOT NULL,
+                    text       TEXT        NOT NULL,
+                    created_at DATETIME    DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
             // ── Indexes ───────────────────────────────────────────
             createIndexIfMissing(s, "CREATE INDEX idx_users_email      ON users(email)");
             createIndexIfMissing(s, "CREATE INDEX idx_friendships_addr ON friendships(addressee_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_user       ON posts(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_recipe     ON posts(recipe_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_kudos_user  ON post_kudos(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_comments_post ON post_comments(post_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_comments_user ON post_comments(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_ratings_recipe   ON user_recipe_ratings(recipe_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_user  ON meal_plans(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_week  ON meal_plans(week_start)");

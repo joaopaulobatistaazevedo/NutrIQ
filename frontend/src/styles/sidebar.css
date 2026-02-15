@@ -128,6 +128,42 @@
   flex: 1;
 }
 
+.sidebar-nutrisocial-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.sidebar-nutrisocial-popup {
+  position: absolute;
+  right: 10px;
+  top: -8px;
+  transform: translateY(-100%);
+  border-radius: 10px;
+  border: 1px solid rgba(251, 113, 133, 0.45);
+  background: rgba(255, 241, 242, 0.98);
+  color: #9f1239;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 5px 8px;
+  white-space: nowrap;
+  box-shadow: 0 10px 20px rgba(136, 19, 55, 0.25);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .sidebar-item-kbd {
   font-size: 10px;
   font-weight: 700;
@@ -229,6 +265,10 @@
   .sidebar-item-arrow { display: none; }
 
   .sidebar-item-kbd {
+    display: none;
+  }
+
+  .sidebar-nutrisocial-popup {
     display: none;
   }
 
