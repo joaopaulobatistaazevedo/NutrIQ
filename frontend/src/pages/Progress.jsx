@@ -369,7 +369,7 @@ export default function Progress() {
       setPhotoPreview('');
 
       setTimeout(() => {
-        navigate('/nutrisocial');
+        navigate('/nutrisocial?tab=profile');
       }, 1200);
     } catch (error) {
       setSubmitStatus(error?.message || 'Não foi possível registar a foto.');
