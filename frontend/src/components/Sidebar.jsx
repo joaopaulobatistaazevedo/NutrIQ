@@ -51,6 +51,7 @@ export default function Sidebar() {
           const isNutriSocial = item.path === '/nutrisocial';
           return (
           <button
+            type="button"
             key={item.path}
             className={`sidebar-item ${isActive(item.path) ? 'active' : ''} ${isNutriSocial ? 'sidebar-item-nutrisocial' : ''}`}
             onClick={() => navigate(item.path)}
@@ -67,7 +68,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <button className="sidebar-logout" onClick={handleLogout}>
+        <button type="button" className="sidebar-logout" onClick={handleLogout}>
           <LogOut className="sidebar-item-icon" />
           <span className="sidebar-item-label">Sair</span>
           <ChevronRight className="sidebar-item-arrow" />

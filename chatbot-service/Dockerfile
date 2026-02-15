@@ -5,10 +5,12 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements.txt ./
+COPY chatbot-service/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY chatbot-service/ ./
+COPY supermarket_scraper ./supermarket_scraper
+COPY examples ./examples
 
 EXPOSE 8000
 

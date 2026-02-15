@@ -171,7 +171,9 @@ def _stable_recipe_id(recipe: RecipeRecord) -> int:
 
 
 def _build_description(recipe: RecipeRecord) -> str:
-    ingredients_preview = ", ".join(recipe.ingredients[:8]).strip()
+    # Keep all scraped ingredients so downstream services (chatbot/cart)
+    # can reconstruct full shopping demand from mirrored recipes.
+    ingredients_preview = "; ".join(recipe.ingredients).strip()
     parts = [f"Fonte: {recipe.source}", f"URL: {recipe.url}"]
     if ingredients_preview:
         parts.append(f"Ingredientes: {ingredients_preview}")

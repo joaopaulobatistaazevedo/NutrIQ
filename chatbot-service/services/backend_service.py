@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import sys
 import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -9,6 +10,8 @@ from urllib import error, request
 from urllib.parse import quote_plus
 
 from config.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 logger = logging.getLogger(__name__)
@@ -251,6 +254,12 @@ class BackendService:
                     added += 1
 
         if added <= 0:
+            # Avoid leaving an empty ACTIVE plan that would shadow valid local plans in the UI.
+            self._request_json(
+                auth_token,
+                method="DELETE",
+                path=f"/api/meal-plans/{plan_id}",
+            )
             return None
 
         return self.fetch_active_meal_plan(auth_token)
@@ -277,14 +286,25 @@ class BackendService:
         if not auth_token or not isinstance(meal_plan, dict):
             return None
 
+        # Source of truth: plano ativo persistido no backend.
+        if not isinstance(meal_plan.get("days"), list) or not meal_plan.get("days"):
+            persisted_plan = self.fetch_active_meal_plan(auth_token)
+            if isinstance(persisted_plan, dict):
+                meal_plan = persisted_plan
+
         ingredient_demand = self._extract_ingredient_demand_from_plan(auth_token, meal_plan)
         if not ingredient_demand:
+            logger.warning("Shopping cart generation aborted: no ingredient demand extracted from meal plan.")
             return None
 
         scraper_report = self._run_supermarket_scraper(ingredient_demand)
         if not scraper_report:
+            logger.warning(
+                "Shopping cart generation aborted: supermarket scraper returned no report."
+            )
             return None
 
+        # Atualiza a BD para manter histórico e disponibilidade no frontend.
         self._request_json(
             auth_token,
             method="POST",
@@ -292,16 +312,25 @@ class BackendService:
             payload=scraper_report,
         )
 
-        latest_prices = self._request_json(
-            auth_token,
-            method="GET",
-            path="/api/prices",
-        )
-        if not isinstance(latest_prices, list):
+        fresh_prices = self._extract_prices_from_scraper_report(scraper_report)
+        if not fresh_prices:
+            logger.warning(
+                "Shopping cart generation failed: fresh scraper report contains no priced items."
+            )
             return None
 
-        cart_snapshot = self._build_cart_snapshot(latest_prices, ingredient_demand, meal_plan)
+        market_names = self._extract_market_names_from_scraper_report(scraper_report)
+        cart_snapshot = self._build_cart_snapshot(
+            fresh_prices,
+            ingredient_demand,
+            meal_plan,
+            market_names=market_names,
+        )
+
         if not cart_snapshot:
+            logger.warning(
+                "Shopping cart generation failed: no market snapshot could be built from fresh scraper prices."
+            )
             return None
 
         saved = self._request_json(
@@ -311,6 +340,108 @@ class BackendService:
             payload=cart_snapshot,
         )
         return saved if isinstance(saved, dict) else cart_snapshot
+
+    def _extract_prices_from_scraper_report(self, report: Dict[str, Any]) -> list[Dict[str, Any]]:
+        if not isinstance(report, dict):
+            return []
+
+        results_by_market = report.get("results_by_market")
+        if not isinstance(results_by_market, dict):
+            return []
+
+        prices: list[Dict[str, Any]] = []
+        for fallback_market_name, entries in results_by_market.items():
+            if not isinstance(entries, list):
+                continue
+
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                if not bool(entry.get("found")):
+                    continue
+
+                ingredient = entry.get("ingredient")
+                ingredient_name = ""
+                normalized_name = ""
+                if isinstance(ingredient, dict):
+                    ingredient_name = str(ingredient.get("name") or "").strip()
+                    normalized_name = self._normalize_ingredient(
+                        ingredient.get("normalized_name") or ingredient_name
+                    )
+
+                ingredient_name = ingredient_name or str(entry.get("ingredient_name") or "").strip()
+                normalized_name = normalized_name or self._normalize_ingredient(ingredient_name)
+                if not normalized_name:
+                    continue
+
+                price = self._safe_float(entry.get("price"), default=0.0)
+                if price <= 0:
+                    continue
+
+                market_name = str(
+                    entry.get("supermarket") or fallback_market_name or "Supermercado"
+                ).strip() or "Supermercado"
+                product_name = str(
+                    entry.get("product_name")
+                    or entry.get("productName")
+                    or ingredient_name
+                    or normalized_name
+                ).strip()
+                if not product_name:
+                    product_name = ingredient_name or normalized_name
+
+                prices.append(
+                    {
+                        "supermarket": market_name,
+                        "ingredientNormalized": normalized_name,
+                        "ingredientName": ingredient_name or normalized_name,
+                        "productName": product_name,
+                        "productUrl": str(
+                            entry.get("product_url") or entry.get("productUrl") or ""
+                        ).strip(),
+                        "imageUrl": str(
+                            entry.get("image_url") or entry.get("imageUrl") or ""
+                        ).strip(),
+                        "price": price,
+                        "currency": str(entry.get("currency") or "EUR").strip() or "EUR",
+                        "calories": self._safe_float(entry.get("calories"), default=0.0),
+                        "source": str(entry.get("source") or "scraper_report").strip(),
+                        "note": entry.get("note"),
+                    }
+                )
+
+        return prices
+
+    def _extract_market_names_from_scraper_report(self, report: Dict[str, Any]) -> list[str]:
+        if not isinstance(report, dict):
+            return []
+
+        market_names: list[str] = []
+        seen: set[str] = set()
+
+        markets = report.get("markets")
+        if isinstance(markets, list):
+            for entry in markets:
+                name = ""
+                if isinstance(entry, dict):
+                    name = str(entry.get("name") or "").strip()
+                else:
+                    name = str(entry or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                market_names.append(name)
+
+        results_by_market = report.get("results_by_market")
+        if isinstance(results_by_market, dict):
+            for raw_name in results_by_market.keys():
+                name = str(raw_name or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                market_names.append(name)
+
+        return market_names
 
     def _build_profile_update_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
         payload: Dict[str, Any] = {}
@@ -448,16 +579,17 @@ class BackendService:
                     continue
                 ingredients = recipe.get("ingredients")
                 if not isinstance(ingredients, list):
-                    continue
+                    ingredients = []
 
                 for entry in ingredients:
                     if not isinstance(entry, dict):
                         continue
-                    name = str(
+                    raw_name = str(
                         entry.get("ingredientName")
                         or entry.get("name")
                         or ""
                     ).strip()
+                    name = self._clean_ingredient_name(raw_name)
                     if not name:
                         continue
 
@@ -479,8 +611,19 @@ class BackendService:
                     else:
                         current["quantity"] = float(current.get("quantity") or 0.0) + quantity
 
-        if demand:
-            return demand
+                # Fallback for mirrored MySQL recipes where ingredients are not structured.
+                for raw_name in self._extract_ingredients_from_recipe_description(recipe):
+                    name = self._clean_ingredient_name(raw_name)
+                    if not name:
+                        continue
+                    normalized = self._normalize_ingredient(name)
+                    if not normalized or normalized in demand:
+                        continue
+                    demand[normalized] = {
+                        "ingredient_name": name,
+                        "quantity": 1.0,
+                        "unit": None,
+                    }
 
         for day in meal_plan.get("days") or []:
             if not isinstance(day, dict):
@@ -488,15 +631,53 @@ class BackendService:
             for meal in day.get("meals") or []:
                 if not isinstance(meal, dict):
                     continue
+                inline_ingredients = meal.get("ingredients")
+                if isinstance(inline_ingredients, list):
+                    for raw_ingredient in inline_ingredients:
+                        name = ""
+                        quantity = 1.0
+                        unit = None
+                        if isinstance(raw_ingredient, dict):
+                            name = self._clean_ingredient_name(
+                                raw_ingredient.get("name")
+                                or raw_ingredient.get("ingredientName")
+                            )
+                            parsed_quantity = self._safe_float(raw_ingredient.get("quantity"), default=1.0)
+                            quantity = parsed_quantity if parsed_quantity > 0 else 1.0
+                            raw_unit = str(raw_ingredient.get("unit") or "").strip()
+                            unit = raw_unit or None
+                        else:
+                            name = self._clean_ingredient_name(raw_ingredient)
+
+                        if not name:
+                            continue
+                        normalized = self._normalize_ingredient(name)
+                        if not normalized:
+                            continue
+
+                        current = demand.get(normalized)
+                        if current is None:
+                            demand[normalized] = {
+                                "ingredient_name": name,
+                                "quantity": quantity,
+                                "unit": unit,
+                            }
+                        else:
+                            current["quantity"] = float(current.get("quantity") or 0.0) + quantity
+                            if current.get("unit") != unit:
+                                current["unit"] = current.get("unit") or unit
+
                 preview = meal.get("ingredients_preview")
                 if not isinstance(preview, list):
                     continue
                 for raw_name in preview:
-                    name = str(raw_name or "").strip()
+                    name = self._clean_ingredient_name(raw_name)
                     if not name:
                         continue
                     normalized = self._normalize_ingredient(name)
                     if not normalized:
+                        continue
+                    if normalized in demand:
                         continue
                     current = demand.get(normalized)
                     if current is None:
@@ -510,24 +691,53 @@ class BackendService:
 
         return demand
 
+    def _extract_ingredients_from_recipe_description(self, recipe: Dict[str, Any]) -> list[str]:
+        description = str(recipe.get("description") or "").strip()
+        if not description:
+            return []
+
+        match = re.search(r"\bingredientes?\s*:\s*(.+)$", description, flags=re.IGNORECASE)
+        if not match:
+            return []
+
+        chunk = match.group(1).strip()
+        chunk = chunk.split("|", 1)[0].strip()
+        if not chunk:
+            return []
+
+        items: list[str] = []
+        for token in re.split(r"[;,]", chunk):
+            cleaned = self._clean_ingredient_name(token)
+            if cleaned:
+                items.append(cleaned)
+        return items
+
     def _run_supermarket_scraper(
         self,
         ingredient_demand: Dict[str, Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
+        workspace_root = self._resolve_scraper_workspace_root()
+        if workspace_root is None:
+            logger.warning(
+                "Shopping cart generation: scraper workspace not found (missing supermarket_scraper or examples/markets.json)."
+            )
+            return None
+
+        if str(workspace_root) not in sys.path:
+            sys.path.insert(0, str(workspace_root))
+
+        markets_path = workspace_root / "examples" / "markets.json"
+        if not markets_path.exists():
+            logger.warning(
+                "Shopping cart generation: markets config not found at %s.",
+                markets_path,
+            )
+            return None
+
         try:
-            import sys
-
-            workspace_root = Path(__file__).resolve().parents[2]
-            if str(workspace_root) not in sys.path:
-                sys.path.append(str(workspace_root))
-
             from supermarket_scraper.models import IngredientNeed
             from supermarket_scraper.report import build_json_report
             from supermarket_scraper.scraper import SupermarketScraper, load_market_configs
-
-            markets_path = workspace_root / "examples" / "markets.json"
-            if not markets_path.exists():
-                return None
 
             ingredients = [
                 IngredientNeed(
@@ -543,17 +753,64 @@ class BackendService:
                 return None
 
             markets = load_market_configs(markets_path)
-            scraper = SupermarketScraper(timeout_seconds=15.0, max_workers=8)
+            total_tasks = max(1, len(ingredients) * len(markets))
+            dynamic_workers = max(8, min(len(ingredients), 48))
+            effective_workers = min(total_tasks, dynamic_workers)
+
+            logger.info(
+                "Shopping cart generation: running supermarket scraper with %s ingredients, %s markets, %s workers.",
+                len(ingredients),
+                len(markets),
+                effective_workers,
+            )
+            scraper = SupermarketScraper(
+                timeout_seconds=6.5,
+                max_workers=effective_workers,
+                connect_timeout_seconds=2.0,
+                delay_scale=0.02,
+                max_product_pages=0,
+                max_search_candidates=24,
+                disable_nutrition_tab=True,
+                selectors_only=True,
+                request_retries=0,
+            )
             matches = scraper.scrape(ingredients=ingredients, markets=markets)
             return build_json_report(ingredients=ingredients, markets=markets, matches=matches)
         except Exception:
+            logger.exception("Shopping cart generation: supermarket scraper execution failed.")
             return None
+
+    def _resolve_scraper_workspace_root(self) -> Optional[Path]:
+        service_root = Path(__file__).resolve().parents[1]
+
+        candidates = [
+            service_root.parent,
+            service_root,
+            Path.cwd().resolve(),
+        ]
+
+        seen: set[str] = set()
+        for candidate in candidates:
+            candidate_path = candidate.resolve()
+            marker = str(candidate_path)
+            if marker in seen:
+                continue
+            seen.add(marker)
+
+            if (
+                (candidate_path / "supermarket_scraper").is_dir()
+                and (candidate_path / "examples" / "markets.json").exists()
+            ):
+                return candidate_path
+
+        return None
 
     def _build_cart_snapshot(
         self,
         prices: list[Dict[str, Any]],
         ingredient_demand: Dict[str, Dict[str, Any]],
         meal_plan: Dict[str, Any],
+        market_names: Optional[list[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         budget_limit = self._safe_float(meal_plan.get("max_weekly_budget"), default=0.0)
         goal_daily_calories = self._safe_float(meal_plan.get("goal_daily_calories"), default=0.0)
@@ -592,6 +849,12 @@ class BackendService:
         if not best_by_market:
             return None
 
+        if isinstance(market_names, list):
+            for market_name in market_names:
+                normalized_name = str(market_name or "").strip()
+                if normalized_name:
+                    best_by_market.setdefault(normalized_name, {})
+
         demand_keys = list(ingredient_demand.keys())
         lists: Dict[str, Dict[str, Any]] = {}
         comparison: list[Dict[str, Any]] = []
@@ -613,11 +876,11 @@ class BackendService:
 
                 covered += 1
                 demand = ingredient_demand[ingredient_key]
-                quantity = max(1, int(round(float(demand.get("quantity") or 1.0))))
                 unit_price = self._safe_float(found.get("price"), default=0.0)
-                subtotal += unit_price * quantity
+                # Scraper price already reflects the required demand for this ingredient.
+                subtotal += unit_price
                 item_calories = self._safe_float(found.get("calories"), default=0.0)
-                calories_total += max(0.0, item_calories) * quantity
+                calories_total += max(0.0, item_calories)
 
                 ingredient_name = str(demand.get("ingredient_name") or ingredient_key).strip() or ingredient_key
                 product_name = str(found.get("productName") or ingredient_name).strip() or ingredient_name
@@ -633,7 +896,7 @@ class BackendService:
                         "unitInfo": str(found.get("note") or found.get("source") or "preço importado").strip(),
                         "unitPrice": unit_price,
                         "discount": 0,
-                        "quantity": quantity,
+                        "quantity": 1,
                         "checked": False,
                         "currency": str(found.get("currency") or "EUR").strip() or "EUR",
                         "productUrl": str(found.get("productUrl") or "").strip(),
@@ -705,7 +968,6 @@ class BackendService:
         optimized_total = 0.0
         missing_ingredients: list[str] = []
         for ingredient_key in demand_keys:
-            quantity = max(1, int(round(float(ingredient_demand[ingredient_key].get("quantity") or 1.0))))
             prices_for_ingredient: list[float] = []
             for market_map in best_by_market.values():
                 candidate = market_map.get(ingredient_key)
@@ -721,7 +983,7 @@ class BackendService:
                 )
                 continue
 
-            optimized_total += min(prices_for_ingredient) * quantity
+            optimized_total += min(prices_for_ingredient)
 
         active_list_id = best_market_key or (next(iter(lists.keys())) if lists else "")
         if not active_list_id:
@@ -731,6 +993,15 @@ class BackendService:
             "lists": lists,
             "activeListId": active_list_id,
             "comparison": comparison,
+            "totalsByMarket": [
+                {
+                    "marketKey": str(entry.get("marketKey") or ""),
+                    "supermarket": str(entry.get("supermarket") or ""),
+                    "totalPrice": self._safe_float(entry.get("total"), default=0.0),
+                    "totalCalories": self._safe_float(entry.get("calories"), default=0.0),
+                }
+                for entry in comparison
+            ],
             "optimizedTotal": round(optimized_total, 2),
             "cartSource": "meal-plan",
             "lastGeneratedSignature": self._plan_signature(meal_plan.get("days") or []),
@@ -767,6 +1038,26 @@ class BackendService:
         without_marks = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
         compact = re.sub(r"[^a-z0-9\s]", " ", without_marks.lower())
         return re.sub(r"\s+", " ", compact).strip()
+
+    def _clean_ingredient_name(self, raw: Any) -> str:
+        text = str(raw or "").strip()
+        if not text:
+            return ""
+
+        text = re.sub(r"\([^)]*\)", " ", text)
+        text = text.replace("q.b.", " ").replace("q.b", " ").replace("qb", " ")
+        text = re.sub(r"^[\-\*\u2022\s]+", "", text)
+        text = re.sub(
+            r"^\s*(?:\d+\s*/\s*\d+|\d+(?:[.,]\d+)?)\s*"
+            r"(?:(?:kg|g|gr|gramas?|ml|l|dl|cl|un|unid(?:ade)?s?|dentes?|"
+            r"colher(?:es)?(?:\s+de\s+(?:sopa|cha|chá))?|"
+            r"chavenas?|chávenas?|xicaras?|xícaras?)\b)?\s*",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(r"\s+", " ", text).strip(" ,.;:-")
+        return text
 
     def _slugify(self, raw: Any) -> str:
         token = self._normalize_ingredient(raw)
@@ -1000,6 +1291,10 @@ class BackendService:
                 }
             )
 
+        total_meals = sum(len(day.get("meals") or []) for day in days)
+        if total_meals <= 0:
+            return None
+
         return {
             "status": "generated",
             "source": "backend_active_plan",
@@ -1066,6 +1361,27 @@ class BackendService:
                     return None
                 return json.loads(raw)
         except error.HTTPError as exc:
+            details = ""
+            try:
+                details = exc.read().decode("utf-8").strip()
+            except Exception:
+                details = ""
+            logger.warning(
+                "Backend HTTP error on %s %s: status=%s body=%s",
+                method,
+                path,
+                exc.code,
+                (details[:400] if details else "<empty>"),
+            )
+            return None
+        except error.URLError as exc:
+            logger.warning("Backend URL error on %s %s: %s", method, path, exc)
+            return None
+        except TimeoutError:
+            logger.warning("Backend timeout on %s %s", method, path)
+            return None
+        except ValueError:
+            logger.warning("Backend returned invalid JSON on %s %s", method, path)
             try:
                 detail = exc.read().decode("utf-8", errors="ignore")
             except Exception:

@@ -45,8 +45,8 @@ services:
 
   chatbot:
     build:
-      context: ./chatbot-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: chatbot-service/Dockerfile
     restart: unless-stopped
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -101,6 +101,7 @@ services:
     restart: "no"
     volumes:
       - ./data:/app/data
+      - ./examples:/app/examples:ro
     command:
       [
         "python",
@@ -111,6 +112,15 @@ services:
         "examples/markets.json",
         "--output",
         "data/report.json",
+        "--turbo",
+        "--workers-per-ingredient",
+        "1",
+        "--timeout",
+        "6.5",
+        "--connect-timeout",
+        "2.0",
+        "--request-retries",
+        "0",
       ]
 
   orchestrator:

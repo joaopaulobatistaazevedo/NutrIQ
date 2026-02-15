@@ -123,6 +123,19 @@ python3 main.py \
 
 Isso imprime uma tabela Markdown no terminal e salva os dados completos em `report.json`, incluindo `price` e `calories` quando encontrados.
 
+Se o teu `meal_plan.json` só tiver títulos de receitas (sem ingredientes), podes
+enriquecer automaticamente com os ingredientes do `recipes_scraped.json` antes
+do scrape:
+
+```bash
+python3 main.py \
+  --meal-plan examples/meal_plan.json \
+  --recipes-json data/recipes_scraped.json \
+  --enriched-meal-plan-output examples/meal_plan_enriched.json \
+  --markets examples/markets.json \
+  --output report.json
+```
+
 ## Scraper de Receitas (Track A)
 
 Fluxo implementado:

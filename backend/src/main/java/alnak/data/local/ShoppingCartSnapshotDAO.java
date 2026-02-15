@@ -12,6 +12,12 @@ public class ShoppingCartSnapshotDAO {
     }
 
     public void save(long userId, String payloadJson) {
+        try {
+            ensureLocalUserExists(userId);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
         try (PreparedStatement ps = conn.prepareStatement("""
             INSERT INTO shopping_cart_snapshots (user_id, payload_json, updated_at)
             VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -24,6 +30,20 @@ public class ShoppingCartSnapshotDAO {
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void ensureLocalUserExists(long userId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("""
+            INSERT INTO users (id, name, email, password_hash, created_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO NOTHING
+        """)) {
+            ps.setLong(1, userId);
+            ps.setString(2, "User " + userId);
+            ps.setString(3, "user-" + userId + "@local.shopping-cart");
+            ps.setString(4, "local-only");
+            ps.executeUpdate();
         }
     }
 

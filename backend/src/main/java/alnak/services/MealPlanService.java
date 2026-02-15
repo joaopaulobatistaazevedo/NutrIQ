@@ -227,10 +227,13 @@ public class MealPlanService {
     }
 
     private Recipe requireRecipe(int recipeId) {
-        Recipe r = recipeDAO.get(recipeId);
-        if (r == null)
-            throw new IllegalArgumentException("Receita não encontrada: " + recipeId);
-        return r;
+        Recipe localRecipe = recipeDAO.get(recipeId);
+        if (localRecipe != null) {
+            return localRecipe;
+        }
+
+        return globalRecipeDAO.getRecipeById(recipeId)
+                .orElseThrow(() -> new IllegalArgumentException("Receita não encontrada: " + recipeId));
     }
 
     private LocalDate parseWeekStart(String raw) {
