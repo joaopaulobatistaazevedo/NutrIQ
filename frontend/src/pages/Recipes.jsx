@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers, X } from 'lucide-react';
 import Layout from '../components/Layout';
-import { fetchRecipes } from '../services/recipeService';
+import { createRecipe, deleteRecipe, fetchRecipes, updateRecipe } from '../services/recipeService';
+import { MY_RECIPES_KEY } from '../constants/storageKeys';
 import '../styles/recipes.css';
 
 const CATEGORY_META = {
@@ -29,6 +30,68 @@ function mealTypeLabel(value) {
   const normalized = normalizeMealType(value);
   if (normalized === 'SNACK') return 'Snack';
   return 'Refeição';
+}
+
+function parseStoredMyRecipes() {
+  const raw = localStorage.getItem(MY_RECIPES_KEY);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((recipe) => recipe && recipe.id && recipe.name);
+  } catch {
+    return [];
+  }
+}
+
+
+function isPersistedRecipeId(recipeId) {
+  const id = Number(recipeId);
+  return Number.isInteger(id) && id > 0;
+}
+
+function parseStepsFromText(value) {
+  return String(value || '')
+    .split('\n')
+    .map((line) => line.replace(/^\s*\d+[\).\-]?\s*/, '').trim())
+    .filter(Boolean)
+    .map((line, index) => ({
+      stepOrder: index + 1,
+      description: line,
+      durationMinutes: 0,
+    }));
+}
+
+function tagsForVisibility(visibility) {
+  const safeVisibility = visibility === 'public' ? 'public' : 'private';
+  return ['user-created', `visibility-${safeVisibility}`];
+}
+
+function toBackendRecipePayload(recipe) {
+  const safeName = String(recipe?.name || '').trim();
+  const safeDescription = String(recipe?.description || recipe?.steps || '').trim() || 'Receita criada manualmente.';
+  const safeImage = String(recipe?.image || '').trim();
+  const safeVisibility = recipe?.visibility === 'public' ? 'public' : 'private';
+
+  return {
+    name: safeName,
+    description: safeDescription,
+    mealType: 'DINNER',
+    prepTimeMin: 0,
+    cookTimeMin: 0,
+    servings: 1,
+    ingredients: [],
+    steps: parseStepsFromText(recipe?.steps),
+    tags: tagsForVisibility(safeVisibility),
+    nutritionalInfo: {
+      calories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+    },
+    imageUrl: safeImage,
+  };
 }
 
 function formatDuration(recipe) {
@@ -268,7 +331,8 @@ export default function Recipes() {
   const [selectedNutritionistRecipe, setSelectedNutritionistRecipe] = useState(null);
   const [activeInnerTab, setActiveInnerTab] = useState('made');
   const [createNotice, setCreateNotice] = useState('');
-  const [myRecipes, setMyRecipes] = useState([]);
+  const [myRecipes, setMyRecipes] = useState(parseStoredMyRecipes);
+  const [isCreatingRecipe, setIsCreatingRecipe] = useState(false);
   const [recipeDraft, setRecipeDraft] = useState({
     name: '',
     ingredients: '',
@@ -315,24 +379,6 @@ export default function Recipes() {
         const safeData = Array.isArray(data) ? data : [];
         setRecipes(safeData);
 
-        setMyRecipes((previous) => {
-          if (previous.length > 0) {
-            return previous;
-          }
-
-          return safeData.slice(0, 3).map((recipe, index) => ({
-            id: `seed-${recipe?.id || index}`,
-            name: String(recipe?.name || `Receita ${index + 1}`),
-            description: String(recipe?.description || '').trim() || 'Sem descrição detalhada.',
-            image: recipeImageFor(recipe),
-            visibility: index === 0 ? 'private' : 'public',
-            sourceUrl: extractSourceUrl(recipe),
-            ingredients: recipeIngredientsText(recipe),
-            steps: recipeStepsText(recipe),
-            utensils: stringListFromValue(recipe?.utensils),
-            allergens: stringListFromValue(recipe?.allergens),
-          }));
-        });
       } catch (loadError) {
         if (!isMounted) return;
         setError(loadError?.message || 'Não foi possível carregar as receitas.');
@@ -352,6 +398,10 @@ export default function Recipes() {
       URL.revokeObjectURL(recipeDraft.photoPreview);
     }
   }, [recipeDraft.photoPreview]);
+
+  useEffect(() => {
+    localStorage.setItem(MY_RECIPES_KEY, JSON.stringify(myRecipes));
+  }, [myRecipes]);
 
   useEffect(() => {
     const hasOverlayOpen = confirmDialog.open || editRecipeDialog.open || Boolean(selectedNutritionistRecipe);
@@ -513,7 +563,7 @@ export default function Recipes() {
     }));
   };
 
-  const toggleMyRecipeVisibility = (recipeId) => {
+  const toggleMyRecipeVisibility = async (recipeId) => {
     const targetRecipe = myRecipes.find((recipe) => recipe.id === recipeId);
     if (!targetRecipe) {
       return;
@@ -531,31 +581,56 @@ export default function Recipes() {
       return;
     }
 
-    setMyRecipes((previous) => previous.map((recipe) => (
-      recipe.id === recipeId
-        ? { ...recipe, visibility: 'private' }
-        : recipe
-    )));
+    const updatedRecipe = { ...targetRecipe, visibility: 'private' };
+
+    try {
+      if (isPersistedRecipeId(recipeId)) {
+        await updateRecipe(recipeId, toBackendRecipePayload(updatedRecipe));
+      }
+
+      setMyRecipes((previous) => previous.map((recipe) => (
+        recipe.id === recipeId
+          ? updatedRecipe
+          : recipe
+      )));
+    } catch (error) {
+      setCreateNotice(error?.message || 'Não foi possível atualizar a visibilidade da receita.');
+    }
   };
 
-  const handleConfirmDialog = () => {
+  const handleConfirmDialog = async () => {
     if (!confirmDialog.recipeId) {
       closeConfirmDialog();
       return;
     }
 
     if (confirmDialog.type === 'publish') {
-      setMyRecipes((previous) => previous.map((recipe) => (
-        recipe.id === confirmDialog.recipeId
-          ? { ...recipe, visibility: 'public' }
-          : recipe
-      )));
+      const recipeId = confirmDialog.recipeId;
+      const targetRecipe = myRecipes.find((recipe) => recipe.id === recipeId);
+
+      if (targetRecipe) {
+        const updatedRecipe = { ...targetRecipe, visibility: 'public' };
+
+        try {
+          if (isPersistedRecipeId(recipeId)) {
+            await updateRecipe(recipeId, toBackendRecipePayload(updatedRecipe));
+          }
+
+          setMyRecipes((previous) => previous.map((recipe) => (
+            recipe.id === recipeId
+              ? updatedRecipe
+              : recipe
+          )));
+        } catch (error) {
+          setCreateNotice(error?.message || 'Não foi possível publicar a receita.');
+        }
+      }
     }
 
     closeConfirmDialog();
   };
 
-  const saveEditedRecipe = (event) => {
+  const saveEditedRecipe = async (event) => {
     event.preventDefault();
 
     const requiredFields = [
@@ -580,24 +655,41 @@ export default function Recipes() {
       return;
     }
 
-    setMyRecipes((previous) => previous.map((recipe) => (
-      recipe.id === editRecipeDialog.id
-        ? {
-          ...recipe,
-          name: String(editRecipeDialog.name || '').trim(),
-          ingredients: String(editRecipeDialog.ingredients || '').trim(),
-          steps: String(editRecipeDialog.steps || '').trim(),
-          utensils: String(editRecipeDialog.utensils || '').trim(),
-          allergens: String(editRecipeDialog.allergens || '').trim(),
-          visibility: editRecipeDialog.visibility === 'public' ? 'public' : 'private',
-          image: String(editRecipeDialog.image || '').trim() || recipe.image,
-          sourceUrl: String(editRecipeDialog.sourceUrl || '').trim(),
-          description: String(editRecipeDialog.steps || '').trim() || recipe.description,
-        }
-        : recipe
-    )));
+    const recipeId = editRecipeDialog.id;
+    const currentRecipe = myRecipes.find((recipe) => recipe.id === recipeId);
+    if (!currentRecipe) {
+      closeEditRecipeDialog();
+      return;
+    }
 
-    closeEditRecipeDialog();
+    const updatedRecipe = {
+      ...currentRecipe,
+      name: String(editRecipeDialog.name || '').trim(),
+      ingredients: String(editRecipeDialog.ingredients || '').trim(),
+      steps: String(editRecipeDialog.steps || '').trim(),
+      utensils: String(editRecipeDialog.utensils || '').trim(),
+      allergens: String(editRecipeDialog.allergens || '').trim(),
+      visibility: editRecipeDialog.visibility === 'public' ? 'public' : 'private',
+      image: String(editRecipeDialog.image || '').trim() || currentRecipe.image,
+      sourceUrl: String(editRecipeDialog.sourceUrl || '').trim(),
+      description: String(editRecipeDialog.steps || '').trim() || currentRecipe.description,
+    };
+
+    try {
+      if (isPersistedRecipeId(recipeId)) {
+        await updateRecipe(recipeId, toBackendRecipePayload(updatedRecipe));
+      }
+
+      setMyRecipes((previous) => previous.map((recipe) => (
+        recipe.id === recipeId
+          ? updatedRecipe
+          : recipe
+      )));
+
+      closeEditRecipeDialog();
+    } catch (error) {
+      setEditNotice(error?.message || 'Não foi possível guardar alterações da receita.');
+    }
   };
 
   const requestDeleteFromEditDialog = () => {
@@ -608,17 +700,27 @@ export default function Recipes() {
     setShowDeleteConfirmInEdit(false);
   };
 
-  const confirmDeleteFromEditDialog = () => {
+  const confirmDeleteFromEditDialog = async () => {
     if (!editRecipeDialog.id) {
       closeEditRecipeDialog();
       return;
     }
 
-    setMyRecipes((previous) => previous.filter((recipe) => recipe.id !== editRecipeDialog.id));
-    closeEditRecipeDialog();
+    const recipeId = editRecipeDialog.id;
+
+    try {
+      if (isPersistedRecipeId(recipeId)) {
+        await deleteRecipe(recipeId);
+      }
+
+      setMyRecipes((previous) => previous.filter((recipe) => recipe.id !== recipeId));
+      closeEditRecipeDialog();
+    } catch (error) {
+      setEditNotice(error?.message || 'Não foi possível eliminar a receita.');
+    }
   };
 
-  const handleCreateSubmit = (event) => {
+  const handleCreateSubmit = async (event) => {
     event.preventDefault();
 
     const requiredFields = [
@@ -639,38 +741,77 @@ export default function Recipes() {
     }
 
     const recipeName = String(recipeDraft.name || '').trim();
+    const parsedSteps = String(recipeDraft.steps || '')
+      .split('\n')
+      .map((line) => line.replace(/^\s*\d+[\).\-]?\s*/, '').trim())
+      .filter(Boolean)
+      .map((line, index) => ({
+        stepOrder: index + 1,
+        description: line,
+        durationMinutes: 0,
+      }));
 
-    const cardImage = recipeDraft.photoFile
-      ? URL.createObjectURL(recipeDraft.photoFile)
-      : '';
+    setIsCreatingRecipe(true);
+    setCreateNotice('');
 
-    const createdRecipe = {
-      id: `mine-${Date.now()}`,
-      name: recipeName,
-      description: String(recipeDraft.steps || '').trim() || 'Receita criada manualmente.',
-      image: cardImage || 'https://placehold.co/900x560/e2e8f0/475569?text=Receita+Criada',
-      visibility: recipeDraft.visibility === 'public' ? 'public' : 'private',
-      sourceUrl: '',
-      ingredients: String(recipeDraft.ingredients || '').trim(),
-      steps: String(recipeDraft.steps || '').trim(),
-      utensils: String(recipeDraft.utensils || '').trim(),
-      allergens: String(recipeDraft.allergens || '').trim(),
-    };
+    try {
+      const payload = {
+        name: recipeName,
+        description: String(recipeDraft.steps || '').trim() || 'Receita criada manualmente.',
+        mealType: 'DINNER',
+        prepTimeMin: 0,
+        cookTimeMin: 0,
+        servings: 1,
+        ingredients: [],
+        steps: parsedSteps,
+        tags: tagsForVisibility(recipeDraft.visibility),
+        nutritionalInfo: {
+          calories: 0,
+          proteinG: 0,
+          carbsG: 0,
+          fatG: 0,
+        },
+        imageUrl: '',
+      };
 
-    setMyRecipes((previous) => [createdRecipe, ...previous]);
-    setRecipeDraft({
-      name: '',
-      ingredients: '',
-      steps: '',
-      utensils: '',
-      allergens: '',
-      visibility: 'private',
-      photoFile: null,
-      photoPreview: '',
-    });
+      const created = await createRecipe(payload);
+      const fallbackImage = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita+Criada';
+      const previewImage = String(recipeDraft.photoPreview || '').startsWith('blob:')
+        ? fallbackImage
+        : (String(recipeDraft.photoPreview || '').trim() || fallbackImage);
 
-    setCreateNotice('Receita adicionada em "Suas receitas".');
-    setActiveInnerTab('mine');
+      const createdRecipe = {
+        id: String(created?.id || `mine-${Date.now()}`),
+        name: String(created?.name || recipeName),
+        description: String(recipeDraft.steps || '').trim() || 'Receita criada manualmente.',
+        image: previewImage,
+        visibility: recipeDraft.visibility === 'public' ? 'public' : 'private',
+        sourceUrl: '',
+        ingredients: String(recipeDraft.ingredients || '').trim(),
+        steps: String(recipeDraft.steps || '').trim(),
+        utensils: String(recipeDraft.utensils || '').trim(),
+        allergens: String(recipeDraft.allergens || '').trim(),
+      };
+
+      setMyRecipes((previous) => [createdRecipe, ...previous]);
+      setRecipeDraft({
+        name: '',
+        ingredients: '',
+        steps: '',
+        utensils: '',
+        allergens: '',
+        visibility: 'private',
+        photoFile: null,
+        photoPreview: '',
+      });
+
+      setCreateNotice('Receita guardada na base de dados e adicionada em "Suas receitas".');
+      setActiveInnerTab('mine');
+    } catch (error) {
+      setCreateNotice(error?.message || 'Não foi possível guardar a receita.');
+    } finally {
+      setIsCreatingRecipe(false);
+    }
   };
 
   return (
@@ -867,7 +1008,7 @@ export default function Recipes() {
                 ) : null}
 
                 <div className="recipes-create-actions">
-                  <button type="submit" className="btn btn-primary">Guardar base da receita</button>
+                  <button type="submit" className="btn btn-primary" disabled={isCreatingRecipe}>{isCreatingRecipe ? 'A guardar...' : 'Guardar base da receita'}</button>
                 </div>
               </form>
             </section>
