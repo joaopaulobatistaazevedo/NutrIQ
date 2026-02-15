@@ -95,8 +95,6 @@ class OpenAIService:
         user_id: str = "anonymous",
     ) -> ChatResponse:
         """Gere a conversa principal, ajustes de plano e compensação calórica."""
-        planning_request = self._looks_like_meal_plan_request(user_message)
-
         memory = self._ensure_user_memory(user_id)
         merged_context = dict(user_context or {})
         if memory:
@@ -119,113 +117,84 @@ class OpenAIService:
             merged_context["coach_metrics"] = coach_metrics
 
         pending_edit_request = bool(merged_context.get("pending_edit_request"))
-        planning_request = self._looks_like_meal_plan_request(user_message) or pending_edit_request
 
+        # Detect whether this is an explicit plan request OR a life event that
+        # should silently trigger a recalculation in the background.
+        is_explicit_plan_request = self._looks_like_meal_plan_request(user_message) or pending_edit_request
+        is_life_event = self._is_life_event(user_message) and not is_explicit_plan_request
+        planning_request = is_explicit_plan_request or is_life_event
+
+        import json as _json
         system_prompt = load_prompt("prompts/assistant.txt")
         if merged_context:
-            import json as _json
             system_prompt += f"\n\nContexto do utilizador:\n{_json.dumps(merged_context, ensure_ascii=False, default=str)}"
+
+        # For life events, hint to the LLM that a plan recalculation is happening
+        # so it responds naturally and in past tense ("já ajustei") not future.
+        if is_life_event:
+            system_prompt += (
+                "\n\n[SISTEMA] O utilizador acabou de reportar um evento alimentar. "
+                "O plano foi recalculado automaticamente em segundo plano. "
+                "Responde em 1–2 frases: reconhece o evento de forma calorosa e informa "
+                "que o plano já foi ajustado. NÃO listes passos. NÃO peças confirmação."
+            )
 
         messages = [{"role": "system", "content": system_prompt}]
         if history:
             messages.extend({"role": item.role, "content": item.content} for item in history)
         messages.append({"role": "user", "content": user_message})
 
-        bot_response = await asyncio.to_thread(self._chat, messages)
+        # LLM response and constraint extraction run in parallel when a plan is needed
         meal_plan_draft = None
         meal_plan = None
 
         if planning_request:
-            # Extraímos os parâmetros, incluindo os novos campos dinâmicos
-            constraints = await self._extract_meal_plan_constraints(messages)
+            bot_response_coro = asyncio.to_thread(self._chat, messages)
+            constraints_coro = self._extract_meal_plan_constraints(messages)
+            bot_response, constraints = await asyncio.gather(bot_response_coro, constraints_coro)
+
             meal_plan_draft = self._build_meal_plan_draft(constraints, user_context, merged_context, memory)
             missing = meal_plan_draft.get("missing_required", [])
 
             if missing:
                 bot_response = (
                     "Para fechar o teu planeamento, ainda preciso de: "
-                    + ", ".join(missing)
-                    + "."
+                    + ", ".join(missing) + "."
                 )
             else:
-                # ── Determine personalised message based on goal + offset direction ──
-                offset = meal_plan_draft["constraints"].get("calories_offset", 0)
-                goal_raw = meal_plan_draft["constraints"].get("goal", "maintain")
-                missing_ingredients = meal_plan_draft["constraints"].get("missing_ingredients")
-
-                if missing_ingredients:
-                    _final_bot_response = (
-                        "Sem problema. Ajustei o teu plano para evitar os ingredientes "
-                        "que não encontraste. Vê as novas sugestões! 🛒"
-                    )
-                elif offset and offset < 0 and goal_raw in ("gain_weight", "gain_muscle"):
-                    # Skipped meals + bulking goal → add more calories
-                    _final_bot_response = (
-                        "Notei que comeste menos hoje. Como o teu objetivo é ganhar, "
-                        "ajustei o plano para compensar com refeições mais calóricas. 💪"
-                    )
-                elif offset and offset < 0:
-                    # Skipped meals + lose/maintain → keep targets, don't under-eat further
-                    _final_bot_response = (
-                        "Plano regenerado. Como comeste menos hoje, mantive os objetivos normais "
-                        "— não vale a pena reduzir ainda mais. ✅"
-                    )
-                elif offset and offset > 0 and goal_raw in ("gain_weight", "gain_muscle"):
-                    # Overate + bulking goal → surplus is fine, no adjustment needed
-                    _final_bot_response = (
-                        "Plano regenerado. Comer um pouco a mais não é problema para o teu objetivo "
-                        "de ganho — mantive as metas normais. 💪"
-                    )
-                elif offset and offset > 0:
-                    # Overate + lose/maintain → light compensation
-                    _final_bot_response = (
-                        "Plano ajustado! Escolhi opções ligeiramente mais leves para compensar "
-                        "o excesso de ontem. Já podes conferir na aba de Planeamento. 🌱"
-                    )
-                else:
-                    _final_bot_response = None  # filled after GA with goal/cost
-
-                bot_response = (
-                    "Um momento — estou a consultar os preços do supermercado "
-                    "para optimizar o plano."
-                )
-
                 # Always fetch fresh supermarket prices before every plan generation
-                await asyncio.to_thread(
-                    self.goal_planner.scrape_and_cache_prices, auth_token
-                )
+                await asyncio.to_thread(self.goal_planner.scrape_and_cache_prices, auth_token)
 
                 goal_constraints = dict(meal_plan_draft["constraints"])
                 meal_plan = self.goal_planner.generate_goal_plan(goal_constraints)
 
+                status = meal_plan.get("status", "empty")
                 goal = meal_plan.get("goal", "maintain")
                 cost = meal_plan.get("estimated_weekly_cost", 0.0)
-                status = meal_plan.get("status", "empty")
 
                 if status == "generated":
-                    if _final_bot_response:
-                        # Append cost info to contextual messages
-                        bot_response = (
-                            f"{_final_bot_response} "
-                            f"(custo estimado: €{cost:.2f}/semana)"
-                        ).strip()
+                    if is_life_event:
+                        # LLM already wrote a natural human response — append cost quietly
+                        bot_response = f"{bot_response.rstrip()} (custo estimado: €{cost:.2f}/semana)"
                     elif pending_edit_request:
                         bot_response = (
-                            f"Plano atualizado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
+                            f"Plano atualizado para o objetivo '{_goal_label(goal)}' 🎯 "
                             f"(custo estimado: €{cost:.2f}/semana). "
-                            "A alteração já foi aplicada na tua aba de Planeamento Semanal."
+                            "Já podes ver as alterações na aba de Planeamento Semanal."
                         )
                     else:
                         bot_response = (
-                            f"Plano gerado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
+                            f"Já gerei o teu plano para '{_goal_label(goal)}' 🎯 "
                             f"(custo estimado: €{cost:.2f}/semana). "
-                            "As receitas estão disponíveis na aba de Planeamento Semanal."
+                            "Podes vê-lo na aba de Planeamento Semanal."
                         )
                 else:
                     bot_response = (
                         "Não foi possível gerar o plano neste momento. "
                         "Tenta novamente dentro de instantes."
                     )
+        else:
+            bot_response = await asyncio.to_thread(self._chat, messages)
 
         self._update_memory_from_context(user_id, merged_context)
         if meal_plan and meal_plan.get("status") == "generated":
@@ -298,9 +267,6 @@ class OpenAIService:
 
     def _looks_like_meal_plan_request(self, text: str) -> bool:
         lower = text.lower()
-        keywords = [
-            "plano", "planear", "planeamento", "semana", "receitas", "menu", 
-            "ajusta", "muda", "altera", "não encontro", "comi a mais", "abusei"]
         strong_keywords = [
             "meal plan", "plano de refeições", "planeamento semanal",
             "planear refeições", "planear a semana", "gerar plano",
@@ -319,6 +285,66 @@ class OpenAIService:
 
         history_tokens = ["histórico", "historico", "anteriores", "últimos", "ultimos"]
         if any(token in lower for token in history_tokens) and any(v in lower for v in action_verbs):
+            return True
+
+        return False
+
+    def _is_life_event(self, text: str) -> bool:
+        """
+        Returns True when the user is reporting a real-life dietary event that should
+        trigger an immediate silent plan recalculation — without them explicitly asking
+        for a new plan.
+
+        Covers: eating out / junk food, skipping meals, overeating, under-eating,
+        illness affecting appetite, etc.
+        """
+        lower = text.lower()
+
+        # Direct food-intake reports
+        ate_tokens = [
+            "comi", "bebi", "comer", "beber", "tomei", "tive", "fui",
+            "almocei", "jantei", "pequei", "petisquei", "lancei",
+        ]
+        junk_or_extra = [
+            "big mac", "mcdonald", "burger king", "kfc", "pizza", "kebab",
+            "hamburguer", "batatas fritas", "nuggets", "hot dog", "sushi",
+            "pastel de nata", "bolo", "gelado", "chocolate", "doces",
+            "fast food", "takeaway", "jantar fora", "almoço fora",
+            "comida rápida", "snack", "tira-teimas", "cerveja", "vinho",
+            "bebida alcoólica", "shots", "festa", "convívio",
+        ]
+        skipped_tokens = [
+            "saltei", "não comi", "nao comi", "não almocei", "nao almocei",
+            "não jantei", "nao jantei", "não pequei", "nao pequei",
+            "fiquei sem comer", "esqueci-me de comer", "não tive tempo de comer",
+            "não tive fome", "pouco", "muito pouco", "quase nada",
+        ]
+        overate_tokens = [
+            "comi a mais", "exagerei", "abusei", "comi demais", "muito",
+            "festa", "jantar especial", "aniversário", "casamento",
+            "não resisti", "escapou-me",
+        ]
+
+        # Illness / low appetite affecting eating
+        illness_tokens = [
+            "estava doente", "tive febre", "não me apeteceu comer",
+            "sem apetite", "mau estar", "enjoo", "vómitos",
+        ]
+
+        has_ate = any(t in lower for t in ate_tokens)
+        has_junk = any(t in lower for t in junk_or_extra)
+        has_skipped = any(t in lower for t in skipped_tokens)
+        has_overate = any(t in lower for t in overate_tokens)
+        has_illness = any(t in lower for t in illness_tokens)
+
+        # "Comi X" where X is clearly junk/excess food
+        if has_ate and has_junk:
+            return True
+        # Explicit skip or overeat signal
+        if has_skipped or has_overate:
+            return True
+        # Illness affecting intake
+        if has_illness:
             return True
 
         return False
