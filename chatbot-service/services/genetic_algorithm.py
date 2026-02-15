@@ -176,6 +176,7 @@ class MealPlanGA:
         mutation_rate: float = 0.22,
         tdee: float | None = None,
         body_weight_kg: float | None = None,
+        calorie_adjustment_per_day: float = 0.0,
     ) -> None:
         planning_days_sanitized = max(1, min(planning_days, 7))
         requested_exclusions = {str(x).strip() for x in (excluded_recipe_ids or []) if str(x).strip()}
@@ -207,7 +208,7 @@ class MealPlanGA:
         if base_weight <= 0:
             base_weight = 70.0
 
-        self.daily_calorie_target = max(1200.0, base_tdee + float(self.profile["calorie_delta"]))
+        self.daily_calorie_target = max(1200.0, base_tdee + float(self.profile["calorie_delta"]) + calorie_adjustment_per_day)
         self.daily_protein_target = max(60.0, base_weight * float(self.profile["protein_g_per_kg"]))
 
         self.profile = {
@@ -217,6 +218,37 @@ class MealPlanGA:
         }
 
         self._recipe_by_id = {r.id: r for r in self.recipes}
+
+        # ── Slot-aware recipe pools ──────────────────────────────────────
+        # Pre-partition recipes so the GA seeds and mutations respect meal context.
+        # Breakfast: lighter calorie profile + breakfast keyword signals.
+        # Main meals: everything else.
+        _breakfast_kw = {
+            "aveia", "iogurte", "panqueca", "muesli", "granola", "torrada",
+            "omelete", "papas", "batido", "fruta", "cereais",
+        }
+        breakfast_cal_threshold = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Pequeno-almoço"] * 1.6
+
+        self._breakfast_pool: list[PricedRecipe] = [
+            r for r in self.recipes
+            if (
+                any(kw in (r.title or "").lower() for kw in _breakfast_kw)
+                or (
+                    (_safe_float(r.calories_per_serving) or 9999) < breakfast_cal_threshold
+                    and (_safe_float(r.protein_g) or 0) < 25
+                )
+            )
+        ]
+        # Fallback: if not enough breakfast recipes, use all
+        if len(self._breakfast_pool) < 5:
+            self._breakfast_pool = list(self.recipes)
+
+        self._main_pool: list[PricedRecipe] = [
+            r for r in self.recipes
+            if r not in self._breakfast_pool or len(self._breakfast_pool) < 5
+        ]
+        if not self._main_pool:
+            self._main_pool = list(self.recipes)
 
     def run(self) -> list[MealSlot]:
         population = self._seed_population()
@@ -272,7 +304,8 @@ class MealPlanGA:
         slots: list[MealSlot] = []
         for day in range(self.planning_days):
             for slot in SLOTS:
-                slots.append(MealSlot(day=day, slot=slot, recipe=random.choice(self.recipes)))
+                pool = self._breakfast_pool if slot == "Pequeno-almoço" else self._main_pool
+                slots.append(MealSlot(day=day, slot=slot, recipe=random.choice(pool)))
         return Individual(slots=slots)
 
     def _heuristic_individual(self) -> Individual:
@@ -292,14 +325,24 @@ class MealPlanGA:
             target_slot = self.daily_calorie_target / len(SLOTS)
             cal_fit = max(0.0, 1.0 - abs(calories - target_slot) / max(target_slot, 1.0))
             protein_density = protein / max(calories, 1.0)
-            return (macro_fit * 0.4 + cal_fit * 0.4 + protein_density * 2.0) / cost
 
-        top = sorted(self.recipes, key=individual_recipe_score, reverse=True)
-        pool = top[: max(10, len(top) // 3)] if top else self.recipes
+            # Preferred-ingredient bonus
+            ingredient_text = " ".join(recipe.ingredients).lower()
+            pref_bonus = min(0.3, sum(0.1 for t in self.liked if t and t in ingredient_text))
+
+            return (macro_fit * 0.4 + cal_fit * 0.4 + protein_density * 2.0 + pref_bonus) / cost
+
+        def slot_top(pool: list[PricedRecipe]) -> list[PricedRecipe]:
+            top = sorted(pool, key=individual_recipe_score, reverse=True)
+            return top[: max(10, len(top) // 3)] if top else pool
+
+        breakfast_top = slot_top(self._breakfast_pool)
+        main_top = slot_top(self._main_pool)
 
         slots: list[MealSlot] = []
         for day in range(self.planning_days):
             for slot in SLOTS:
+                pool = breakfast_top if slot == "Pequeno-almoço" else main_top
                 slots.append(MealSlot(day=day, slot=slot, recipe=random.choice(pool)))
         return Individual(slots=slots)
 
@@ -319,14 +362,16 @@ class MealPlanGA:
         score_budget = self._score_budget(ind)
         score_validation = self._score_source_validation(ind)
         score_quality = self._score_nutritional_quality(ind)
+        score_variety = self._score_weekly_variety(ind)
         bonus_practicality = self._score_practicality_bonus(ind)
 
         weighted_100 = (
-            0.30 * score_obj
-            + 0.25 * score_pref
-            + 0.20 * score_budget
-            + 0.15 * score_validation
+            0.28 * score_obj
+            + 0.23 * score_pref
+            + 0.18 * score_budget
+            + 0.13 * score_validation
             + 0.10 * score_quality
+            + 0.08 * score_variety
         )
         repeat_penalty = self._repeat_penalty(ind)
 
@@ -560,6 +605,48 @@ class MealPlanGA:
 
         return max(0.0, min(100.0, macro_component + distribution_component))
 
+    def _score_weekly_variety(self, ind: Individual) -> float:
+        """
+        Rewards plans that use a wide variety of unique recipes across the week.
+        A plan where every dinner is the same recipe scores near 0;
+        a plan with no repeats at all scores 100.
+
+        Also penalises same-slot repeats on consecutive days
+        (e.g. identical lunch Monday and Tuesday).
+        """
+        if not ind.slots:
+            return 0.0
+
+        total = len(ind.slots)
+        recipe_ids = [str(ms.recipe.id or ms.recipe.url or "") for ms in ind.slots]
+        unique_count = len(set(recipe_ids))
+
+        # Uniqueness ratio: 0–70 points
+        uniqueness_score = (unique_count / max(total, 1)) * 70.0
+
+        # Consecutive same-slot same-recipe penalty: up to −30 pts
+        by_slot: dict[str, dict[int, str]] = {}
+        for ms in ind.slots:
+            by_slot.setdefault(ms.slot, {})[ms.day] = str(ms.recipe.id or ms.recipe.url or "")
+
+        consecutive_hits = 0
+        for slot_map in by_slot.values():
+            for day in range(1, self.planning_days):
+                if slot_map.get(day - 1) == slot_map.get(day) and slot_map.get(day):
+                    consecutive_hits += 1
+
+        consecutive_penalty = min(30.0, consecutive_hits * 10.0)
+
+        # Breakfast variety bonus: if all breakfasts differ (+15 pts extra)
+        breakfast_ids = [
+            str(ms.recipe.id or ms.recipe.url or "")
+            for ms in ind.slots if ms.slot == "Pequeno-almoço"
+        ]
+        breakfast_bonus = 15.0 if len(set(breakfast_ids)) == len(breakfast_ids) else 0.0
+
+        raw = uniqueness_score - consecutive_penalty + breakfast_bonus
+        return max(0.0, min(100.0, raw))
+
     def _score_practicality_bonus(self, ind: Individual) -> float:
         days = self._group_by_day(ind.slots)
         if not days:
@@ -667,12 +754,13 @@ class MealPlanGA:
                 for ms in slots
                 if ms.day == current.day
             }
+            slot_pool = self._breakfast_pool if current.slot == "Pequeno-almoço" else self._main_pool
             pool = [
                 recipe
-                for recipe in self.recipes
+                for recipe in slot_pool
                 if str(recipe.id or recipe.url or "") not in day_used
             ]
-            slots[idx].recipe = random.choice(pool or self.recipes)
+            slots[idx].recipe = random.choice(pool or slot_pool)
         elif mode < 0.80:
             day = random.randrange(self.planning_days)
             day_indices = [i for i, ms in enumerate(slots) if ms.day == day]

@@ -94,6 +94,9 @@ class OpenAIService:
         auth_token: Optional[str] = None,
         user_id: str = "anonymous",
     ) -> ChatResponse:
+        """Gere a conversa principal, ajustes de plano e compensação calórica."""
+        planning_request = self._looks_like_meal_plan_request(user_message)
+
         memory = self._ensure_user_memory(user_id)
         merged_context = dict(user_context or {})
         if memory:
@@ -120,35 +123,74 @@ class OpenAIService:
 
         system_prompt = load_prompt("prompts/assistant.txt")
         if merged_context:
-            system_prompt += f"\n\nContexto do utilizador:\n{merged_context}"
+            import json as _json
+            system_prompt += f"\n\nContexto do utilizador:\n{_json.dumps(merged_context, ensure_ascii=False, default=str)}"
 
         messages = [{"role": "system", "content": system_prompt}]
         if history:
             messages.extend({"role": item.role, "content": item.content} for item in history)
         messages.append({"role": "user", "content": user_message})
 
-        bot_response = self._chat(messages)
+        bot_response = await asyncio.to_thread(self._chat, messages)
         meal_plan_draft = None
         meal_plan = None
 
         if planning_request:
+            # Extraímos os parâmetros, incluindo os novos campos dinâmicos
             constraints = await self._extract_meal_plan_constraints(messages)
-            meal_plan_draft = self._build_meal_plan_draft(constraints, merged_context, memory)
+            meal_plan_draft = self._build_meal_plan_draft(constraints, user_context, merged_context, memory)
             missing = meal_plan_draft.get("missing_required", [])
 
             if missing:
                 bot_response = (
-                    "Para fechar o planeamento desta semana, ainda preciso de: "
+                    "Para fechar o teu planeamento, ainda preciso de: "
                     + ", ".join(missing)
                     + "."
                 )
             else:
+                # ── Determine personalised message based on goal + offset direction ──
+                offset = meal_plan_draft["constraints"].get("calories_offset", 0)
+                goal_raw = meal_plan_draft["constraints"].get("goal", "maintain")
+                missing_ingredients = meal_plan_draft["constraints"].get("missing_ingredients")
+
+                if missing_ingredients:
+                    _final_bot_response = (
+                        "Sem problema. Ajustei o teu plano para evitar os ingredientes "
+                        "que não encontraste. Vê as novas sugestões! 🛒"
+                    )
+                elif offset and offset < 0 and goal_raw in ("gain_weight", "gain_muscle"):
+                    # Skipped meals + bulking goal → add more calories
+                    _final_bot_response = (
+                        "Notei que comeste menos hoje. Como o teu objetivo é ganhar, "
+                        "ajustei o plano para compensar com refeições mais calóricas. 💪"
+                    )
+                elif offset and offset < 0:
+                    # Skipped meals + lose/maintain → keep targets, don't under-eat further
+                    _final_bot_response = (
+                        "Plano regenerado. Como comeste menos hoje, mantive os objetivos normais "
+                        "— não vale a pena reduzir ainda mais. ✅"
+                    )
+                elif offset and offset > 0 and goal_raw in ("gain_weight", "gain_muscle"):
+                    # Overate + bulking goal → surplus is fine, no adjustment needed
+                    _final_bot_response = (
+                        "Plano regenerado. Comer um pouco a mais não é problema para o teu objetivo "
+                        "de ganho — mantive as metas normais. 💪"
+                    )
+                elif offset and offset > 0:
+                    # Overate + lose/maintain → light compensation
+                    _final_bot_response = (
+                        "Plano ajustado! Escolhi opções ligeiramente mais leves para compensar "
+                        "o excesso de ontem. Já podes conferir na aba de Planeamento. 🌱"
+                    )
+                else:
+                    _final_bot_response = None  # filled after GA with goal/cost
+
                 bot_response = (
                     "Um momento — estou a consultar os preços do supermercado "
-                    "para optimizar o plano"
+                    "para optimizar o plano."
                 )
 
-                # para não congelar o servidor durante chamadas de rede ao Java service
+                # Always fetch fresh supermarket prices before every plan generation
                 await asyncio.to_thread(
                     self.goal_planner.scrape_and_cache_prices, auth_token
                 )
@@ -161,7 +203,13 @@ class OpenAIService:
                 status = meal_plan.get("status", "empty")
 
                 if status == "generated":
-                    if pending_edit_request:
+                    if _final_bot_response:
+                        # Append cost info to contextual messages
+                        bot_response = (
+                            f"{_final_bot_response} "
+                            f"(custo estimado: €{cost:.2f}/semana)"
+                        ).strip()
+                    elif pending_edit_request:
                         bot_response = (
                             f"Plano atualizado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
                             f"(custo estimado: €{cost:.2f}/semana). "
@@ -171,7 +219,7 @@ class OpenAIService:
                         bot_response = (
                             f"Plano gerado com sucesso para o objetivo '{_goal_label(goal)}' 🎯 "
                             f"(custo estimado: €{cost:.2f}/semana). "
-                            f"As receitas estão disponíveis na aba de Planeamento Semanal."
+                            "As receitas estão disponíveis na aba de Planeamento Semanal."
                         )
                 else:
                     bot_response = (
@@ -205,31 +253,36 @@ class OpenAIService:
         return response.choices[0].message.content or ""
 
     async def _extract_preferences(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extração estrita para o onboarding."""
         extraction_prompt = (
             "Extrai APENAS preferências para JSON válido com as chaves: "
             "favorite_foods (array), disliked_ingredients (array), "
-            "restrictions (array), allergens (array), "
             "max_weekly_budget (number), planning_days (number). "
             "Se faltar algo usa null. Responde APENAS JSON."
         )
         extraction_messages = list(messages)
         extraction_messages.append({"role": "user", "content": extraction_prompt})
-        raw_json = self._chat(extraction_messages)
+        raw_json = await asyncio.to_thread(self._chat, extraction_messages)
         return safe_json_loads(raw_json)
 
-    async def _extract_meal_plan_constraints(
-        self, messages: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def _extract_meal_plan_constraints(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Extrai constraints dinâmicas, incluindo excessos calóricos, refeições saltadas
+        e ingredientes indisponíveis no supermercado.
+        """
         extraction_prompt = (
-            "Extrai os constraints para meal planning para JSON válido com as chaves: "
+            "Extrai os constraints para JSON válido com as chaves: "
             "max_weekly_budget, planning_days, favorite_foods, disliked_ingredients, "
+            "calories_offset (int - positivo se o utilizador comeu a mais, NEGATIVO se saltou refeições ou comeu menos do que o plano previa), "
+            "missing_ingredients (array - itens que o utilizador não tem ou não encontrou na loja), "
             "restrictions, allergens, new_liked_ingredients, requested_extra_ingredients, "
             "goal (valores possíveis: 'lose_weight', 'gain_weight', 'maintain', 'gain_muscle'). "
+            "IMPORTANTE: calories_offset deve ser negativo quando o utilizador refere que saltou refeições, comeu pouco, ou teve um dia com menos calorias. "
             "Se faltar algum campo usa null ou array vazio. Responde APENAS JSON."
         )
         extraction_messages = list(messages)
         extraction_messages.append({"role": "user", "content": extraction_prompt})
-        raw_json = self._chat(extraction_messages)
+        raw_json = await asyncio.to_thread(self._chat, extraction_messages)
         return safe_json_loads(raw_json)
 
     # ──────────────────────────────────────────────────────────────────────
@@ -239,11 +292,15 @@ class OpenAIService:
     def _is_onboarding_complete(self, preferences: Dict[str, Any]) -> bool:
         if not preferences:
             return False
+        # max_weekly_budget is optional per the onboarding prompt — only foods + days required
         required = ["favorite_foods", "planning_days"]
         return all(preferences.get(key) not in (None, "", []) for key in required)
 
     def _looks_like_meal_plan_request(self, text: str) -> bool:
         lower = text.lower()
+        keywords = [
+            "plano", "planear", "planeamento", "semana", "receitas", "menu", 
+            "ajusta", "muda", "altera", "não encontro", "comi a mais", "abusei"]
         strong_keywords = [
             "meal plan", "plano de refeições", "planeamento semanal",
             "planear refeições", "planear a semana", "gerar plano",
@@ -270,22 +327,31 @@ class OpenAIService:
         self,
         constraints: Dict[str, Any],
         user_context: Optional[Dict[str, Any]],
+        merged_context: Optional[Dict[str, Any]] = None,
         memory: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        merged = dict(user_context or {})
-        merged.update({k: v for k, v in constraints.items() if v not in (None, "")})
+        """Consolida os dados do chat com o contexto persistido do backend."""
+        # Prefer merged_context (already enriched with memory) over raw user_context
+        merged = dict(merged_context or user_context or {})
+        
+        # Atualiza o contexto com o que o utilizador acabou de dizer no chat
+        for k, v in constraints.items():
+            if v not in (None, "", []):
+                merged[k] = v
         if memory:
             for key in ("goal", "max_weekly_budget", "planning_days"):
                 if merged.get(key) in (None, "") and memory.get(key) not in (None, ""):
                     merged[key] = memory.get(key)
 
-        planning_days = merged.get("planning_days")
+        # Tratamento do calories_offset (garante que é inteiro)
         try:
-            if planning_days is not None:
-                planning_days = int(planning_days)
+            calories_offset = int(merged.get("calories_offset", 0))
         except (TypeError, ValueError):
-            planning_days = None
-        if planning_days is None:
+            calories_offset = 0
+
+        try:
+            planning_days = int(merged.get("planning_days", 7))
+        except (TypeError, ValueError):
             planning_days = 7
         planning_days = max(1, min(planning_days, 7))
 
@@ -304,8 +370,8 @@ class OpenAIService:
                 "goal": goal,
                 "favorite_foods": merged.get("favorite_foods", []),
                 "disliked_ingredients": merged.get("disliked_ingredients", []),
-                "new_liked_ingredients": merged.get("new_liked_ingredients", []),
-                "requested_extra_ingredients": merged.get("requested_extra_ingredients", []),
+                "calories_offset": calories_offset,
+                "missing_ingredients": merged.get("missing_ingredients", []),
                 "restrictions": merged.get("restrictions", []),
                 "allergens": merged.get("allergens", []),
                 "exclude_recipe_ids": recent_recipe_ids,
