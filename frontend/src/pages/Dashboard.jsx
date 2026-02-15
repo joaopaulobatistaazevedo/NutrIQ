@@ -125,26 +125,6 @@ function extractSourceUrl(recipe) {
   return match[0].replace(/[.,;!?]+$/, '');
 }
 
-function estimateWeeklySpend(prices) {
-  const cheapestByIngredient = new Map();
-
-  prices.forEach((entry) => {
-    const ingredient = String(entry?.ingredientNormalized || '').trim();
-    const price = Number(entry?.price);
-
-    if (!ingredient || !Number.isFinite(price)) {
-      return;
-    }
-
-    const previous = cheapestByIngredient.get(ingredient);
-    if (previous === undefined || price < previous) {
-      cheapestByIngredient.set(ingredient, price);
-    }
-  });
-
-  return Array.from(cheapestByIngredient.values()).reduce((total, value) => total + value, 0);
-}
-
 function parseStorage(key, fallback = null) {
   try {
     const raw = localStorage.getItem(key);
@@ -765,7 +745,6 @@ export default function Dashboard() {
 
         const profile = apiUser?.profile || {};
         const dailyGoal = Math.max(1200, Math.round(toNumberOr(2150, profile?.dailyCalories)));
-        const estimatedSpendByPrices = estimateWeeklySpend(prices);
         const storedWeeklyPlan = loadStoredWeeklyPlan();
         const storedMealLookup = buildStoredMealLookup(storedWeeklyPlan);
         const priceIndex = buildPriceIndex(prices);
@@ -801,6 +780,9 @@ export default function Dashboard() {
         const weeklyCalories = WEEK_DAYS.map((dayLabel) => {
           const dayMeals = flatMeals.filter((meal) => meal?.dayLabel === dayLabel);
           const real = Math.round(dayMeals.reduce((sum, meal) => {
+            if (!meal?.completed) {
+              return sum;
+            }
             const recipe = recipeById.get(Number(meal?.recipe_id));
             const metrics = estimateMealMetrics(meal, recipe, priceIndex);
             return sum + toNumberOr(0, metrics.kcal);
@@ -839,15 +821,13 @@ export default function Dashboard() {
         const weeklyAdherencePct =
           weeklyTotalMeals > 0 ? Math.round((weeklyCompletedMeals / weeklyTotalMeals) * 100) : 0;
 
-        const computedPlanCost = flatMeals.reduce((sum, meal) => {
+        const completedMeals = flatMeals.filter((meal) => Boolean(meal?.completed));
+        const completedMealsCost = completedMeals.reduce((sum, meal) => {
           const recipe = recipeById.get(Number(meal?.recipe_id));
           const metrics = estimateMealMetrics(meal, recipe, priceIndex);
           return sum + toNumberOr(0, metrics.cost);
         }, 0);
-        const weeklyPlanCost = toNumberOr(0, activePlan?.total_cost);
-        const estimatedWeeklySpend = computedPlanCost > 0
-          ? computedPlanCost
-          : (weeklyPlanCost > 0 ? weeklyPlanCost : estimatedSpendByPrices);
+        const estimatedWeeklySpend = completedMealsCost;
 
         if (!isMounted) {
           return;
@@ -856,7 +836,11 @@ export default function Dashboard() {
         setDashboardData({
           userName: toName(apiUser?.name),
           dailyGoal,
-          consumedCalories: Math.round(mealsForToday.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0)),
+          consumedCalories: Math.round(
+            mealsForToday.reduce((sum, meal) => (
+              meal?.completed ? sum + toNumberOr(0, meal.kcal) : sum
+            ), 0),
+          ),
           weeklyBudget: Math.max(0, toNumberOr(0, profile?.budgetWeekly)),
           estimatedWeeklySpend,
           weeklyCalories,
@@ -885,7 +869,9 @@ export default function Dashboard() {
   const MealIcon = activeMealData?.icon || Sunrise;
   const completedCount = meals.filter((meal) => Boolean(meal.completed)).length;
   const completedPct = meals.length ? (completedCount / meals.length) * 100 : 0;
-  const consumedKcal = meals.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0);
+  const consumedKcal = meals.reduce((sum, meal) => (
+    meal?.completed ? sum + toNumberOr(0, meal.kcal) : sum
+  ), 0);
   const isActiveMealCompleted = Boolean(activeMealData?.completed);
 
   useEffect(() => {
@@ -978,6 +964,44 @@ export default function Dashboard() {
         },
       }),
     );
+  };
+
+  const handleCompleteActiveMeal = () => {
+    if (!activeMealData || isActiveMealCompleted) {
+      return;
+    }
+
+    const kcalIncrement = Math.max(0, Math.round(toNumberOr(0, activeMealData.kcal)));
+    const todayDayLabel = WEEK_DAYS[(new Date().getDay() + 6) % 7];
+
+    setTodayMeals((previous) => previous.map((meal, index) => (
+      index === activeMeal
+        ? { ...meal, completed: true }
+        : meal
+    )));
+
+    setDashboardData((previous) => {
+      const totalMeals = Math.max(0, toNumberOr(0, previous.weeklyTotalMeals));
+      const currentCompleted = Math.max(0, toNumberOr(0, previous.weeklyCompletedMeals));
+      const nextCompletedMeals = Math.min(totalMeals, currentCompleted + 1);
+      const nextAdherence = totalMeals > 0 ? Math.round((nextCompletedMeals / totalMeals) * 100) : 0;
+
+      const nextWeeklyCalories = Array.isArray(previous.weeklyCalories)
+        ? previous.weeklyCalories.map((entry) => (
+          entry?.day === todayDayLabel
+            ? { ...entry, real: Math.max(0, Math.round(toNumberOr(0, entry.real) + kcalIncrement)) }
+            : entry
+        ))
+        : previous.weeklyCalories;
+
+      return {
+        ...previous,
+        consumedCalories: Math.max(0, Math.round(toNumberOr(0, previous.consumedCalories) + kcalIncrement)),
+        weeklyCompletedMeals: nextCompletedMeals,
+        weeklyAdherencePct: nextAdherence,
+        weeklyCalories: nextWeeklyCalories,
+      };
+    });
   };
 
   return (
@@ -1102,9 +1126,14 @@ export default function Dashboard() {
                     <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>
                       Ver receita completa <ChevronRight size={15} />
                     </button>
-                    <button type="button" className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`} disabled>
+                    <button
+                      type="button"
+                      className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`}
+                      onClick={handleCompleteActiveMeal}
+                      disabled={isActiveMealCompleted}
+                    >
                       <CheckCircle2 size={14} />
-                      <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Por concluir'}</span>
+                      <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Marcar como comida'}</span>
                     </button>
                   </div>
                 </motion.div>
