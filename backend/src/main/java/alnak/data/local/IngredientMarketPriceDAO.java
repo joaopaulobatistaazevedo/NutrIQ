@@ -27,13 +27,14 @@ public class IngredientMarketPriceDAO {
         final String sql = """
             INSERT INTO ingredient_market_prices (
                 ingredient_normalized, supermarket, ingredient_name, product_name, product_url,
-                price, currency, calories, source, note
+                image_url, price, currency, calories, source, note
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(ingredient_normalized, supermarket) DO UPDATE SET
                 ingredient_name = excluded.ingredient_name,
                 product_name = excluded.product_name,
                 product_url = excluded.product_url,
+                image_url = excluded.image_url,
                 price = excluded.price,
                 currency = excluded.currency,
                 calories = excluded.calories,
@@ -51,11 +52,12 @@ public class IngredientMarketPriceDAO {
                     setNullableString(ps, 3, item.getIngredientName());
                     setNullableString(ps, 4, item.getProductName());
                     setNullableString(ps, 5, item.getProductUrl());
-                    ps.setDouble(6, item.getPrice());
-                    setNullableString(ps, 7, item.getCurrency());
-                    setNullableDouble(ps, 8, item.getCalories());
-                    setNullableString(ps, 9, item.getSource());
-                    setNullableString(ps, 10, item.getNote());
+                    setNullableString(ps, 6, item.getImageUrl());
+                    ps.setDouble(7, item.getPrice());
+                    setNullableString(ps, 8, item.getCurrency());
+                    setNullableDouble(ps, 9, item.getCalories());
+                    setNullableString(ps, 10, item.getSource());
+                    setNullableString(ps, 11, item.getNote());
                     ps.addBatch();
                 }
                 int[] result = ps.executeBatch();
@@ -75,7 +77,7 @@ public class IngredientMarketPriceDAO {
     public List<IngredientMarketPrice> listAll() {
         final String sql = """
             SELECT ingredient_name, ingredient_normalized, supermarket, product_name, product_url,
-                   price, currency, calories, source, note, scraped_at
+                   image_url, price, currency, calories, source, note, scraped_at
             FROM ingredient_market_prices
             ORDER BY ingredient_normalized, supermarket
         """;
@@ -95,7 +97,7 @@ public class IngredientMarketPriceDAO {
     public List<IngredientMarketPrice> findByIngredientNormalized(String ingredientNormalized) {
         final String sql = """
             SELECT ingredient_name, ingredient_normalized, supermarket, product_name, product_url,
-                   price, currency, calories, source, note, scraped_at
+                   image_url, price, currency, calories, source, note, scraped_at
             FROM ingredient_market_prices
             WHERE ingredient_normalized = ?
             ORDER BY price ASC, supermarket ASC
@@ -118,7 +120,7 @@ public class IngredientMarketPriceDAO {
     public Optional<IngredientMarketPrice> findCheapestByIngredientNormalized(String ingredientNormalized) {
         final String sql = """
             SELECT ingredient_name, ingredient_normalized, supermarket, product_name, product_url,
-                   price, currency, calories, source, note, scraped_at
+                   image_url, price, currency, calories, source, note, scraped_at
             FROM ingredient_market_prices
             WHERE ingredient_normalized = ?
             ORDER BY price ASC, supermarket ASC
@@ -145,6 +147,7 @@ public class IngredientMarketPriceDAO {
         item.setSupermarket(rs.getString("supermarket"));
         item.setProductName(rs.getString("product_name"));
         item.setProductUrl(rs.getString("product_url"));
+        item.setImageUrl(rs.getString("image_url"));
         item.setPrice(rs.getDouble("price"));
         item.setCurrency(rs.getString("currency"));
 

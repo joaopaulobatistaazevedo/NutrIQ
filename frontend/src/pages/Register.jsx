@@ -1,6 +1,7 @@
-// src/pages/Register.jsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { setAuthSession, setStoredRoleForEmail } from '../utils/authSession';
+import { registerUser } from '../services/authService';
 import '../styles/auth.css';
 
 export default function Register() {
@@ -9,15 +10,58 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState('user');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    navigate('/welcome-bot', { state: { name: name.trim() } });
+    setErrorMessage('');
+
+    if (password !== confirmPassword) {
+      setErrorMessage('As passwords não coincidem.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setErrorMessage('A password deve ter pelo menos 8 caracteres.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const trimmedEmail = email.trim();
+      const trimmedName = name.trim();
+      const role = selectedRole === 'nutritionist' ? 'nutritionist' : 'user';
+
+      const auth = await registerUser({
+        name: trimmedName,
+        email: trimmedEmail,
+        password,
+      });
+
+      setStoredRoleForEmail(trimmedEmail, role);
+      setAuthSession({
+        userId: auth.userId,
+        token: auth.token,
+        email: trimmedEmail,
+        name: trimmedName,
+        role,
+      });
+
+      navigate(role === 'nutritionist' ? '/nutritionist' : '/welcome-bot', {
+        state: { name: trimmedName },
+        replace: true,
+      });
+    } catch (error) {
+      setErrorMessage(error.message || 'Não foi possível criar a conta.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="auth-page">
-      {/* Animated blobs */}
       <div className="auth-blob ab-1" />
       <div className="auth-blob ab-2" />
       <div className="auth-blob ab-3" />
@@ -39,6 +83,25 @@ export default function Register() {
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="o.teu@email.com" required />
             </div>
             <div className="auth-field">
+              <label>Tipo de conta</label>
+              <div className="auth-role-switch" role="radiogroup" aria-label="Tipo de conta">
+                <button
+                  type="button"
+                  className={`auth-role-option ${selectedRole === 'user' ? 'active' : ''}`}
+                  onClick={() => setSelectedRole('user')}
+                >
+                  Utilizador
+                </button>
+                <button
+                  type="button"
+                  className={`auth-role-option ${selectedRole === 'nutritionist' ? 'active' : ''}`}
+                  onClick={() => setSelectedRole('nutritionist')}
+                >
+                  Nutricionista
+                </button>
+              </div>
+            </div>
+            <div className="auth-field">
               <label>Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required />
             </div>
@@ -46,13 +109,15 @@ export default function Register() {
               <label>Confirmar password</label>
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" required />
             </div>
-            <button type="submit" className="auth-submit">Criar conta</button>
+            {errorMessage && <p className="auth-error">{errorMessage}</p>}
+            <button type="submit" className="auth-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'A criar conta...' : 'Criar conta'}
+            </button>
           </form>
 
           <p className="auth-footer">Já tens conta? <Link to="/login">Entrar</Link></p>
         </div>
 
-        {/* Side visual */}
         <div className="auth-visual">
           <div className="auth-visual-inner">
             <h2>Junta-te a milhares de utilizadores</h2>

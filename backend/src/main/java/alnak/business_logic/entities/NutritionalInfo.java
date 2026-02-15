@@ -1,5 +1,8 @@
 package alnak.business_logic.entities;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * Immutable value object holding macro-nutrient data per serving.
  */
@@ -10,7 +13,13 @@ public final class NutritionalInfo {
     private final double carbsG;
     private final double fatG;
 
-    public NutritionalInfo(double calories, double proteinG, double carbsG, double fatG) {
+    @JsonCreator
+    public NutritionalInfo(
+            @JsonProperty("calories") double calories,
+            @JsonProperty("proteinG") double proteinG,
+            @JsonProperty("carbsG") double carbsG,
+            @JsonProperty("fatG") double fatG
+    ) {
         this.calories = calories;
         this.proteinG = proteinG;
         this.carbsG   = carbsG;

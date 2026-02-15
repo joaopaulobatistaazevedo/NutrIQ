@@ -70,6 +70,12 @@ public class UserService {
         return getMe(userId);
     }
 
+    public User recordMealPhoto(Long userId) {
+        getMe(userId);
+        userDAO.recordMealPhotoForStreak(userId);
+        return getMe(userId);
+    }
+
     public List<User> listUsers() {
         return userDAO.listUsers();
     }

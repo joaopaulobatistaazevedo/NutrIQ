@@ -6,6 +6,7 @@ public class IngredientMarketPrice {
     private String supermarket;
     private String productName;
     private String productUrl;
+    private String imageUrl;
     private double price;
     private String currency = "EUR";
     private Double calories;
@@ -51,6 +52,14 @@ public class IngredientMarketPrice {
 
     public void setProductUrl(String productUrl) {
         this.productUrl = productUrl;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public double getPrice() {

@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/favicon.ico",
+      "destination": "/NutriBot.svg"
+    },
+    {
+      "source": "/((?!.*\\.).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

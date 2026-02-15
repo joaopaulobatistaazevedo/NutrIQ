@@ -4,14 +4,17 @@ import json
 import math
 import random
 import socket
+import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .extractors import (
     extract_products_from_json_ld,
@@ -90,9 +93,29 @@ def load_market_configs(markets_path: str | Path) -> list[MarketConfig]:
 
 
 class SupermarketScraper:
-    def __init__(self, timeout_seconds: float = 15.0, max_workers: int = 8) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float = 15.0,
+        max_workers: int = 8,
+        connect_timeout_seconds: float = 3.5,
+        delay_scale: float = 0.2,
+        max_product_pages: int = 6,
+        max_search_candidates: int = 120,
+        disable_nutrition_tab: bool = False,
+        selectors_only: bool = False,
+        request_retries: int = 1,
+    ) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_workers = max_workers
+        self.connect_timeout_seconds = max(0.5, float(connect_timeout_seconds))
+        self.delay_scale = max(0.0, float(delay_scale))
+        self.max_product_pages = max(0, int(max_product_pages))
+        self.max_search_candidates = max(10, int(max_search_candidates))
+        self.disable_nutrition_tab = bool(disable_nutrition_tab)
+        self.selectors_only = bool(selectors_only)
+        self.request_retries = max(0, int(request_retries))
+        self._thread_local = threading.local()
+        self._pool_size = max(16, min(512, self.max_workers * 4))
 
     def scrape(
         self,
@@ -129,7 +152,9 @@ class SupermarketScraper:
         return results
 
     def _lookup_ingredient(
-        self, ingredient: IngredientNeed, market: MarketConfig
+        self,
+        ingredient: IngredientNeed,
+        market: MarketConfig,
     ) -> PriceMatch:
         query = quote_plus(ingredient.name)
         query_compact = normalize_text(ingredient.name).replace(" ", "")
@@ -142,25 +167,37 @@ class SupermarketScraper:
         host = urlparse(search_url).hostname or "host_desconhecido"
         try:
             if market.max_delay_seconds > 0:
-                lower = max(0.0, market.min_delay_seconds)
-                upper = max(lower, market.max_delay_seconds)
+                lower = max(0.0, market.min_delay_seconds * self.delay_scale)
+                upper = max(lower, market.max_delay_seconds * self.delay_scale)
                 time.sleep(random.uniform(lower, upper))
 
             headers = {**DEFAULT_HEADERS, **market.headers}
-            response = requests.get(search_url, headers=headers, timeout=self.timeout_seconds)
+            response = self._http_get(search_url, headers=headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 
             candidates = self._collect_search_candidates(soup=soup, market=market)
-            if len(candidates) < 3:
+            has_search_price = any(_safe_float(item.get("price")) for item in candidates)
+            needs_product_page_enrichment = (
+                len(candidates) < 2
+                or not has_search_price
+            )
+            if needs_product_page_enrichment and self.max_product_pages > 0:
                 candidates.extend(
                     self._extract_from_product_pages(
+                        ingredient=ingredient,
                         soup=soup,
                         html_text=response.text,
                         market=market,
                         headers=headers,
+                        seed_urls=[
+                            str(item.get("url")).strip()
+                            for item in candidates
+                            if item.get("url")
+                        ],
                     )
                 )
+                candidates = _dedupe_candidates(candidates)
             extracted = self._select_best_candidate(ingredient=ingredient, candidates=candidates)
 
             if extracted is None:
@@ -181,6 +218,7 @@ class SupermarketScraper:
                 calories=extracted.get("calories"),
                 currency=extracted.get("currency", market.currency) or market.currency,
                 product_url=extracted.get("url"),
+                image_url=extracted.get("image_url"),
                 source=extracted.get("source"),
                 note=extracted.get("selection_note"),
             )
@@ -234,43 +272,71 @@ class SupermarketScraper:
         soup: BeautifulSoup,
         market: MarketConfig,
     ) -> list[dict[str, Any]]:
-        candidates: list[dict[str, Any]] = []
-        candidates.extend(
-            extract_products_from_json_ld(
-                soup=soup,
-                base_url=market.base_url,
-                limit=120,
-            )
+        selector_candidates = extract_products_from_selectors(
+            soup=soup,
+            config=market,
+            limit=self.max_search_candidates,
         )
-        candidates.extend(
-            extract_products_from_selectors(
-                soup=soup,
-                config=market,
-                limit=120,
-            )
+        if self.selectors_only and selector_candidates and any(
+            _safe_float(item.get("price")) for item in selector_candidates
+        ):
+            return _dedupe_candidates(selector_candidates)
+
+        needs_json_ld = not selector_candidates or not any(
+            _safe_float(item.get("price")) for item in selector_candidates
         )
-        return _dedupe_candidates(candidates)
+        if not needs_json_ld:
+            return _dedupe_candidates(selector_candidates)
+
+        json_ld_candidates = extract_products_from_json_ld(
+            soup=soup,
+            base_url=market.base_url,
+            limit=self.max_search_candidates,
+        )
+        return _dedupe_candidates([*selector_candidates, *json_ld_candidates])
 
     def _extract_from_product_pages(
         self,
+        ingredient: IngredientNeed,
         soup: BeautifulSoup,
         html_text: str,
         market: MarketConfig,
         headers: dict[str, str],
+        seed_urls: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        candidates = extract_product_url_candidates(
+        discovered_urls = extract_product_url_candidates(
             soup=soup,
             html_text=html_text,
             base_url=market.base_url,
             url_patterns=market.product_url_patterns,
         )
+        candidates: list[str] = []
+        seen_urls: set[str] = set()
+        for url in (seed_urls or []):
+            token = str(url or "").strip()
+            if not token or token in seen_urls:
+                continue
+            seen_urls.add(token)
+            candidates.append(token)
+        for url in discovered_urls:
+            token = str(url or "").strip()
+            if not token or token in seen_urls:
+                continue
+            seen_urls.add(token)
+            candidates.append(token)
+
         if not candidates:
             return []
 
+        candidates = _prioritize_candidate_urls(
+            candidates=candidates,
+            ingredient_name=ingredient.name,
+        )
+
         extracted_items: list[dict[str, Any]] = []
-        for candidate_url in candidates[:8]:
+        for candidate_url in candidates[: self.max_product_pages]:
             try:
-                response = requests.get(candidate_url, headers=headers, timeout=self.timeout_seconds)
+                response = self._http_get(candidate_url, headers=headers)
                 response.raise_for_status()
             except requests.RequestException:
                 continue
@@ -303,14 +369,40 @@ class SupermarketScraper:
             if any(item.get("calories") is not None for item in extracted_items[start_index:]):
                 pass
             else:
-                fallback_calories = self._extract_calories_from_nutritional_tab(
-                    soup=candidate_soup,
-                    headers=headers,
-                )
+                # First try calories already visible in product page (e.g. table "Energia (kcal)").
+                fallback_calories = parse_calories_value(candidate_soup.get_text(" ", strip=True))
+                if fallback_calories is None and not self.disable_nutrition_tab:
+                    fallback_calories = self._extract_calories_from_nutritional_tab(
+                        soup=candidate_soup,
+                        headers=headers,
+                        page_url=candidate_url,
+                    )
                 if fallback_calories is not None:
+                    applied_to_existing = False
                     for item in extracted_items[start_index:]:
                         if item.get("calories") is None:
                             item["calories"] = fallback_calories
+                            applied_to_existing = True
+
+                    # If page extractors didn't yield priced items, still return a lightweight
+                    # calories-only candidate keyed by URL so dedupe can enrich search results.
+                    if not applied_to_existing:
+                        extracted_items.append(
+                            {
+                                "name": None,
+                                "price": None,
+                                "calories": fallback_calories,
+                                "currency": market.currency,
+                                "url": candidate_url,
+                                "source": "nutrition-page",
+                            }
+                        )
+
+            if _page_has_priced_ingredient_hit(
+                ingredient_name=ingredient.name,
+                items=extracted_items[start_index:],
+            ):
+                break
 
             if len(extracted_items) >= 24:
                 break
@@ -321,6 +413,7 @@ class SupermarketScraper:
         self,
         soup: BeautifulSoup,
         headers: dict[str, str],
+        page_url: str | None = None,
     ) -> float | None:
         anchor = soup.select_one(".js-nutritional-tab-anchor[data-url]")
         if anchor is None:
@@ -329,9 +422,10 @@ class SupermarketScraper:
         tab_url = str(anchor.attrs.get("data-url") or "").strip()
         if not tab_url:
             return None
+        tab_url = urljoin(page_url or "", tab_url)
 
         try:
-            response = requests.get(tab_url, headers=headers, timeout=self.timeout_seconds)
+            response = self._http_get(tab_url, headers=headers)
             response.raise_for_status()
         except requests.RequestException:
             return None
@@ -386,6 +480,41 @@ class SupermarketScraper:
             return None
         return best_payload
 
+    def _thread_session(self) -> requests.Session:
+        session = getattr(self._thread_local, "session", None)
+        if isinstance(session, requests.Session):
+            return session
+
+        session = requests.Session()
+        retry = Retry(
+            total=self.request_retries,
+            connect=self.request_retries,
+            read=self.request_retries,
+            status=self.request_retries,
+            backoff_factor=0.12,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "HEAD", "OPTIONS"}),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(
+            pool_connections=self._pool_size,
+            pool_maxsize=self._pool_size,
+            max_retries=retry,
+        )
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        self._thread_local.session = session
+        return session
+
+    def _http_get(self, url: str, headers: dict[str, str]) -> requests.Response:
+        session = self._thread_session()
+        return session.get(
+            url,
+            headers=headers,
+            timeout=(self.connect_timeout_seconds, self.timeout_seconds),
+            allow_redirects=True,
+        )
+
 
 def _safe_float(value: Any) -> float | None:
     try:
@@ -409,6 +538,8 @@ def _dedupe_candidates(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 existing = deduped[existing_index]
                 if existing.get("calories") is None and item.get("calories") is not None:
                     existing["calories"] = item.get("calories")
+                if not existing.get("image_url") and item.get("image_url"):
+                    existing["image_url"] = item.get("image_url")
                 continue
 
         key = (name, price, url)
@@ -417,6 +548,8 @@ def _dedupe_candidates(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             existing = deduped[existing_index]
             if existing.get("calories") is None and item.get("calories") is not None:
                 existing["calories"] = item.get("calories")
+            if not existing.get("image_url") and item.get("image_url"):
+                existing["image_url"] = item.get("image_url")
             if not existing.get("source") and item.get("source"):
                 existing["source"] = item.get("source")
             continue
@@ -539,3 +672,38 @@ def _classify_connection_error(host: str, exc: requests.ConnectionError) -> str:
     if "connection refused" in message:
         return f"Erro de conexão: ligação recusada por '{host}'."
     return f"Erro de conexão: {exc}"
+
+
+def _prioritize_candidate_urls(
+    candidates: list[str],
+    ingredient_name: str,
+) -> list[str]:
+    tokens = [token for token in normalize_text(ingredient_name).split() if token]
+    if not tokens:
+        return candidates
+
+    def _score(url: str) -> tuple[int, int]:
+        normalized_url = normalize_text(url.replace("/", " "))
+        hits = sum(1 for token in tokens if token and token in normalized_url)
+        # Mais hits primeiro, URLs compactas depois.
+        return (-hits, len(url))
+
+    return sorted(candidates, key=_score)
+
+
+def _page_has_priced_ingredient_hit(
+    ingredient_name: str,
+    items: list[dict[str, Any]],
+) -> bool:
+    ingredient_tokens = [token for token in normalize_text(ingredient_name).split() if token]
+    if not ingredient_tokens:
+        return False
+
+    for item in items:
+        price = _safe_float(item.get("price"))
+        if price is None or price <= 0:
+            continue
+        name = normalize_text(str(item.get("name") or ""))
+        if all(token in name for token in ingredient_tokens[:2]):
+            return True
+    return False

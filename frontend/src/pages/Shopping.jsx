@@ -1,222 +1,1102 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, Circle, Minus, Plus, ShoppingCart, Store, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
+import { fetchRecipeById } from '../services/recipeService';
+import {
+  getCheapestIngredientPrice,
+  importPriceReport,
+  listIngredientPrices,
+  listLatestPrices,
+} from '../services/priceService';
+import { generateShoppingCartFromMealPlan } from '../services/chatbotService';
+import { fetchPersistedShoppingCart, savePersistedShoppingCart } from '../services/shoppingCartService';
+import { PROFILE_KEY, WEEKLY_PLAN_KEY, CART_GENERATE_REQUEST_KEY } from '../constants/storageKeys';
+import { resolveAccountId, scopedKey } from '../utils/accountScope';
 import '../styles/shopping.css';
 
-const INITIAL_LISTS = {
-  pingo_doce: {
-    name: 'Pingo Doce',
-    items: [
-      {
-        id: 'pd-1',
-        name: 'Papel Higiénico Compacto 6 Rolos',
-        unitInfo: '6 UN | 0,40 €/UN',
-        unitPrice: 2.39,
-        discount: 0,
-        quantity: 1,
-        checked: false,
-      },
-      {
-        id: 'pd-2',
-        name: 'Iogurte Grego Natural',
-        unitInfo: '4 UN | 0,65 €/UN',
-        unitPrice: 2.6,
-        discount: 0.4,
-        quantity: 2,
-        checked: false,
-      },
-    ],
-  },
-  continente: {
-    name: 'Continente',
-    items: [
-      {
-        id: 'ct-1',
-        name: 'Peito de Frango (bandeja)',
-        unitInfo: '800 g | 8,20 €/kg',
-        unitPrice: 6.56,
-        discount: 0.5,
-        quantity: 1,
-        checked: false,
-      },
-      {
-        id: 'ct-2',
-        name: 'Massa Integral Fusilli',
-        unitInfo: '500 g | 1,58 €/UN',
-        unitPrice: 1.58,
-        discount: 0,
-        quantity: 2,
-        checked: true,
-      },
-    ],
-  },
-  lidl: {
-    name: 'Lidl',
-    items: [
-      {
-        id: 'ld-1',
-        name: 'Arroz Basmati',
-        unitInfo: '1 kg | 2,49 €/UN',
-        unitPrice: 2.49,
-        discount: 0.3,
-        quantity: 1,
-        checked: false,
-      },
-      {
-        id: 'ld-2',
-        name: 'Atum em Água',
-        unitInfo: '4 Latas | 0,90 €/UN',
-        unitPrice: 3.6,
-        discount: 0,
-        quantity: 1,
-        checked: false,
-      },
-    ],
-  },
-};
+const CARD_ACCENTS = ['is-pingo', 'is-continente', 'is-lidl'];
+const EMPTY_ITEMS = [];
 
-const SUGGESTED_ITEMS = [
-  { name: 'Banana (1kg)', unitInfo: '1 kg | 1,39 €/UN', unitPrice: 1.39 },
-  { name: 'Aveia Integral', unitInfo: '500 g | 1,89 €/UN', unitPrice: 1.89 },
-  { name: 'Leite magro', unitInfo: '1 L | 0,89 €/UN', unitPrice: 0.89 },
-];
-
-function formatCurrency(value) {
-  return value.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+function formatCurrency(value, currency = 'EUR') {
+  return Number(value || 0).toLocaleString('pt-PT', {
+    style: 'currency',
+    currency: currency || 'EUR',
+  });
 }
 
-function getCardAccent(storeKey) {
-  if (storeKey === 'pingo_doce') return 'is-pingo';
-  if (storeKey === 'continente') return 'is-continente';
-  return 'is-lidl';
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
 }
 
-function itemImageFor(name) {
-  const seed = encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'));
+function normalizeIngredientKey(value) {
+  return slugify(value || '').replace(/_/g, ' ').trim();
+}
+
+function cleanIngredientLabel(rawValue) {
+  let value = String(rawValue || '').trim();
+  if (!value) return '';
+
+  value = value.replace(/\([^)]*\)/g, ' ');
+  value = value.replace(/q\.?b\.?/gi, ' ');
+  value = value.replace(/^[-\u2022*\s]+/, '');
+  value = value.replace(
+    /^\s*(?:\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*(?:(?:kg|g|gr|gramas?|ml|l|dl|cl|un|unid(?:ade)?s?|dentes?|colher(?:es)?(?:\s+de\s+(?:sopa|cha|chá))?|chávenas?|xícaras?|xicaras?)\b)?\s*/i,
+    '',
+  );
+  value = value.replace(/\s+/g, ' ').trim();
+  value = value.replace(/^[,.;:-]+|[,.;:-]+$/g, '').trim();
+  return value;
+}
+
+function extractDemandFromRecipes(recipes) {
+  const demand = new Map();
+
+  recipes.forEach((recipe) => {
+    const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+    ingredients.forEach((ingredient) => {
+      const ingredientName = cleanIngredientLabel(ingredient?.ingredientName);
+      if (!ingredientName) return;
+
+      const key = normalizeIngredientKey(ingredientName);
+      if (!key) return;
+
+      const quantityRaw = Number(ingredient?.quantity);
+      const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? quantityRaw : 1;
+      const current = demand.get(key) || { ingredientName, quantity: 0 };
+
+      demand.set(key, {
+        ingredientName: current.ingredientName,
+        quantity: current.quantity + quantity,
+      });
+    });
+  });
+
+  return demand;
+}
+
+function extractDemandFromRecipeDescriptions(recipes) {
+  const demand = new Map();
+
+  recipes.forEach((recipe) => {
+    const description = String(recipe?.description || '').trim();
+    if (!description) return;
+
+    const match = description.match(/\bingredientes?\s*:\s*(.+)$/i);
+    if (!match) return;
+
+    const chunk = String(match[1] || '').split('|')[0].trim();
+    if (!chunk) return;
+
+    chunk.split(/[;,]/).forEach((token) => {
+      const ingredientName = cleanIngredientLabel(token);
+      if (!ingredientName) return;
+      const key = normalizeIngredientKey(ingredientName);
+      if (!key) return;
+
+      const current = demand.get(key) || { ingredientName, quantity: 0 };
+      demand.set(key, {
+        ingredientName: current.ingredientName,
+        quantity: current.quantity + 1,
+      });
+    });
+  });
+
+  return demand;
+}
+
+function extractDemandFromPlanPreview(plan) {
+  const demand = new Map();
+  const days = Array.isArray(plan?.days) ? plan.days : [];
+
+  days.forEach((day) => {
+    const meals = Array.isArray(day?.meals) ? day.meals : [];
+    meals.forEach((meal) => {
+      const preview = Array.isArray(meal?.ingredients_preview) ? meal.ingredients_preview : [];
+      preview.forEach((rawValue) => {
+        const ingredientName = cleanIngredientLabel(rawValue);
+        if (!ingredientName) return;
+        const key = normalizeIngredientKey(ingredientName);
+        if (!key) return;
+
+        const current = demand.get(key) || { ingredientName, quantity: 0 };
+        demand.set(key, {
+          ingredientName: current.ingredientName,
+          quantity: current.quantity + 1,
+        });
+      });
+    });
+  });
+
+  return demand;
+}
+
+function mergeDemandMaps(...maps) {
+  const merged = new Map();
+
+  maps.forEach((map) => {
+    if (!(map instanceof Map)) return;
+    map.forEach((value, key) => {
+      if (!key || !value) return;
+      const previous = merged.get(key) || {
+        ingredientName: value.ingredientName || key,
+        quantity: 0,
+      };
+      merged.set(key, {
+        ingredientName: previous.ingredientName,
+        quantity: Number(previous.quantity || 0) + Number(value.quantity || 0),
+      });
+    });
+  });
+
+  return merged;
+}
+
+function buildGeneratedLists(prices, ingredientDemand) {
+  const bestByMarket = new Map();
+
+  prices.forEach((entry) => {
+    const marketName = String(entry?.supermarket || '').trim();
+    if (!marketName) return;
+
+    const ingredientKey = normalizeIngredientKey(
+      String(entry?.ingredientNormalized || entry?.ingredientName || '').trim(),
+    );
+    if (!ingredientKey || !ingredientDemand.has(ingredientKey)) return;
+
+    const price = Number(entry?.price);
+    if (!Number.isFinite(price) || price <= 0) return;
+
+    if (!bestByMarket.has(marketName)) {
+      bestByMarket.set(marketName, new Map());
+    }
+
+    const marketMap = bestByMarket.get(marketName);
+    const previous = marketMap.get(ingredientKey);
+    if (!previous || price < Number(previous.price || 0)) {
+      marketMap.set(ingredientKey, entry);
+    }
+  });
+
+  const marketEntries = Array.from(bestByMarket.entries());
+  const demandKeys = Array.from(ingredientDemand.keys());
+
+  const lists = {};
+  const comparison = [];
+  let bestMarketKey = '';
+  let bestMarketTotal = Number.POSITIVE_INFINITY;
+  let colorIndex = 0;
+
+  marketEntries.forEach(([marketName, marketMap]) => {
+    let subtotal = 0;
+    let coveredIngredients = 0;
+
+    const items = demandKeys
+      .map((ingredientKey, index) => {
+        const found = marketMap.get(ingredientKey);
+        if (!found) return null;
+
+        coveredIngredients += 1;
+        const normalized = normalizePriceItem(found, index);
+        const demand = ingredientDemand.get(ingredientKey);
+        const quantity = Math.max(1, Math.ceil(Number(demand?.quantity || 1)));
+        subtotal += normalized.unitPrice * quantity;
+
+        return {
+          ...normalized,
+          ingredientName: demand?.ingredientName || normalized.ingredientName,
+          quantity,
+        };
+      })
+      .filter(Boolean);
+
+    const marketKey = slugify(marketName) || `market_${colorIndex}`;
+    lists[marketKey] = {
+      name: marketName,
+      accentClass: CARD_ACCENTS[colorIndex % CARD_ACCENTS.length],
+      items,
+    };
+
+    comparison.push({
+      marketKey,
+      supermarket: marketName,
+      total: subtotal,
+      missingCount: Math.max(0, demandKeys.length - coveredIngredients),
+      coveredCount: coveredIngredients,
+      totalIngredients: demandKeys.length,
+    });
+
+    if (coveredIngredients === demandKeys.length && subtotal < bestMarketTotal) {
+      bestMarketTotal = subtotal;
+      bestMarketKey = marketKey;
+    }
+
+    colorIndex += 1;
+  });
+
+  comparison.sort((a, b) => a.total - b.total);
+
+  if (!bestMarketKey && comparison.length) {
+    bestMarketKey = comparison[0].marketKey;
+    bestMarketTotal = comparison[0].total;
+  }
+
+  const bestOverall = demandKeys.reduce((sum, ingredientKey) => {
+    let ingredientBest = Number.POSITIVE_INFINITY;
+    const quantity = Math.max(1, Math.ceil(Number(ingredientDemand.get(ingredientKey)?.quantity || 1)));
+
+    marketEntries.forEach(([, marketMap]) => {
+      const found = marketMap.get(ingredientKey);
+      if (!found) return;
+      const amount = Number(found.price || 0);
+      if (Number.isFinite(amount) && amount > 0 && amount < ingredientBest) {
+        ingredientBest = amount;
+      }
+    });
+
+    return sum + (Number.isFinite(ingredientBest) ? ingredientBest * quantity : 0);
+  }, 0);
+
+  const missingIngredients = demandKeys.filter(
+    (ingredientKey) => !marketEntries.some(([, marketMap]) => marketMap.has(ingredientKey)),
+  );
+
+  return {
+    lists,
+    bestMarketKey,
+    bestMarketTotal: Number.isFinite(bestMarketTotal) ? bestMarketTotal : 0,
+    comparison,
+    optimizedTotal: bestOverall,
+    missingIngredients,
+  };
+}
+
+function parseStorage(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizePriceItem(entry, index) {
+  const ingredientName = String(
+    entry?.ingredientName || entry?.ingredientNormalized || 'Ingrediente',
+  ).trim();
+  const productName = String(entry?.productName || ingredientName).trim();
+  const market = String(entry?.supermarket || 'Supermercado').trim();
+  const safeIngredient = slugify(entry?.ingredientNormalized || ingredientName) || 'ingrediente';
+
+  return {
+    id: `${slugify(market) || 'market'}-${safeIngredient}-${index}`,
+    ingredientName,
+    name: productName,
+    unitInfo:
+      String(entry?.note || '').trim() ||
+      (entry?.source ? `fonte: ${entry.source}` : 'preço importado'),
+    unitPrice: Number(entry?.price || 0),
+    discount: 0,
+    quantity: 1,
+    checked: false,
+    currency: String(entry?.currency || 'EUR').trim() || 'EUR',
+    productUrl: String(entry?.productUrl || '').trim(),
+    imageUrl: String(entry?.imageUrl || entry?.image_url || '').trim(),
+  };
+}
+
+function buildListsFromPrices(prices) {
+  const lists = {};
+  let colorIndex = 0;
+
+  prices.forEach((entry, index) => {
+    const market = String(entry?.supermarket || 'Supermercado').trim() || 'Supermercado';
+    const key = slugify(market) || `market_${colorIndex}`;
+
+    if (!lists[key]) {
+      lists[key] = {
+        name: market,
+        accentClass: CARD_ACCENTS[colorIndex % CARD_ACCENTS.length],
+        items: [],
+      };
+      colorIndex += 1;
+    }
+
+    lists[key].items.push(normalizePriceItem(entry, index));
+  });
+
+  Object.values(lists).forEach((list) => {
+    list.items.sort((left, right) => left.ingredientName.localeCompare(right.ingredientName, 'pt'));
+  });
+
+  return lists;
+}
+
+function normalizeCheapestResult(entry) {
+  if (!entry) {
+    return null;
+  }
+
+  const ingredientName = String(
+    entry?.ingredientName || entry?.ingredientNormalized || 'Ingrediente',
+  ).trim();
+  const market = String(entry?.supermarket || 'Supermercado').trim() || 'Supermercado';
+  const safeIngredient = slugify(entry?.ingredientNormalized || ingredientName) || 'ingrediente';
+
+  return {
+    id: `cheapest-${safeIngredient}-${Date.now()}`,
+    ingredientName,
+    name: String(entry?.productName || ingredientName).trim(),
+    unitInfo:
+      String(entry?.note || '').trim() ||
+      (entry?.source ? `fonte: ${entry.source}` : 'preço importado'),
+    unitPrice: Number(entry?.price || 0),
+    discount: 0,
+    quantity: 1,
+    checked: false,
+    currency: String(entry?.currency || 'EUR').trim() || 'EUR',
+    productUrl: String(entry?.productUrl || '').trim(),
+    imageUrl: String(entry?.imageUrl || entry?.image_url || '').trim(),
+    supermarket: market,
+  };
+}
+
+function itemImageFor(item) {
+  const imageUrl = String(item?.imageUrl || '').trim();
+  if (imageUrl) {
+    return imageUrl;
+  }
+  const seed = encodeURIComponent(String(item?.name || '').toLowerCase().replace(/\s+/g, '-'));
   return `https://picsum.photos/seed/${seed}/300/300`;
 }
 
-export default function Shopping() {
-  const [lists, setLists] = useState(INITIAL_LISTS);
-  const [activeListId, setActiveListId] = useState('pingo_doce');
+function planSignature(plan) {
+  const days = Array.isArray(plan?.days) ? plan.days : [];
+  return days
+    .map((day) => {
+      const date = String(day?.date || '');
+      const meals = Array.isArray(day?.meals) ? day.meals : [];
+      const mealSig = meals
+        .map((meal) => `${meal?.meal_id || ''}:${meal?.recipe_id || ''}:${meal?.title || ''}`)
+        .join('|');
+      return `${date}=>${mealSig}`;
+    })
+    .join('#');
+}
 
-  const activeList = lists[activeListId];
-  const activeItems = activeList.items;
+function isPersistedCartSnapshot(payload) {
+  return !!(payload && typeof payload === 'object' && payload.lists && typeof payload.lists === 'object');
+}
+
+function buildCartSnapshot({
+  lists,
+  activeListId,
+  comparison,
+  optimizedTotal,
+  cartSource,
+  lastGeneratedSignature,
+}) {
+  return {
+    lists,
+    activeListId,
+    comparison,
+    optimizedTotal,
+    cartSource,
+    lastGeneratedSignature,
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function applyCartSnapshotToState(snapshot, setters) {
+  if (!isPersistedCartSnapshot(snapshot)) {
+    return false;
+  }
+
+  const persistedLists = snapshot.lists || {};
+  const persistedActive = String(snapshot.activeListId || '');
+  const fallbackListId = Object.keys(persistedLists)[0] || '';
+
+  setters.setLists(persistedLists);
+  setters.setComparison(Array.isArray(snapshot.comparison) ? snapshot.comparison : []);
+  setters.setOptimizedTotal(Number(snapshot.optimizedTotal || 0));
+  setters.setCartSource(String(snapshot.cartSource || 'meal-plan'));
+  setters.setLastGeneratedSignature(String(snapshot.lastGeneratedSignature || ''));
+  setters.setActiveListId(
+    persistedActive && persistedLists[persistedActive] ? persistedActive : fallbackListId,
+  );
+  return true;
+}
+
+export default function Shopping() {
+  const accountId = useMemo(() => {
+    const profile = parseStorage(PROFILE_KEY, null);
+    return resolveAccountId(profile);
+  }, []);
+
+  const [lists, setLists] = useState({});
+  const [activeListId, setActiveListId] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [ingredientQuery, setIngredientQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [queryError, setQueryError] = useState('');
+  const [cheapestResult, setCheapestResult] = useState(null);
+  const [ingredientMatches, setIngredientMatches] = useState(EMPTY_ITEMS);
+  const [importPayload, setImportPayload] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState('');
+  const [weeklyPlan, setWeeklyPlan] = useState(() => parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
+  const [comparison, setComparison] = useState([]);
+  const [optimizedTotal, setOptimizedTotal] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState('');
+  const [isGeneratingCart, setIsGeneratingCart] = useState(false);
+  const [cartSource, setCartSource] = useState('manual');
+  const [lastGeneratedSignature, setLastGeneratedSignature] = useState('');
+  const generateCartRef = useRef(null);
+
+  const loadPrices = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const prices = await listLatestPrices();
+      const nextLists = buildListsFromPrices(prices);
+      const firstListId = Object.keys(nextLists)[0] || '';
+      setLists(nextLists);
+      setComparison([]);
+      setOptimizedTotal(0);
+      setCartSource('manual');
+      setLastGeneratedSignature('');
+      setActiveListId((previous) => (previous && nextLists[previous] ? previous : firstListId));
+    } catch (error) {
+      setLoadError(error.message || 'Não foi possível carregar os preços.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const generateCartFromMealPlan = useCallback(async () => {
+    const currentPlan = parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null) || weeklyPlan;
+    if (!currentPlan?.days?.length) {
+      setGenerationStatus('Ainda não existe um plano de refeições com receitas para gerar carrinho.');
+      return;
+    }
+
+    setIsGeneratingCart(true);
+    setGenerationStatus('A recolher preços reais no supermercado e a gerar carrinho...');
+
+    try {
+      const generatedCart = await generateShoppingCartFromMealPlan(currentPlan);
+      const applied = applyCartSnapshotToState(generatedCart, {
+        setLists,
+        setComparison,
+        setOptimizedTotal,
+        setCartSource,
+        setLastGeneratedSignature,
+        setActiveListId,
+      });
+
+      if (!applied) {
+        throw new Error('Resposta inválida ao gerar carrinho.');
+      }
+
+      const missingIngredients = Array.isArray(generatedCart?.missingIngredients)
+        ? generatedCart.missingIngredients
+        : [];
+
+      if (missingIngredients.length) {
+        setGenerationStatus(
+          `Carrinho gerado com lacunas: ${missingIngredients.length} ingredientes sem preços importados.`,
+        );
+      } else {
+        const generatedComparison = Array.isArray(generatedCart?.comparison) ? generatedCart.comparison : [];
+        const bestMarketKey = String(generatedCart?.activeListId || '');
+        const winning = generatedComparison.find((entry) => entry.marketKey === bestMarketKey)
+          || generatedComparison[0];
+        const total = Number(winning?.total || 0);
+        setGenerationStatus(
+          `Carrinho gerado com todos os ingredientes do plano: ${winning?.supermarket || 'N/D'} (${formatCurrency(total)}).`,
+        );
+      }
+    } catch (error) {
+      const errorText = String(error?.message || '').toLowerCase();
+      const shouldFallbackLocal =
+        errorText.includes('not found')
+        || errorText.includes('404')
+        || errorText.includes('405');
+
+      if (!shouldFallbackLocal) {
+        setGenerationStatus(error.message || 'Não foi possível gerar o carrinho automaticamente.');
+        return;
+      }
+
+      try {
+        const recipeIds = Array.from(
+          new Set(
+            (currentPlan.days || [])
+              .flatMap((day) => day?.meals || [])
+              .map((meal) => Number(meal?.recipe_id || meal?.recipeId || 0))
+              .filter((id) => Number.isInteger(id) && id > 0),
+          ),
+        );
+
+        if (!recipeIds.length) {
+          throw new Error('Plano sem receitas identificáveis para construir carrinho.');
+        }
+
+        const [recipes, prices] = await Promise.all([
+          Promise.all(recipeIds.map((recipeId) => fetchRecipeById(recipeId).catch(() => null))),
+          listLatestPrices(),
+        ]);
+
+        const validRecipes = recipes.filter(Boolean);
+        const demand = mergeDemandMaps(
+          extractDemandFromRecipes(validRecipes),
+          extractDemandFromRecipeDescriptions(validRecipes),
+          extractDemandFromPlanPreview(currentPlan),
+        );
+
+        if (!demand.size) {
+          throw new Error('As receitas do plano não têm ingredientes suficientes para gerar carrinho.');
+        }
+
+        const generated = buildGeneratedLists(prices, demand);
+        if (!Object.keys(generated.lists).length) {
+          throw new Error('Não há preços disponíveis para os ingredientes do teu plano.');
+        }
+
+        const generatedSignature = planSignature(currentPlan);
+        const selectedListId = generated.bestMarketKey || Object.keys(generated.lists)[0] || '';
+
+        setLists(generated.lists);
+        setComparison(generated.comparison);
+        setOptimizedTotal(generated.optimizedTotal);
+        setActiveListId(selectedListId);
+        setCartSource('meal-plan');
+        setLastGeneratedSignature(generatedSignature);
+
+        try {
+          await savePersistedShoppingCart(
+            buildCartSnapshot({
+              lists: generated.lists,
+              activeListId: selectedListId,
+              comparison: generated.comparison,
+              optimizedTotal: generated.optimizedTotal,
+              cartSource: 'meal-plan',
+              lastGeneratedSignature: generatedSignature,
+            }),
+          );
+        } catch {
+          // Persistência é best-effort no fallback local.
+        }
+
+        setGenerationStatus(
+          'Carrinho gerado em modo local (fallback) porque o endpoint de geração ainda não está disponível.',
+        );
+      } catch (fallbackError) {
+        setGenerationStatus(
+          fallbackError.message || 'Não foi possível gerar o carrinho automaticamente.',
+        );
+      }
+    } finally {
+      setIsGeneratingCart(false);
+    }
+  }, [accountId, weeklyPlan]);
+
+  useEffect(() => {
+    generateCartRef.current = generateCartFromMealPlan;
+  }, [generateCartFromMealPlan]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      setIsLoading(true);
+      setLoadError('');
+
+      try {
+        const persisted = await fetchPersistedShoppingCart();
+        if (
+          !cancelled
+          && applyCartSnapshotToState(persisted, {
+            setLists,
+            setComparison,
+            setOptimizedTotal,
+            setCartSource,
+            setLastGeneratedSignature,
+            setActiveListId,
+          })
+        ) {
+          setGenerationStatus('Carrinho carregado da base de dados.');
+          return;
+        }
+
+        if (!cancelled) {
+          await loadPrices();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message || 'Não foi possível carregar o carrinho persistido.');
+          await loadPrices();
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadPrices]);
+
+  useEffect(() => {
+    const storageKey = scopedKey(WEEKLY_PLAN_KEY, accountId);
+
+    const syncPlan = () => {
+      const next = parseStorage(storageKey, null);
+      setWeeklyPlan((previous) => {
+        const previousSerialized = JSON.stringify(previous ?? null);
+        const nextSerialized = JSON.stringify(next ?? null);
+        return previousSerialized === nextSerialized ? previous : next;
+      });
+    };
+
+    const onPlanUpdated = (event) => {
+      const payloadAccountId = event?.detail?.accountId;
+      if (!payloadAccountId || payloadAccountId === accountId) {
+        syncPlan();
+      }
+    };
+
+    const onStorage = (event) => {
+      if (event.key === storageKey || event.key === CART_GENERATE_REQUEST_KEY) {
+        syncPlan();
+      }
+
+      if (event.key === CART_GENERATE_REQUEST_KEY && event.newValue) {
+        localStorage.removeItem(CART_GENERATE_REQUEST_KEY);
+        void generateCartRef.current?.();
+      }
+    };
+
+    const onShoppingCartUpdated = (event) => {
+      const payloadAccountId = event?.detail?.accountId;
+      if (payloadAccountId && payloadAccountId !== accountId) {
+        return;
+      }
+
+      const snapshot = event?.detail?.shoppingCart;
+      const applied = applyCartSnapshotToState(snapshot, {
+        setLists,
+        setComparison,
+        setOptimizedTotal,
+        setCartSource,
+        setLastGeneratedSignature,
+        setActiveListId,
+      });
+
+      if (applied) {
+        setGenerationStatus('Carrinho otimizado atualizado pelo NutriBot.');
+      }
+    };
+
+    syncPlan();
+    window.addEventListener('nutribot:weekly-plan-updated', onPlanUpdated);
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('nutribot:shopping-cart-updated', onShoppingCartUpdated);
+
+    if (localStorage.getItem(CART_GENERATE_REQUEST_KEY)) {
+      localStorage.removeItem(CART_GENERATE_REQUEST_KEY);
+      void generateCartRef.current?.();
+    }
+
+    return () => {
+      window.removeEventListener('nutribot:weekly-plan-updated', onPlanUpdated);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('nutribot:shopping-cart-updated', onShoppingCartUpdated);
+    };
+  }, [accountId]);
+
+  useEffect(() => {
+    if (cartSource !== 'meal-plan') {
+      return;
+    }
+
+    const currentSignature = planSignature(weeklyPlan);
+    if (!currentSignature || currentSignature === lastGeneratedSignature) {
+      return;
+    }
+
+    void generateCartFromMealPlan();
+  }, [cartSource, generateCartFromMealPlan, lastGeneratedSignature, weeklyPlan]);
+
+
+
+  useEffect(() => {
+    if (cartSource !== 'meal-plan' || !Object.keys(lists).length) {
+      return;
+    }
+
+    const persistTimeout = setTimeout(() => {
+      void savePersistedShoppingCart(
+        buildCartSnapshot({
+          lists,
+          activeListId,
+          comparison,
+          optimizedTotal,
+          cartSource,
+          lastGeneratedSignature,
+        }),
+      );
+    }, 350);
+
+    return () => {
+      clearTimeout(persistTimeout);
+    };
+  }, [
+    lists,
+    activeListId,
+    comparison,
+    optimizedTotal,
+    cartSource,
+    lastGeneratedSignature,
+  ]);
+
+  const activeList = activeListId ? lists[activeListId] : null;
+  const activeItems = activeList?.items || EMPTY_ITEMS;
 
   const updateItem = (itemId, updater) => {
-    setLists((previous) => ({
-      ...previous,
-      [activeListId]: {
-        ...previous[activeListId],
-        items: previous[activeListId].items.map((item) => (item.id === itemId ? updater(item) : item)),
-      },
-    }));
+    if (!activeListId) {
+      return;
+    }
+
+    setLists((previous) => {
+      const currentList = previous[activeListId];
+      if (!currentList) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [activeListId]: {
+          ...currentList,
+          items: currentList.items.map((item) => (item.id === itemId ? updater(item) : item)),
+        },
+      };
+    });
   };
 
   const removeItem = (itemId) => {
-    setLists((previous) => ({
-      ...previous,
-      [activeListId]: {
-        ...previous[activeListId],
-        items: previous[activeListId].items.filter((item) => item.id !== itemId),
-      },
-    }));
+    if (!activeListId) {
+      return;
+    }
+
+    setLists((previous) => {
+      const currentList = previous[activeListId];
+      if (!currentList) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [activeListId]: {
+          ...currentList,
+          items: currentList.items.filter((item) => item.id !== itemId),
+        },
+      };
+    });
   };
 
-  const addSuggestedItem = (suggestion) => {
-    setLists((previous) => ({
-      ...previous,
-      [activeListId]: {
-        ...previous[activeListId],
-        items: [
-          ...previous[activeListId].items,
-          {
-            id: `${activeListId}-${Date.now()}`,
-            name: suggestion.name,
-            unitInfo: suggestion.unitInfo,
-            unitPrice: suggestion.unitPrice,
-            discount: 0,
-            quantity: 1,
-            checked: false,
-          },
-        ],
-      },
-    }));
+  const addItemToActiveList = (item) => {
+    if (!item || !activeListId) {
+      return;
+    }
+
+    setLists((previous) => {
+      const currentList = previous[activeListId];
+      if (!currentList) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [activeListId]: {
+          ...currentList,
+          items: [
+            ...currentList.items,
+            {
+              ...item,
+              id: `${activeListId}-${Date.now()}`,
+              quantity: 1,
+              checked: false,
+            },
+          ],
+        },
+      };
+    });
+  };
+
+  const searchCheapestIngredient = async (event) => {
+    event.preventDefault();
+    const cleanedQuery = String(ingredientQuery || '').trim();
+    setCheapestResult(null);
+    setIngredientMatches(EMPTY_ITEMS);
+    setQueryError('');
+
+    if (!cleanedQuery) {
+      setQueryError('Escreve um ingrediente para pesquisar.');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const [cheapestResponse, matches] = await Promise.all([
+        getCheapestIngredientPrice(cleanedQuery),
+        listIngredientPrices(cleanedQuery),
+      ]);
+      setCheapestResult(normalizeCheapestResult(cheapestResponse));
+      setIngredientMatches(Array.isArray(matches) ? matches.slice(0, 6) : EMPTY_ITEMS);
+    } catch (error) {
+      setQueryError(error.message || 'Não foi possível pesquisar o ingrediente.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const importReportPayload = async (event) => {
+    event.preventDefault();
+    const cleanedPayload = String(importPayload || '').trim();
+    setImportStatus('');
+
+    if (!cleanedPayload) {
+      setImportStatus('Cola aqui o JSON do report antes de importar.');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const response = await importPriceReport(cleanedPayload);
+      await loadPrices();
+      const imported = Number(response?.importedEntries || 0);
+      const deduped = Number(response?.dedupedEntries || 0);
+      setImportStatus(`Importação concluída: ${imported} gravados (${deduped} deduplicados).`);
+      setImportPayload('');
+    } catch (error) {
+      setImportStatus(error.message || 'Falha ao importar report.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const summary = useMemo(() => {
     const subtotal = activeItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
-    const savings = activeItems.reduce((total, item) => total + item.discount * item.quantity, 0);
     const checkedItems = activeItems.filter((item) => item.checked).length;
     const totalUnits = activeItems.reduce((total, item) => total + item.quantity, 0);
-    return { subtotal, savings, checkedItems, totalUnits };
-  }, [activeItems]);
+    const currency = activeItems[0]?.currency || 'EUR';
+
+    const bestScenarioTotal = optimizedTotal > 0 ? optimizedTotal : subtotal;
+    const saving = Math.max(0, subtotal - bestScenarioTotal);
+
+    return {
+      subtotal,
+      checkedItems,
+      totalUnits,
+      currency,
+      saving,
+    };
+  }, [activeItems, optimizedTotal]);
+
+  const marketEntries = Object.entries(lists);
+  const hasData = marketEntries.length > 0;
+
+  const bestComparison = comparison.length ? comparison[0] : null;
 
   return (
     <Layout>
-      <div className="shopping-page">
-        <PageHeader
-          className="shopping-header"
-          title="Lista de Compras"
-          subtitle="Organiza por loja, ajusta quantidades e acompanha o total em tempo real."
-          tag={(
-            <div className="shopping-header-tag">
-              <ShoppingCart size={16} />
-              Lista do dia
-            </div>
-          )}
-        />
+      <div className="page">
+        <div className="container-xl">
+          <div className="shopping-page">
+            <PageHeader
+              className="shopping-header page-header d-print-none"
+              title="Lista de Compras"
+              subtitle="Gera automaticamente o carrinho com base no teu plano e compara preços por supermercado."
+              tag={(
+                <div className="shopping-header-tag badge bg-primary-lt text-primary">
+                  <ShoppingCart size={16} />
+                  Preços atuais
+                </div>
+              )}
+            />
 
-        <div className="shopping-grid">
-          <section className="shopping-lists-panel">
+            <div className="shopping-grid">
+              <section className="shopping-lists-panel card">
             <h2>Listas por supermercado</h2>
 
-            <div className="shopping-list-switchers">
-              {Object.entries(lists).map(([key, list]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`shopping-list-pill ${key === activeListId ? 'is-active' : ''}`}
-                  onClick={() => setActiveListId(key)}
-                >
-                  <Store size={14} />
-                  <span>{list.name}</span>
-                  <strong>{list.items.length}</strong>
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="suggestion-chip shopping-generate-btn btn btn-primary"
+              onClick={() => void generateCartFromMealPlan()}
+              disabled={isGeneratingCart}
+            >
+              {isGeneratingCart ? 'A gerar carrinho...' : 'Gerar carrinho'}
+            </button>
+            {generationStatus ? <p className="shopping-feedback">{generationStatus}</p> : null}
 
-            <div className="shopping-suggestions">
-              <h3>Adicionar rápido</h3>
-              <div className="shopping-suggestion-items">
-                {SUGGESTED_ITEMS.map((item) => (
+            {isLoading ? (
+              <p className="shopping-feedback">A carregar preços...</p>
+            ) : loadError ? (
+              <p className="shopping-feedback shopping-feedback-error">{loadError}</p>
+            ) : !hasData ? (
+              <p className="shopping-feedback">
+                Não existem preços importados. Corre o scraper e faz import para o backend.
+              </p>
+            ) : (
+              <div className="shopping-list-switchers">
+                {marketEntries.map(([key, list]) => (
                   <button
-                    key={item.name}
+                    key={key}
                     type="button"
-                    className="suggestion-chip"
-                    onClick={() => addSuggestedItem(item)}
+                    className={`shopping-list-pill ${key === activeListId ? 'is-active' : ''}`}
+                    onClick={() => setActiveListId(key)}
                   >
-                    + {item.name}
+                    <Store size={14} />
+                    <span>{list.name}</span>
+                    <strong>{list.items.length}</strong>
                   </button>
                 ))}
               </div>
-            </div>
-          </section>
+            )}
 
-          <section className="shopping-cart-panel">
+            {comparison.length ? (
+              <div className="shopping-comparison">
+                <h3>Diferença de preços</h3>
+                {comparison.map((entry) => (
+                  <div key={entry.marketKey} className="shopping-comparison-row">
+                    <div>
+                      <strong>{entry.supermarket}</strong>
+                      {Number.isFinite(Number(entry.healthScore)) ? (
+                        <small>Saúde: {Number(entry.healthScore).toFixed(1)} • Score: {Number(entry.marketScore || 0).toFixed(2)}</small>
+                      ) : null}
+                      {entry.missingCount > 0 ? (
+                        <small>
+                          {entry.coveredCount}/{entry.totalIngredients} ingredientes com preço
+                        </small>
+                      ) : null}
+                      {Number(entry.budgetPenalty || 0) > 0 ? (
+                        <small>Penalização orçamento: {Number(entry.budgetPenalty).toFixed(2)}</small>
+                      ) : null}
+                    </div>
+                    <div className="shopping-comparison-prices">
+                      <span>{formatCurrency(entry.total)}</span>
+                      <small>
+                        {entry.marketKey === bestComparison?.marketKey
+                          ? 'Melhor equilíbrio'
+                          : `+${formatCurrency(Math.max(0, entry.total - (bestComparison?.total || 0)))}`}
+                      </small>
+                    </div>
+                  </div>
+                ))}
+                <p className="shopping-feedback shopping-optimized-note">
+                  Melhor cenário combinando supermercados: {formatCurrency(optimizedTotal)}.
+                </p>
+              </div>
+            ) : null}
+
+            <div className="shopping-suggestions">
+              <h3>Buscar ingrediente mais barato</h3>
+              <form className="shopping-search-form" onSubmit={searchCheapestIngredient}>
+                <input
+                  type="text"
+                  placeholder="Ex: ovos, azeite, massa"
+                  value={ingredientQuery}
+                  onChange={(event) => setIngredientQuery(event.target.value)}
+                />
+                <button type="submit" className="suggestion-chip" disabled={isSearching}>
+                  {isSearching ? 'A pesquisar...' : 'Pesquisar'}
+                </button>
+              </form>
+
+              {queryError ? <p className="shopping-feedback shopping-feedback-error">{queryError}</p> : null}
+
+              {cheapestResult ? (
+                <article className="shopping-cheapest-card">
+                  <h4>{cheapestResult.name}</h4>
+                  <p>{cheapestResult.supermarket}</p>
+                  <strong>{formatCurrency(cheapestResult.unitPrice, cheapestResult.currency)}</strong>
+                  <div className="shopping-cheapest-actions">
+                    <button
+                      type="button"
+                      className="suggestion-chip"
+                      onClick={() => addItemToActiveList(cheapestResult)}
+                      disabled={!activeListId}
+                    >
+                      + Adicionar à lista
+                    </button>
+                    {cheapestResult.productUrl ? (
+                      <a href={cheapestResult.productUrl} target="_blank" rel="noreferrer">
+                        Ver produto
+                      </a>
+                    ) : null}
+                  </div>
+
+                  {ingredientMatches.length ? (
+                    <div className="shopping-cheapest-matches">
+                      {ingredientMatches.map((match) => (
+                        <span key={`${match.supermarket}-${match.productName}-${match.price}`}>
+                          {match.supermarket}: {formatCurrency(match.price, match.currency)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ) : null}
+            </div>
+
+            <div className="shopping-import-panel">
+              <h3>Importar report.json</h3>
+              <form className="shopping-import-form" onSubmit={importReportPayload}>
+                <textarea
+                  value={importPayload}
+                  onChange={(event) => setImportPayload(event.target.value)}
+                  placeholder="Cola aqui o JSON do report do scraper..."
+                />
+                <button type="submit" className="suggestion-chip" disabled={isImporting}>
+                  {isImporting ? 'A importar...' : 'Importar para backend'}
+                </button>
+              </form>
+              {importStatus ? <p className="shopping-feedback">{importStatus}</p> : null}
+            </div>
+              </section>
+
+              <section className="shopping-cart-panel card">
             <header className="shopping-cart-header">
-              <h2>O meu carrinho ({activeItems.length})</h2>
+              <h2>
+                {activeList?.name ? `Carrinho - ${activeList.name}` : 'Carrinho'} ({activeItems.length})
+              </h2>
               <p>
                 {summary.checkedItems} / {activeItems.length} itens concluídos
               </p>
             </header>
 
             <div className="shopping-items">
+              {!activeList && !isLoading ? (
+                <p className="shopping-feedback">Seleciona um supermercado para ver os produtos.</p>
+              ) : null}
+
               {activeItems.map((item) => (
-                <article key={item.id} className={`shopping-item ${getCardAccent(activeListId)}`}>
+                <article key={item.id} className={`shopping-item ${activeList.accentClass}`}>
                   <div className="shopping-item-image" aria-hidden="true">
-                    <img src={itemImageFor(item.name)} alt={item.name} loading="lazy" />
+                    <img src={itemImageFor(item)} alt={item.name} loading="lazy" />
                   </div>
 
                   <div className="shopping-item-content">
@@ -224,10 +1104,25 @@ export default function Shopping() {
                       <div>
                         <h3>{item.name}</h3>
                         <p>{activeList.name}</p>
-                        <small>{item.unitInfo}</small>
+                        <small>{item.ingredientName}</small>
+                        {item.productUrl ? (
+                          <a
+                            className="shopping-item-link"
+                            href={item.productUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Ver produto
+                          </a>
+                        ) : null}
                       </div>
 
-                      <button type="button" className="trash-btn" onClick={() => removeItem(item.id)} aria-label="Remover item">
+                      <button
+                        type="button"
+                        className="trash-btn"
+                        onClick={() => removeItem(item.id)}
+                        aria-label="Remover item"
+                      >
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -260,7 +1155,9 @@ export default function Shopping() {
                         <span>{item.checked ? 'Concluído' : 'Marcar'}</span>
                       </button>
 
-                      <strong className="line-total">{formatCurrency(item.unitPrice * item.quantity)}</strong>
+                      <strong className="line-total">
+                        {formatCurrency(item.unitPrice * item.quantity, item.currency)}
+                      </strong>
                     </div>
                   </div>
                 </article>
@@ -269,22 +1166,22 @@ export default function Shopping() {
 
             <footer className="shopping-summary">
               <div className="summary-row">
-                <span>Poupança</span>
-                <strong className="saving">{formatCurrency(summary.savings)}</strong>
+                <span>Poupança face ao melhor cenário otimizado</span>
+                <strong className="saving">{formatCurrency(summary.saving, summary.currency)}</strong>
               </div>
               <div className="summary-row">
                 <span>Subtotal ({summary.totalUnits} un)</span>
-                <strong>{formatCurrency(summary.subtotal)}</strong>
+                <strong>{formatCurrency(summary.subtotal, summary.currency)}</strong>
               </div>
 
-              <button type="button" className="checkout-btn">
+              <button type="button" className="checkout-btn btn btn-success" disabled={!activeItems.length}>
                 Avançar para checkout
               </button>
-              <p className="checkout-note">
-                Algumas promoções podem ser aplicadas apenas no checkout final.
-              </p>
+              <p className="checkout-note">Esta lista usa os últimos preços importados em `/api/prices`.</p>
             </footer>
-          </section>
+              </section>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

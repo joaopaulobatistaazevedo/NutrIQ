@@ -42,3 +42,5 @@ build/
 *.db-wal
 *.db-shm
 database/
+!database/
+!database/meal_planner.db

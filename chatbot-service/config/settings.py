@@ -10,13 +10,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 class Settings(BaseSettings):
     openai_api_key: str = Field(
+        default="",
         validation_alias=AliasChoices("OPENAI_API_KEY", "GROQ_API_KEY")
     )
-    model_name: str = "gpt-4o-mini"
-    max_tokens: int = 600
-    temperature: float = 0.7
+    model_name: str = "gpt-4o"
+    max_tokens: int = 900
+    temperature: float = 0.4
     allowed_origins: str = "*"
-    backend_api_url: str = "http://localhost:7070"
+    backend_api_url: str = "http://localhost:7071"
+    java_service_url: str = Field(
+        default="http://localhost:7071",
+        validation_alias=AliasChoices("JAVA_SERVICE_URL", "BACKEND_API_URL"),
+    )
     backend_timeout_seconds: float = 6.0
 
     model_config = SettingsConfigDict(

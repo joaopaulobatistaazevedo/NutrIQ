@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon, Pencil } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
 import Layout from '../components/Layout';
-import PageHeader from '../components/PageHeader';
-import { PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
+import { fetchActiveMealPlan } from '../services/mealPlanService';
+import { CART_GENERATE_REQUEST_KEY, PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
+import { resolveAccountId, scopedKey } from '../utils/accountScope';
 import '../styles/meal-plan.css';
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
@@ -42,6 +44,7 @@ function getMonthCells(anchorDate) {
   return cells;
 }
 
+
 function capitalize(value) {
   if (!value) return value;
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -58,51 +61,14 @@ function parseStorage(key, fallback) {
   }
 }
 
-function resolveAccountId(profile) {
-  const username = String(profile?.username || '').trim().toLowerCase();
-  if (!username) {
-    return 'anonymous';
-  }
-  return username.replace(/\s+/g, '_');
-}
-
-function scopedKey(base, accountId) {
-  return `${base}:${accountId}`;
-}
-
 function slotMeta(slot) {
   if (slot === 'Pequeno-almoço') {
-    return { icon: Sunrise, time: '08:00' };
+    return { icon: Sunrise, time: '08:00', kcal: 380 };
   }
   if (slot === 'Almoço') {
-    return { icon: Sun, time: '13:00' };
+    return { icon: Sun, time: '13:00', kcal: 620 };
   }
-  return { icon: Moon, time: '20:00' };
-}
-
-function getMealsByDate(date) {
-  const breakfast = [
-    'Overnight oats com banana e sementes',
-    'Iogurte grego com granola e frutos vermelhos',
-    'Pão integral com ovo mexido e queijo fresco',
-  ];
-  const lunch = [
-    'Frango grelhado com arroz integral e legumes',
-    'Bowl de quinoa com salmão e espinafres',
-    'Massa integral com atum, tomate e rúcula',
-  ];
-  const dinner = [
-    'Sopa de legumes e omelete de claras',
-    'Pescada no forno com batata-doce',
-    'Salada morna de grão com legumes assados',
-  ];
-
-  const idx = date.getDate();
-  return [
-    { slot: 'Pequeno-almoço', icon: Sunrise, time: '08:00', dish: breakfast[idx % breakfast.length], source: null },
-    { slot: 'Almoço', icon: Sun, time: '13:00', dish: lunch[(idx + 1) % lunch.length], source: null },
-    { slot: 'Jantar', icon: Moon, time: '20:00', dish: dinner[(idx + 2) % dinner.length], source: null },
-  ];
+  return { icon: Moon, time: '20:00', kcal: 540 };
 }
 
 export default function MealPlan() {
@@ -111,14 +77,14 @@ export default function MealPlan() {
     return resolveAccountId(profile);
   }, []);
 
+  const navigate = useNavigate();
+
   const today = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
 
-  const [weeklyPlan, setWeeklyPlan] = useState(() =>
-    parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null)
-  );
+  const [weeklyPlan, setWeeklyPlan] = useState(() => parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
   const [monthCursor, setMonthCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
 
@@ -133,13 +99,13 @@ export default function MealPlan() {
   }, [selectedDate]);
 
   const selectedIso = useMemo(() => selectedDate.toISOString().slice(0, 10), [selectedDate]);
-
   const monthCells = useMemo(() => getMonthCells(monthCursor), [monthCursor]);
+
   const meals = useMemo(() => {
     const planDay = weeklyPlan?.days?.find((day) => day?.date === selectedIso);
 
     if (!planDay?.meals?.length) {
-      return getMealsByDate(selectedDate);
+      return [];
     }
 
     return planDay.meals.map((meal) => {
@@ -149,37 +115,61 @@ export default function MealPlan() {
         icon: meta.icon,
         time: meta.time,
         dish: meal.title,
-        source: meal.source,
+        kcal: Number.isFinite(Number(meal.kcal)) ? Number(meal.kcal) : meta.kcal,
       };
     });
-  }, [selectedDate, selectedIso, weeklyPlan]);
-
+  }, [selectedIso, weeklyPlan]);
   useEffect(() => {
-    const refreshPlan = () => {
-      setWeeklyPlan(parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
+    let cancelled = false;
+
+    const storageKey = scopedKey(WEEKLY_PLAN_KEY, accountId);
+
+    const syncPlan = async () => {
+      const localPlan = parseStorage(storageKey, null);
+      if (!cancelled) {
+        setWeeklyPlan(localPlan);
+      }
+
+      try {
+        const backendPlan = await fetchActiveMealPlan();
+        if (!cancelled && backendPlan) {
+          localStorage.setItem(storageKey, JSON.stringify(backendPlan));
+          setWeeklyPlan(backendPlan);
+        }
+      } catch {
+      }
     };
 
     const onPlanUpdate = (event) => {
       const payloadAccountId = event?.detail?.accountId;
       if (!payloadAccountId || payloadAccountId === accountId) {
-        refreshPlan();
+        void syncPlan();
       }
     };
 
     const onStorageChange = (event) => {
-      if (event.key === scopedKey(WEEKLY_PLAN_KEY, accountId)) {
-        refreshPlan();
+      if (event.key === storageKey) {
+        void syncPlan();
       }
     };
 
+    void syncPlan();
     window.addEventListener('nutribot:weekly-plan-updated', onPlanUpdate);
     window.addEventListener('storage', onStorageChange);
 
     return () => {
+      cancelled = true;
       window.removeEventListener('nutribot:weekly-plan-updated', onPlanUpdate);
       window.removeEventListener('storage', onStorageChange);
     };
   }, [accountId]);
+
+
+  const handleGenerateCart = () => {
+    localStorage.setItem(CART_GENERATE_REQUEST_KEY, String(Date.now()));
+    window.dispatchEvent(new CustomEvent('nutribot:generate-cart-request', { detail: { accountId } }));
+    navigate('/shopping');
+  };
 
   const goToPreviousMonth = () => {
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -189,119 +179,103 @@ export default function MealPlan() {
     setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  const handleEditMeal = (meal) => {
-    window.dispatchEvent(
-      new CustomEvent('nutribot:meal-edit-request', {
-        detail: {
-          accountId,
-          date: selectedIso,
-          day_label: selectedLabel,
-          slot: meal.slot,
-          current_dish: meal.dish,
-        },
-      })
-    );
-  };
-
   return (
     <Layout>
-      <div className="meal-plan">
-        <PageHeader
-          className="meal-plan-header"
-          title="Plano Alimentar"
-          subtitle="Organiza, ajusta e acompanha o teu plano de refeições dia a dia"
-          titleClassName="meal-plan-title"
-          subtitleClassName="meal-plan-subtitle"
-          actions={(
-            <button className="btn-primary">
-              <CalendarDays size={16} />
-              <span>Gerar Plano</span>
-            </button>
-          )}
-        />
-
-        <section className="meal-plan-grid">
-          <article className="calendar-card">
-            <div className="calendar-toolbar">
-              <button type="button" className="calendar-nav-btn" onClick={goToPreviousMonth} aria-label="Mês anterior">
-                <ChevronLeft size={16} />
+      <div className="page">
+        <div className="container-xl">
+          <div className="meal-plan">
+            <header className="meal-plan-header page-header d-print-none">
+              <div>
+                <h1 className="meal-plan-title page-title">Calendário de Refeições</h1>
+                <p className="meal-plan-subtitle text-secondary mb-0">Organiza e acompanha o plano nutricional dia a dia</p>
+              </div>
+              <button className="btn btn-primary d-inline-flex align-items-center gap-2" type="button" onClick={handleGenerateCart}>
+                <CalendarDays size={16} />
+                <span>Gerar carrinho</span>
               </button>
+            </header>
 
-              <h2>{monthLabel}</h2>
-
-              <button type="button" className="calendar-nav-btn" onClick={goToNextMonth} aria-label="Mês seguinte">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            <div className="calendar-week-row" role="presentation">
-              {WEEK_DAYS.map((day) => (
-                <span key={day} className="calendar-week-day">
-                  {day}
-                </span>
-              ))}
-            </div>
-
-            <div className="calendar-days-grid" role="grid" aria-label={`Dias de ${monthLabel}`}>
-              {monthCells.map((date, index) => {
-                if (!date) {
-                  return <span key={`empty-${index}`} className="calendar-empty-cell" aria-hidden="true" />;
-                }
-
-                const isToday = isSameDate(date, today);
-                const isSelected = isSameDate(date, selectedDate);
-
-                return (
-                  <button
-                    key={date.toISOString()}
-                    type="button"
-                    className={`calendar-day-btn ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
-                    onClick={() => setSelectedDate(date)}
-                  >
-                    {date.getDate()}
+            <section className="meal-plan-grid">
+              <article className="calendar-card card">
+                <div className="calendar-toolbar">
+                  <button type="button" className="calendar-nav-btn" onClick={goToPreviousMonth} aria-label="Mês anterior">
+                    <ChevronLeft size={16} />
                   </button>
-                );
-              })}
-            </div>
-          </article>
 
-          <article className="daily-plan-card">
-            <h2 className="daily-plan-title">{selectedLabel}</h2>
-            <p className="daily-plan-subtitle">Plano alimentar do dia</p>
+                  <h2>{monthLabel}</h2>
 
-            <div className="daily-meals">
-              {meals.map((meal) => {
-                const Icon = meal.icon;
-                return (
-                  <article key={meal.slot} className="daily-meal-item">
-                    <div className="daily-meal-head">
-                      <span className="daily-meal-slot">
-                        <Icon size={16} />
-                        {meal.slot}
-                      </span>
-                      <span className="daily-meal-time">
-                        <Clock3 size={14} />
-                        {meal.time}
-                      </span>
-                    </div>
+                  <button type="button" className="calendar-nav-btn" onClick={goToNextMonth} aria-label="Mês seguinte">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
 
-                    <h3>{meal.dish}</h3>
-                    <p>{meal.source ? `Fonte: ${meal.source}` : 'Plano diário recomendado'}</p>
+                <div className="calendar-week-row" role="presentation">
+                  {WEEK_DAYS.map((day) => (
+                    <span key={day} className="calendar-week-day">
+                      {day}
+                    </span>
+                  ))}
+                </div>
 
-                    <button
-                      type="button"
-                      className="daily-meal-edit"
-                      onClick={() => handleEditMeal(meal)}
-                    >
-                      <Pencil size={14} />
-                      <span>Editar</span>
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          </article>
-        </section>
+                <div className="calendar-days-grid" role="grid" aria-label={`Dias de ${monthLabel}`}>
+                  {monthCells.map((date, index) => {
+                    if (!date) {
+                      return <span key={`empty-${index}`} className="calendar-empty-cell" aria-hidden="true" />;
+                    }
+
+                    const isToday = isSameDate(date, today);
+                    const isSelected = isSameDate(date, selectedDate);
+
+                    return (
+                      <button
+                        key={date.toISOString()}
+                        type="button"
+                        className={`calendar-day-btn ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedDate(date)}
+                      >
+                        {date.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="daily-plan-card card">
+                <h2 className="daily-plan-title">{selectedLabel}</h2>
+                <p className="daily-plan-subtitle">Plano diário recomendado</p>
+
+                <div className="daily-meals">
+                  {!meals.length ? (
+                    <p className="daily-meals-empty">
+                      Ainda não tens refeições planeadas. Fala com o chatbot para criares o teu plano!
+                    </p>
+                  ) : null}
+
+                  {meals.map((meal) => {
+                    const Icon = meal.icon;
+                    return (
+                      <article key={`${selectedIso}-${meal.slot}-${meal.dish}`} className="daily-meal-item">
+                        <div className="daily-meal-head">
+                          <span className="daily-meal-slot">
+                            <Icon size={16} />
+                            {meal.slot}
+                          </span>
+                          <span className="daily-meal-time">
+                            <Clock3 size={14} />
+                            {meal.time}
+                          </span>
+                        </div>
+
+                        <h3>{meal.dish}</h3>
+                        <p>{meal.kcal} kcal</p>
+                      </article>
+                    );
+                  })}
+                </div>
+              </article>
+            </section>
+          </div>
+        </div>
       </div>
     </Layout>
   );

@@ -293,6 +293,11 @@ def _extract_recipe_from_json_ld(
             cook = _parse_duration(node.get("cookTime"))
             total = _parse_duration(node.get("totalTime"))
             servings = _safe_text(node.get("recipeYield"))
+            image_url = _extract_image_url_from_ld(node)
+            if image_url:
+                image_url = urljoin(url, image_url)
+            if not image_url:
+                image_url = _extract_image_url_from_page(soup, url)
             tags = _extract_tags_from_ld(node, source.default_tags)
 
             if not title or not ingredients:
@@ -309,6 +314,7 @@ def _extract_recipe_from_json_ld(
                 cook_time_minutes=cook,
                 total_time_minutes=total,
                 servings=servings,
+                image_url=image_url,
                 tags=tags,
             )
 
@@ -362,6 +368,7 @@ def _extract_recipe_from_selectors(
     cook_text = _extract_text_by_selectors(soup, [".cook-time", ".tempo-cozedura", "[itemprop='cookTime']"])
     total_text = _extract_text_by_selectors(soup, [".total-time", ".tempo-total", "[itemprop='totalTime']"])
     servings = _extract_text_by_selectors(soup, [".servings", ".doses", "[itemprop='recipeYield']"])
+    image_url = _extract_image_url_from_page(soup, url)
 
     if not title or not ingredients:
         return None
@@ -380,6 +387,7 @@ def _extract_recipe_from_selectors(
         cook_time_minutes=_parse_duration(cook_text),
         total_time_minutes=_parse_duration(total_text),
         servings=servings,
+        image_url=image_url,
         tags=_dedupe(tags),
     )
 
@@ -421,6 +429,7 @@ def load_recipes_from_json(path: str) -> list[RecipeRecord]:
                 cook_time_minutes=_to_int_or_none(row.get("cook_time_minutes")),
                 total_time_minutes=_to_int_or_none(row.get("total_time_minutes")),
                 servings=_safe_text(row.get("servings")),
+                image_url=_safe_text(row.get("image_url")),
                 tags=[str(item) for item in (row.get("tags") or [])],
             )
         )
@@ -485,6 +494,29 @@ def _extract_tags_from_ld(node: dict[str, Any], base_tags: list[str]) -> list[st
     return _dedupe(tags)
 
 
+def _extract_image_url_from_ld(node: dict[str, Any]) -> str | None:
+    return _coerce_image_url(node.get("image"))
+
+
+def _coerce_image_url(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return _safe_text(raw)
+    if isinstance(raw, list):
+        for item in raw:
+            candidate = _coerce_image_url(item)
+            if candidate:
+                return candidate
+        return None
+    if isinstance(raw, dict):
+        for key in ("url", "contentUrl", "thumbnailUrl"):
+            candidate = _safe_text(raw.get(key))
+            if candidate:
+                return candidate
+    return None
+
+
 def _extract_text_by_selectors(soup: BeautifulSoup, selectors: list[str]) -> str | None:
     for selector in selectors:
         node = soup.select_one(selector)
@@ -521,6 +553,38 @@ def _extract_meta_keywords(soup: BeautifulSoup) -> list[str]:
     if not raw:
         return []
     return _dedupe([item.strip() for item in raw.split(",") if item.strip()])
+
+
+def _extract_image_url_from_page(soup: BeautifulSoup, page_url: str) -> str | None:
+    for selector in (
+        "meta[property='og:image']",
+        "meta[name='og:image']",
+        "meta[name='twitter:image']",
+        "meta[property='twitter:image']",
+    ):
+        node = soup.select_one(selector)
+        if isinstance(node, Tag):
+            content = _safe_text(node.attrs.get("content"))
+            if content:
+                return urljoin(page_url, content)
+
+    for selector in (
+        ".wprm-recipe-image img",
+        ".recipe-image img",
+        ".entry-content img",
+        "article img",
+        "img",
+    ):
+        node = soup.select_one(selector)
+        if not isinstance(node, Tag):
+            continue
+        for attr in ("src", "data-src", "data-lazy-src"):
+            raw_url = _safe_text(node.attrs.get(attr))
+            if raw_url and not raw_url.startswith("data:"):
+                return urljoin(page_url, raw_url)
+
+    return None
+
 
 
 def _parse_duration(value: Any) -> int | None:

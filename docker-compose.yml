@@ -1,0 +1,170 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DB:-bugsbyte}
+      MYSQL_USER: ${MYSQL_USER:-bugsbyte}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-uma_password_forte}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+    ports:
+      - "${MYSQL_HOST_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 7071
+      UPLOADS_DIR: /app/uploads
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: ${MYSQL_DB:-bugsbyte}
+      MYSQL_USER: ${MYSQL_USER:-bugsbyte}
+      MYSQL_PASS: ${MYSQL_PASSWORD:-uma_password_forte}
+      MYSQL_PARAMS: useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_HOST_PORT:-7071}:7071"
+    volumes:
+      - backend_sqlite_data:/app/database
+      - backend_uploads_data:/app/uploads
+
+  chatbot:
+    build:
+      context: .
+      dockerfile: chatbot-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MODEL_NAME: ${MODEL_NAME:-gpt-4o-mini}
+      BACKEND_API_URL: http://backend:7071
+      JAVA_SERVICE_URL: http://backend:7071
+      ALLOWED_ORIGINS: "*"
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${CHATBOT_HOST_PORT:-8000}:8000"
+    volumes:
+      - ./.run-batista/logs:/logs
+      - chatbot_data:/app/data
+    command:
+      [
+        "sh",
+        "-lc",
+        "mkdir -p /logs && python -m uvicorn main:app --host 0.0.0.0 --port 8000 2>&1 | tee -a /logs/chatbot.log",
+      ]
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    restart: unless-stopped
+    environment:
+      VITE_BACKEND_API_URL: ${VITE_BACKEND_API_URL:-http://localhost:7071}
+      VITE_CHATBOT_API_URL: ${VITE_CHATBOT_API_URL:-http://localhost:8000}
+      CHOKIDAR_USEPOLLING: "true"
+    command:
+      [
+        "sh",
+        "-lc",
+        "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm ci; fi && npm run dev -- --host 0.0.0.0 --port 5173"
+      ]
+    depends_on:
+      backend:
+        condition: service_started
+      chatbot:
+        condition: service_started
+    ports:
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+  supermarket-scraper:
+    build:
+      context: .
+      dockerfile: docker/supermarket-scraper.Dockerfile
+    restart: "no"
+    volumes:
+      - ./data:/app/data
+      - ./examples:/app/examples:ro
+    command:
+      [
+        "python",
+        "main.py",
+        "--meal-plan",
+        "examples/meal_plan.json",
+        "--markets",
+        "examples/markets.json",
+        "--output",
+        "data/report.json",
+        "--turbo",
+        "--workers-per-ingredient",
+        "1",
+        "--timeout",
+        "6.5",
+        "--connect-timeout",
+        "2.0",
+        "--request-retries",
+        "0",
+      ]
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: docker/orchestrator.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      chatbot:
+        condition: service_started
+      frontend:
+        condition: service_started
+      supermarket-scraper:
+        condition: service_started
+    environment:
+      BACKEND_URL: http://backend:7071
+      CHATBOT_HEALTH_URL: http://chatbot:8000/health
+      FRONTEND_URL: http://frontend:5173
+      RECIPE_SEED_JSON: /app/data/recipes_scraped.json
+      RECIPES_DB_PATH: /app/data/recipes.db
+      PRICE_REPORT_JSON: /app/data/report.json
+      PRICE_REPORT_WAIT_SECONDS: "150"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: ${MYSQL_DB:-bugsbyte}
+      MYSQL_USER: ${MYSQL_USER:-bugsbyte}
+      MYSQL_PASS: ${MYSQL_PASSWORD:-uma_password_forte}
+      MYSQL_PARAMS: useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_SEED_SQL: /app/data/mysql_seed.sql
+      MYSQL_SEED_MODE: ${MYSQL_SEED_MODE:-if_empty}
+      MYSQL_SEED_FORCE: ${MYSQL_SEED_FORCE:-false}
+      ORCHESTRATOR_KEEP_ALIVE: "true"
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  mysql_data:
+  backend_sqlite_data:
+  backend_uploads_data:
+  frontend_node_modules:
+  chatbot_data:
