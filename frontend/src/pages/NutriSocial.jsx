@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock3, Flame, MessageCircle, Pencil, Send, ThumbsUp, Trash2, UserMinus, UserPlus, Users, X } from 'lucide-react';
+import { Clock3, Flame, MessageCircle, Pencil, Send, ThumbsUp, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
@@ -24,6 +24,21 @@ import { getAuthSession } from '../utils/authSession';
 import '../styles/nutrisocial.css';
 
 const FALLBACK_POST_IMAGE = 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
+const QUICK_EMOJI_COMMENTS = ['🔥', '🤤', '😍', '👏', '💚', '🍽️'];
+const NUTRISOCIAL_COMMUNITIES_STORAGE_KEY = 'nutrisocial.communities.v1';
+
+function emojiToTwemojiUrl(emoji) {
+  const codePoints = Array.from(String(emoji || ''))
+    .map((char) => char.codePointAt(0)?.toString(16))
+    .filter(Boolean)
+    .join('-');
+
+  if (!codePoints) {
+    return '';
+  }
+
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${codePoints}.svg`;
+}
 
 function normalizePostImage(post) {
   const candidates = [
@@ -225,7 +240,10 @@ export default function NutriSocial() {
   const [friendSuggestions, setFriendSuggestions] = useState([]);
   const [selectedFriendId, setSelectedFriendId] = useState('');
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
-  const [activePanel, setActivePanel] = useState('');
+  const [activeTab, setActiveTab] = useState('feed');
+  const [communities, setCommunities] = useState([]);
+  const [communityNameDraft, setCommunityNameDraft] = useState('');
+  const [communityInviteDraftById, setCommunityInviteDraftById] = useState({});
 
   const [feedPosts, setFeedPosts] = useState([]);
   const [friendIds, setFriendIds] = useState([]);
@@ -379,7 +397,7 @@ export default function NutriSocial() {
     let cancelled = false;
     const cleanQuery = String(friendSearchQuery || '').trim();
 
-    if (activePanel !== 'friends' || !token) {
+    if (activeTab !== 'friends' || !token) {
       return () => {
         cancelled = true;
       };
@@ -424,7 +442,47 @@ export default function NutriSocial() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activePanel, friendSearchQuery, token]);
+  }, [activeTab, friendSearchQuery, token]);
+
+  useEffect(() => {
+    try {
+      const savedValue = localStorage.getItem(NUTRISOCIAL_COMMUNITIES_STORAGE_KEY);
+      if (!savedValue) {
+        setCommunities([]);
+        return;
+      }
+
+      const parsed = JSON.parse(savedValue);
+      if (!Array.isArray(parsed)) {
+        setCommunities([]);
+        return;
+      }
+
+      const normalized = parsed
+        .map((community) => ({
+          id: String(community?.id || ''),
+          name: String(community?.name || '').trim(),
+          memberIds: Array.isArray(community?.memberIds)
+            ? community.memberIds
+              .map((memberId) => Number(memberId))
+              .filter((memberId) => Number.isInteger(memberId) && memberId > 0)
+            : [],
+        }))
+        .filter((community) => community.id && community.name);
+
+      setCommunities(normalized);
+    } catch {
+      setCommunities([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NUTRISOCIAL_COMMUNITIES_STORAGE_KEY, JSON.stringify(communities));
+    } catch {
+      // ignore persistence errors
+    }
+  }, [communities]);
 
   const userDirectory = useMemo(() => {
     const map = new Map();
@@ -478,6 +536,11 @@ export default function NutriSocial() {
   const selectedFriendSuggestion = useMemo(
     () => friendSuggestions.find((item) => Number(item?.id) === Number(selectedFriendId)) || null,
     [friendSuggestions, selectedFriendId],
+  );
+
+  const visibleFeedPosts = useMemo(
+    () => feedPosts.filter((post) => friendIds.includes(Number(post?.userId))),
+    [feedPosts, friendIds],
   );
 
   const getPostInteraction = (postId) => {
@@ -605,6 +668,9 @@ export default function NutriSocial() {
     const numericFriendId = Number(friendId);
     if (!Number.isInteger(numericFriendId) || numericFriendId <= 0) return;
 
+    const confirmation = window.confirm('Tem certeza que pretende remover amigo?');
+    if (!confirmation) return;
+
     const candidateFriendshipIds = [
       encodeFriendshipId(currentUserId, numericFriendId),
       encodeFriendshipId(numericFriendId, currentUserId),
@@ -716,8 +782,90 @@ export default function NutriSocial() {
     }
   };
 
-  const togglePanel = (panelName) => {
-    setActivePanel((previous) => (previous === panelName ? '' : panelName));
+  const handleQuickEmojiComment = async (postId, emoji) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const cleanEmoji = String(emoji || '').trim();
+    if (!cleanEmoji) {
+      return;
+    }
+
+    try {
+      const newComment = await addPostComment(token, postId, cleanEmoji);
+      const key = String(postId);
+      setInteractionsByPost((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || { kudosByUser: {} }),
+          comments: [...(previous[key]?.comments || []), newComment].slice(-40),
+        },
+      }));
+    } catch (error) {
+      setFeedError(error?.message || 'Não foi possível comentar com emoji.');
+    }
+  };
+
+  const handleCreateCommunity = (event) => {
+    event.preventDefault();
+    const name = String(communityNameDraft || '').trim();
+
+    if (name.length < 2) {
+      setFriendError('O nome da comunidade deve ter pelo menos 2 caracteres.');
+      return;
+    }
+
+    setCommunities((previous) => [
+      {
+        id: `community-${Date.now()}`,
+        name,
+        memberIds: [],
+      },
+      ...previous,
+    ]);
+    setCommunityNameDraft('');
+    setFriendError('');
+    setFriendStatus('Comunidade criada com sucesso.');
+  };
+
+  const handleRenameCommunity = (communityId, nextName) => {
+    const name = String(nextName || '').trim();
+    if (name.length < 2) {
+      setFriendError('O nome da comunidade deve ter pelo menos 2 caracteres.');
+      return;
+    }
+
+    setCommunities((previous) => previous.map((community) => (
+      community.id === communityId ? { ...community, name } : community
+    )));
+    setFriendError('');
+    setFriendStatus('Nome da comunidade atualizado.');
+  };
+
+  const handleInviteFriendToCommunity = (communityId) => {
+    const selected = Number(communityInviteDraftById[communityId] || 0);
+    if (!Number.isInteger(selected) || selected <= 0) {
+      setFriendError('Seleciona um amigo para convidar.');
+      return;
+    }
+
+    setCommunities((previous) => previous.map((community) => {
+      if (community.id !== communityId) return community;
+      if (community.memberIds.includes(selected)) return community;
+      return {
+        ...community,
+        memberIds: [...community.memberIds, selected],
+      };
+    }));
+
+    setCommunityInviteDraftById((previous) => ({
+      ...previous,
+      [communityId]: '',
+    }));
+    setFriendError('');
+    setFriendStatus('Convite adicionado à comunidade.');
   };
 
   return (
@@ -734,32 +882,64 @@ export default function NutriSocial() {
                 <span className="badge bg-orange-lt text-orange d-inline-flex align-items-center gap-2 py-2 px-3">
                   <Flame size={14} /> Streak {streakCount} dias
                 </span>
-                <Link to="/progress" className="btn btn-primary btn-sm">Registar refeição</Link>
               </div>
             </div>
           </div>
 
-          <div className="card mb-3">
-            <div className="card-body py-3">
-              <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
-                {storyUsers.map((user, index) => (
-                  <button key={`story-${user.id}`} type="button" className="nutri-social-story-item">
-                    <span className="nutri-social-story-avatar">{String(user?.name || '').trim().slice(0, 2).toUpperCase() || String(user.id).slice(-2)}</span>
-                    <span className="nutri-social-story-label">{index === 0 ? 'Tu' : user.name}</span>
-                  </button>
-                ))}
-                {storyUsers.length === 0 ? <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p> : null}
+          <nav className="card mb-3" aria-label="Navegação NutriSocial">
+            <div className="card-body py-2">
+              <div className="nutri-social-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'feed'}
+                  className={`nutri-social-tab ${activeTab === 'feed' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('feed')}
+                >
+                  Feed
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'friends'}
+                  className={`nutri-social-tab ${activeTab === 'friends' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('friends')}
+                >
+                  Amigos
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'meal'}
+                  className={`nutri-social-tab ${activeTab === 'meal' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('meal')}
+                >
+                  Registar Refeição
+                </button>
               </div>
             </div>
-          </div>
+          </nav>
 
-          {activePanel === 'friends' ? (
+          {activeTab === 'feed' ? (
+            <div className="card mb-3">
+              <div className="card-body py-3">
+                <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
+                  {storyUsers.map((user, index) => (
+                    <button key={`story-${user.id}`} type="button" className="nutri-social-story-item">
+                      <span className="nutri-social-story-avatar">{String(user?.name || '').trim().slice(0, 2).toUpperCase() || String(user.id).slice(-2)}</span>
+                      <span className="nutri-social-story-label">{index === 0 ? 'Tu' : user.name}</span>
+                    </button>
+                  ))}
+                  {storyUsers.length === 0 ? <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p> : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'friends' ? (
             <section className="card mb-3">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <h3 className="card-title m-0">Rede de amigos</h3>
-                <button type="button" className="btn btn-icon" onClick={() => setActivePanel('')}>
-                  <X size={16} />
-                </button>
               </div>
 
               <div className="card-body">
@@ -819,7 +999,8 @@ export default function NutriSocial() {
                 {friendsLoading ? <p className="text-secondary mb-0">A carregar amizades...</p> : null}
 
                 {!friendsLoading ? (
-                  <div className="nutri-social-friends-grid">
+                  <>
+                    <div className="nutri-social-friends-grid">
                     <div className="nutri-social-friend-list">
                       <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
                       {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
@@ -888,30 +1069,101 @@ export default function NutriSocial() {
                       ))}
                     </div>
                   </div>
+
+                  <section className="nutri-social-friend-community mt-3">
+                    <h4 className="h6 mb-2">Comunidades</h4>
+                    <form className="row g-2 mb-3" onSubmit={handleCreateCommunity}>
+                      <div className="col">
+                        <input
+                          className="form-control"
+                          type="text"
+                          value={communityNameDraft}
+                          onChange={(event) => setCommunityNameDraft(event.target.value)}
+                          placeholder="Nome da comunidade"
+                        />
+                      </div>
+                      <div className="col-auto">
+                        <button type="submit" className="btn btn-primary btn-sm">Criar comunidade</button>
+                      </div>
+                    </form>
+
+                    {communities.length === 0 ? <p className="text-secondary mb-0">Ainda não criaste comunidades.</p> : null}
+                    {communities.map((community) => (
+                      <article className="nutri-social-community-item" key={community.id}>
+                        <div className="row g-2 align-items-center">
+                          <div className="col-12 col-md-5">
+                            <label className="form-label mb-1">Nome</label>
+                            <input
+                              className="form-control form-control-sm"
+                              type="text"
+                              value={community.name}
+                              onChange={(event) => handleRenameCommunity(community.id, event.target.value)}
+                            />
+                          </div>
+                          <div className="col-12 col-md-5">
+                            <label className="form-label mb-1">Convidar amigo</label>
+                            <select
+                              className="form-select form-select-sm"
+                              value={communityInviteDraftById[community.id] || ''}
+                              onChange={(event) => setCommunityInviteDraftById((previous) => ({
+                                ...previous,
+                                [community.id]: event.target.value,
+                              }))}
+                              disabled={friendUsers.length === 0}
+                            >
+                              <option value="">Seleciona um amigo</option>
+                              {friendUsers.map((friend) => (
+                                <option key={`community-invite-${community.id}-${friend.id}`} value={friend.id}>
+                                  {friend.name || `Utilizador #${friend.id}`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-12 col-md-2 d-grid">
+                            <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => handleInviteFriendToCommunity(community.id)}>
+                              Convidar
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="nutri-social-community-members mt-2">
+                          <small className="text-secondary">Membros:</small>
+                          <div className="nutri-social-id-cloud">
+                            {community.memberIds.length === 0 ? (
+                              <span>Sem amigos convidados</span>
+                            ) : (
+                              community.memberIds.map((memberId) => {
+                                const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
+                                return <span key={`community-${community.id}-member-${memberId}`}>{member?.name || `#${memberId}`}</span>;
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                  </>
                 ) : null}
               </div>
             </section>
           ) : null}
 
-          <section className="card">
+          {activeTab === 'feed' ? (
+            <section className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
               <h3 className="card-title m-0">Feed NutriSocial</h3>
               <div className="d-flex align-items-center gap-2">
                 <span className="badge">Utilizador #{currentUserId || '—'}</span>
-                <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => togglePanel('friends')}>
-                  <Users size={14} />
-                  Amigos
-                </button>
               </div>
             </div>
             <div className="card-body">
               {feedLoading ? <p className="text-secondary mb-2">A carregar feed...</p> : null}
               {!feedLoading && feedError ? <p className="text-danger mb-2">{feedError}</p> : null}
               {!feedLoading && !feedError && feedStatus ? <p className="text-success mb-2">{feedStatus}</p> : null}
-              {!feedLoading && !feedError && feedPosts.length === 0 ? <p className="text-secondary mb-0">Ainda não existem partilhas no teu feed.</p> : null}
+              {!feedLoading && !feedError && visibleFeedPosts.length === 0 ? <p className="text-secondary mb-0">Ainda não existem partilhas no teu feed.</p> : null}
 
               <div className="d-grid gap-3">
-                {feedPosts.map((post) => {
+                {visibleFeedPosts.map((post) => {
                   const interaction = getPostInteraction(post.id);
                   const kudosCount = Object.keys(interaction.kudosByUser || {}).length;
                   const hasKudoFromMe = Boolean(interaction.kudosByUser?.[String(currentUserId)]);
@@ -1069,6 +1321,30 @@ export default function NutriSocial() {
                           })()
                         ) : null}
 
+                        <div className="nutri-social-quick-emoji">
+                          {QUICK_EMOJI_COMMENTS.map((emoji) => (
+                            <button
+                              key={`quick-emoji-${post.id}-${emoji}`}
+                              type="button"
+                              className="nutri-social-emoji-chip"
+                              onClick={() => handleQuickEmojiComment(post.id, emoji)}
+                              aria-label={`Comentar ${emoji}`}
+                              title={`Comentar ${emoji}`}
+                            >
+                              <img
+                                className="nutri-social-emoji-icon"
+                                src={emojiToTwemojiUrl(emoji)}
+                                alt={emoji}
+                                loading="lazy"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                              <span className="nutri-social-emoji-fallback">{emoji}</span>
+                            </button>
+                          ))}
+                        </div>
+
                         <form className="nutri-social-comment-form" onSubmit={(event) => handleCommentSubmit(event, post.id)}>
                           <input
                             className="form-control"
@@ -1104,7 +1380,20 @@ export default function NutriSocial() {
                 })}
               </div>
             </div>
-          </section>
+            </section>
+          ) : null}
+
+          {activeTab === 'meal' ? (
+            <section className="card">
+              <div className="card-header">
+                <h3 className="card-title m-0">Registar Refeição</h3>
+              </div>
+              <div className="card-body">
+                <p className="text-secondary mb-3">Usa esta aba para abrir o registo de refeição.</p>
+                <Link to="/progress" className="btn btn-primary">Ir para Registar Refeição</Link>
+              </div>
+            </section>
+          ) : null}
         </div>
       </div>
     </Layout>
