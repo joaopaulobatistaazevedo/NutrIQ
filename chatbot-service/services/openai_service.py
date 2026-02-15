@@ -124,6 +124,22 @@ class OpenAIService:
         if temporal_hints:
             merged_context.update(temporal_hints)
 
+        preference_hints = self._extract_inline_preference_hints(user_message)
+        if preference_hints:
+            if preference_hints.get("favorite_foods"):
+                merged_context["favorite_foods"] = self._merge_unique_text(
+                    merged_context.get("favorite_foods") or [],
+                    preference_hints.get("favorite_foods") or [],
+                )
+            if preference_hints.get("disliked_ingredients"):
+                merged_context["disliked_ingredients"] = self._merge_unique_text(
+                    merged_context.get("disliked_ingredients") or [],
+                    preference_hints.get("disliked_ingredients") or [],
+                )
+            hinted_days = preference_hints.get("planning_days")
+            if hinted_days not in (None, ""):
+                merged_context["planning_days"] = hinted_days
+
         # Detect whether this is an explicit plan request OR a life event that
         # should silently trigger a recalculation in the background.
         is_explicit_plan_request = self._looks_like_meal_plan_request(user_message) or pending_edit_request
@@ -409,7 +425,7 @@ class OpenAIService:
             planning_days = int(merged.get("planning_days", 7))
         except (TypeError, ValueError):
             planning_days = 7
-        planning_days = max(1, min(planning_days, 7))
+        planning_days = max(1, min(planning_days, 14))
 
         max_budget = merged.get("max_weekly_budget")
         goal = merged.get("goal", "maintain")
@@ -710,6 +726,65 @@ class OpenAIService:
                 pass
 
         return hints
+
+    def _extract_inline_preference_hints(self, text: str) -> Dict[str, Any]:
+        if not text or not isinstance(text, str):
+            return {}
+
+        lowered = " ".join(text.lower().split())
+        hints: Dict[str, Any] = {}
+
+        liked_markers = ("gosto de", "adoro", "prefiro", "curto")
+        disliked_markers = ("não gosto de", "nao gosto de", "odeio", "detesto", "não quero", "nao quero", "evita")
+
+        liked: List[str] = []
+        disliked: List[str] = []
+
+        for marker in liked_markers:
+            liked.extend(self._extract_food_tokens_after_marker(lowered, marker))
+        for marker in disliked_markers:
+            disliked.extend(self._extract_food_tokens_after_marker(lowered, marker))
+
+        if liked and disliked:
+            disliked_set = {item.strip().lower() for item in disliked}
+            liked = [item for item in liked if item.strip().lower() not in disliked_set]
+
+        if liked:
+            hints["favorite_foods"] = self._merge_unique_text([], liked)
+        if disliked:
+            hints["disliked_ingredients"] = self._merge_unique_text([], disliked)
+
+        days_match = re.search(r"\b(?:pr[oó]ximos?\s+)?(\d{1,2})\s*dias?\b", lowered)
+        if days_match:
+            try:
+                hints["planning_days"] = max(1, min(14, int(days_match.group(1))))
+            except (TypeError, ValueError):
+                pass
+
+        return hints
+
+    def _extract_food_tokens_after_marker(self, text: str, marker: str) -> List[str]:
+        if not text or not marker:
+            return []
+
+        pattern = (
+            rf"{re.escape(marker)}\s+(.+?)"
+            rf"(?=(?:\b(?:gera|cria|faz|monta|plano|para|pr[oó]ximos?|semana|dias?)\b|[.!?]|$))"
+        )
+        tokens: List[str] = []
+        for match in re.finditer(pattern, text):
+            fragment = match.group(1).strip(" ,.;:-")
+            if not fragment:
+                continue
+
+            parts = re.split(r"\s*(?:,|/|\be\b|\bou\b)\s*", fragment)
+            for part in parts:
+                cleaned = part.strip(" ,.;:-")
+                cleaned = re.sub(r"^(?:de|do|da|dos|das|o|a|os|as)\s+", "", cleaned)
+                if len(cleaned) >= 2:
+                    tokens.append(cleaned)
+
+        return self._merge_unique_text([], tokens)
 
     def _safe_week_offset(self, value: Any) -> int:
         try:

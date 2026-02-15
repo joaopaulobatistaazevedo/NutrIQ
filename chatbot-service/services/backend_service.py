@@ -3,7 +3,7 @@ import logging
 import re
 import sys
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 from urllib import error, request
@@ -197,69 +197,88 @@ class BackendService:
         if meal_plan.get("status") != "generated":
             return None
 
-        week_start = str(meal_plan.get("week_start") or "").strip()
-        if not week_start:
-            return None
-
-        created_plan = self._create_meal_plan(auth_token, week_start)
-        if not created_plan:
-            created_plan = self._request_json(
-                auth_token,
-                method="GET",
-                path="/api/meal-plans/active",
-            )
-            if not isinstance(created_plan, dict):
-                return None
-
-        plan_id = created_plan.get("id")
-        if not isinstance(plan_id, int):
-            return None
-
-        added = 0
+        days_by_week: Dict[str, list[Dict[str, Any]]] = {}
         for day in meal_plan.get("days") or []:
             if not isinstance(day, dict):
                 continue
 
-            day_of_week = self._iso_date_to_day_of_week(day.get("date"))
-            if not day_of_week:
+            parsed_day_date = self._parse_iso_date(day.get("date"))
+            if parsed_day_date is None:
                 continue
+            week_start_date = parsed_day_date - timedelta(days=parsed_day_date.weekday())
+            days_by_week.setdefault(week_start_date.isoformat(), []).append(day)
 
-            for meal in day.get("meals") or []:
-                if not isinstance(meal, dict):
-                    continue
-
-                meal_type = self._slot_to_meal_type(meal.get("slot"))
-                if not meal_type:
-                    continue
-
-                recipe_id = self._resolve_or_create_recipe_id(auth_token, meal, meal_type)
-                if recipe_id is None:
-                    continue
-
-                payload = {
-                    "recipeId": recipe_id,
-                    "dayOfWeek": day_of_week,
-                    "mealType": meal_type,
-                }
-                response = self._request_json(
-                    auth_token,
-                    method="POST",
-                    path=f"/api/meal-plans/{plan_id}/meals",
-                    payload=payload,
-                )
-                if response is not None:
-                    added += 1
-
-        if added <= 0:
-            # Avoid leaving an empty ACTIVE plan that would shadow valid local plans in the UI.
-            self._request_json(
-                auth_token,
-                method="DELETE",
-                path=f"/api/meal-plans/{plan_id}",
-            )
+        if not days_by_week:
             return None
 
-        return self.fetch_active_meal_plan(auth_token)
+        total_added = 0
+
+        # Create future weeks first and current week last, so the current week
+        # remains the latest ACTIVE plan on backend endpoints that return only one.
+        for week_start in sorted(days_by_week.keys(), reverse=True):
+            created_plan = self._create_meal_plan(auth_token, week_start)
+            if not isinstance(created_plan, dict):
+                created_plan = self._find_latest_plan_by_week_start(auth_token, week_start)
+            if not isinstance(created_plan, dict):
+                continue
+
+            plan_id = created_plan.get("id")
+            if not isinstance(plan_id, int):
+                continue
+
+            added_for_plan = 0
+            for day in days_by_week.get(week_start, []):
+                if not isinstance(day, dict):
+                    continue
+
+                parsed_day_date = self._parse_iso_date(day.get("date"))
+                if parsed_day_date is None:
+                    continue
+
+                day_of_week = self._iso_date_to_day_of_week(parsed_day_date)
+                if not day_of_week:
+                    continue
+
+                for meal in day.get("meals") or []:
+                    if not isinstance(meal, dict):
+                        continue
+
+                    meal_type = self._slot_to_meal_type(meal.get("slot"))
+                    if not meal_type:
+                        continue
+
+                    recipe_id = self._resolve_or_create_recipe_id(auth_token, meal, meal_type)
+                    if recipe_id is None:
+                        continue
+
+                    payload = {
+                        "recipeId": recipe_id,
+                        "dayOfWeek": day_of_week,
+                        "mealType": meal_type,
+                    }
+                    response = self._request_json(
+                        auth_token,
+                        method="POST",
+                        path=f"/api/meal-plans/{plan_id}/meals",
+                        payload=payload,
+                    )
+                    if response is not None:
+                        added_for_plan += 1
+                        total_added += 1
+
+            if added_for_plan <= 0:
+                # Avoid leaving empty ACTIVE plans in the backend.
+                self._request_json(
+                    auth_token,
+                    method="DELETE",
+                    path=f"/api/meal-plans/{plan_id}",
+                )
+
+        if total_added <= 0:
+            return None
+
+        # Return the generated plan payload to keep forward-day coverage in UI.
+        return meal_plan
 
     def fetch_active_meal_plan(self, auth_token: Optional[str]) -> Optional[Dict[str, Any]]:
         if not auth_token:
@@ -1315,10 +1334,37 @@ class BackendService:
 
         return ""
 
-    def _iso_date_to_day_of_week(self, raw_date: Any) -> Optional[str]:
+    def _parse_iso_date(self, raw_date: Any) -> Optional[date]:
         try:
-            parsed = datetime.fromisoformat(str(raw_date)).date()
+            return datetime.fromisoformat(str(raw_date)).date()
         except (TypeError, ValueError):
+            return None
+
+    def _find_latest_plan_by_week_start(self, auth_token: str, week_start: str) -> Optional[Dict[str, Any]]:
+        target_week_start = self._normalize_week_start(week_start)
+        if not target_week_start:
+            return None
+
+        plans = self._request_json(
+            auth_token,
+            method="GET",
+            path="/api/meal-plans",
+        )
+        if not isinstance(plans, list):
+            return None
+
+        for plan in plans:
+            if not isinstance(plan, dict):
+                continue
+            plan_week_start = self._normalize_week_start(plan.get("weekStart"))
+            if plan_week_start == target_week_start:
+                return plan
+
+        return None
+
+    def _iso_date_to_day_of_week(self, raw_date: Any) -> Optional[str]:
+        parsed = self._parse_iso_date(raw_date)
+        if parsed is None:
             return None
 
         return [

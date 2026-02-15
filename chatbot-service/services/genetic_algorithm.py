@@ -88,6 +88,13 @@ BREAKFAST_KEYWORDS = {
     "bagel", "tosta mista", "toast", "pão com", "pao com",
 }
 
+SNACK_KEYWORDS = {
+    "snack", "barra", "barrita", "bolacha", "bolachas", "cookie", "cookies",
+    "queque", "queques", "muffin", "muffins", "croissant", "donut", "doughnut",
+    "tosta", "torrada", "sandes", "sanduiche", "sanduíche", "wrap",
+    "chips", "aperitivo",
+}
+
 MAIN_ONLY_KEYWORDS = {
     "bacalhau", "bife", "costela", "feijoada", "cozido", "arroz de",
     "frango assado", "frango no forno", "massa com", "esparguete",
@@ -200,7 +207,7 @@ class MealPlanGA:
         body_weight_kg: float | None = None,
         calorie_adjustment_per_day: float = 0.0,
     ) -> None:
-        planning_days_sanitized = max(1, min(planning_days, 7))
+        planning_days_sanitized = max(1, min(planning_days, 14))
         requested_exclusions = {str(x).strip() for x in (excluded_recipe_ids or []) if str(x).strip()}
         usable = [r for r in recipes if r.title and str(r.id).strip() not in requested_exclusions]
         if len(usable) < max(9, planning_days_sanitized * 2):
@@ -240,6 +247,12 @@ class MealPlanGA:
         }
 
         self._recipe_by_id = {r.id: r for r in self.recipes}
+        self._has_liked_candidates = False
+        if self.liked:
+            self._has_liked_candidates = any(
+                any(token and token in self._recipe_text(recipe) for token in self.liked)
+                for recipe in self.recipes
+            )
 
         # ── Slot-aware recipe categorisation ────────────────────────────
         # Each slot has a calorie target window and keyword signals.
@@ -270,6 +283,9 @@ class MealPlanGA:
             text = self._recipe_text(r)
             # Hard reject desserts from main meal slots
             if any(kw in text for kw in DESSERT_KEYWORDS):
+                return False
+            # Hard reject explicit snacks from lunch/dinner slots
+            if any(kw in text for kw in SNACK_KEYWORDS):
                 return False
             # Explicit breakfast items should not appear as main meals
             if any(kw in text for kw in BREAKFAST_KEYWORDS):
@@ -501,6 +517,15 @@ class MealPlanGA:
                 if any(tok and tok in ingredient_text for tok in excluded):
                     return True
 
+        if self.liked and self._has_liked_candidates:
+            liked_slot_count = 0
+            for ms in ind.slots:
+                ingredient_text = self._recipe_text(ms.recipe)
+                if any(tok and tok in ingredient_text for tok in self.liked):
+                    liked_slot_count += 1
+            if liked_slot_count <= 0:
+                return True
+
         for day_slots in days.values():
             if len(day_slots) < 3 or len(day_slots) > 6:
                 return True
@@ -595,6 +620,12 @@ class MealPlanGA:
 
         if preferred_recipe_count / len(slots) > 0.60:
             points += 10.0
+        elif self.liked:
+            preferred_ratio = preferred_recipe_count / len(slots)
+            if preferred_ratio >= 0.40:
+                points += 8.0
+            elif preferred_ratio >= 0.25:
+                points += 4.0
 
         recipe_count: dict[str, int] = {}
         for ms in slots:
@@ -739,6 +770,8 @@ class MealPlanGA:
         text = self._recipe_text(recipe)
         if any(kw in text for kw in DESSERT_KEYWORDS):
             return False
+        if any(kw in text for kw in SNACK_KEYWORDS):
+            return False
         if any(kw in text for kw in BREAKFAST_KEYWORDS):
             cal = _safe_float(recipe.calories_per_serving)
             main_cal_lo = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Almoço"] * 0.55
@@ -757,6 +790,7 @@ class MealPlanGA:
         """
         _main_only_kw = MAIN_ONLY_KEYWORDS
         _breakfast_only_kw = BREAKFAST_KEYWORDS
+        _snack_kw = SNACK_KEYWORDS
         _dessert_kw = DESSERT_KEYWORDS
 
         breakfast_cal_hi = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Pequeno-almoço"] * 1.80
@@ -770,6 +804,7 @@ class MealPlanGA:
             is_dessert = any(kw in text for kw in _dessert_kw)
             is_main_only = any(kw in text for kw in _main_only_kw)
             is_breakfast_only = any(kw in text for kw in _breakfast_only_kw)
+            is_snack_like = any(kw in text for kw in _snack_kw)
 
             if ms.slot == "Pequeno-almoço":
                 if is_dessert:
@@ -783,6 +818,8 @@ class MealPlanGA:
             elif ms.slot in ("Almoço", "Jantar"):
                 if is_dessert:
                     penalty += 100.0
+                elif is_snack_like:
+                    penalty += 90.0
                 elif is_breakfast_only and cal > 0 and cal < main_cal_lo:
                     # Pure breakfast item (e.g. oatmeal) as a main meal
                     penalty += 80.0

@@ -42,22 +42,24 @@ def _apply_plan_persistence_and_cart(response: ChatResponse, backend_token: Opti
         generated_plan = dict(response.meal_plan)
         persisted_plan = backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
         if persisted_plan:
-            response.meal_plan = persisted_plan
+            # Keep the generated plan in the response so the frontend can show
+            # forward-looking days beyond the persisted backend week model.
+            response.meal_plan = generated_plan
             response.meal_plan_persisted = True
         else:
             logger.warning(
                 "Plano gerado mas não persistido no backend (token=%s)",
                 "present" if backend_token else "missing",
             )
-            response.meal_plan = None
+            response.meal_plan = generated_plan
             response.meal_plan_persisted = False
             response.response = (
-                "Consegui gerar o plano, mas não foi possível guardá-lo na base de dados. "
-                "Tenta novamente dentro de instantes."
-            )
+                f"{(response.response or '').strip()} "
+                "Consegui gerar o plano, mas não foi possível guardá-lo totalmente na base de dados."
+            ).strip()
 
         if response.meal_plan_persisted:
-            cart_plan_input = dict(response.meal_plan or {})
+            cart_plan_input = dict(generated_plan or {})
             for key in ("max_weekly_budget", "goal_daily_calories", "planning_days", "goal"):
                 if key not in cart_plan_input and key in generated_plan:
                     cart_plan_input[key] = generated_plan[key]

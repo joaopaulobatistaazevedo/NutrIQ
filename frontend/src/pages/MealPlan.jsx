@@ -61,6 +61,67 @@ function parseStorage(key, fallback) {
   }
 }
 
+function toLocalIsoDate(dateValue) {
+  if (!(dateValue instanceof Date) || Number.isNaN(dateValue.getTime())) {
+    return '';
+  }
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+  const day = String(dateValue.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeDateKey(rawValue) {
+  const text = String(rawValue || '').trim();
+  if (!text) return '';
+  return text.slice(0, 10);
+}
+
+function countPlanMeals(plan) {
+  if (!plan || !Array.isArray(plan.days)) {
+    return 0;
+  }
+  return plan.days.reduce((total, day) => {
+    if (!day || !Array.isArray(day.meals)) {
+      return total;
+    }
+    return total + day.meals.length;
+  }, 0);
+}
+
+function getPlanDateBounds(plan) {
+  if (!plan || !Array.isArray(plan.days)) {
+    return { min: '', max: '' };
+  }
+  const dates = plan.days
+    .map((day) => normalizeDateKey(day?.date))
+    .filter(Boolean)
+    .sort();
+  if (!dates.length) {
+    return { min: '', max: '' };
+  }
+  return { min: dates[0], max: dates[dates.length - 1] };
+}
+
+function shouldPreferBackendPlan(localPlan, backendPlan) {
+  const localMeals = countPlanMeals(localPlan);
+  const backendMeals = countPlanMeals(backendPlan);
+  if (backendMeals <= 0) {
+    return false;
+  }
+  if (localMeals <= 0) {
+    return true;
+  }
+
+  const localBounds = getPlanDateBounds(localPlan);
+  const backendBounds = getPlanDateBounds(backendPlan);
+  const backendCoversSameOrLongerRange = Boolean(
+    backendBounds.max && (!localBounds.max || backendBounds.max >= localBounds.max),
+  );
+
+  return backendMeals >= localMeals && backendCoversSameOrLongerRange;
+}
+
 function slotMeta(slot) {
   if (slot === 'Snack') {
     return { icon: Sun, time: '16:30', kcal: 280 };
@@ -95,11 +156,11 @@ export default function MealPlan() {
     return capitalize(formatter.format(selectedDate));
   }, [selectedDate]);
 
-  const selectedIso = useMemo(() => selectedDate.toISOString().slice(0, 10), [selectedDate]);
+  const selectedIso = useMemo(() => toLocalIsoDate(selectedDate), [selectedDate]);
   const monthCells = useMemo(() => getMonthCells(monthCursor), [monthCursor]);
 
   const meals = useMemo(() => {
-    const planDay = weeklyPlan?.days?.find((day) => day?.date === selectedIso);
+    const planDay = weeklyPlan?.days?.find((day) => normalizeDateKey(day?.date) === selectedIso);
 
     if (!planDay?.meals?.length) {
       return [];
@@ -123,15 +184,19 @@ export default function MealPlan() {
 
     const syncPlan = async () => {
       const localPlan = parseStorage(storageKey, null);
+      let nextPlan = localPlan;
       if (!cancelled) {
-        setWeeklyPlan(localPlan);
+        setWeeklyPlan(nextPlan);
       }
 
       try {
         const backendPlan = await fetchActiveMealPlan();
-        if (!cancelled && backendPlan) {
-          localStorage.setItem(storageKey, JSON.stringify(backendPlan));
-          setWeeklyPlan(backendPlan);
+        if (backendPlan && shouldPreferBackendPlan(localPlan, backendPlan)) {
+          nextPlan = backendPlan;
+        }
+        if (!cancelled && nextPlan) {
+          localStorage.setItem(storageKey, JSON.stringify(nextPlan));
+          setWeeklyPlan(nextPlan);
         }
       } catch {
       }

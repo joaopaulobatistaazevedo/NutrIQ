@@ -92,7 +92,7 @@ class GoalMealPlannerService:
           calories_offset      : int  (positive = overate; negative = skipped meals / ate less)
         """
         goal = _normalise_goal(constraints.get("goal"))
-        requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
+        requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=14)
         planning_days = requested_planning_days
         week_start = _resolve_week_start(constraints)
         today = date.today()
