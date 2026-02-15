@@ -5,7 +5,6 @@ import PageHeader from '../components/PageHeader';
 import { fetchRecipeById } from '../services/recipeService';
 import {
   getCheapestIngredientPrice,
-  importPriceReport,
   listIngredientPrices,
   listLatestPrices,
 } from '../services/priceService';
@@ -17,6 +16,39 @@ import '../styles/shopping.css';
 
 const CARD_ACCENTS = ['is-pingo', 'is-continente', 'is-lidl'];
 const EMPTY_ITEMS = [];
+
+const MARKET_CHECKOUT_RULES = [
+  {
+    key: 'continente',
+    matches: ['continente'],
+    checkoutUrl: 'https://www.continente.pt/checkout',
+    addToCartUrl: (productId, quantity) => (
+      `https://www.continente.pt/on/demandware.store/Sites-continente-Site/default/Cart-AddProduct?pid=${encodeURIComponent(productId)}&quantity=${Math.max(1, Number(quantity || 1))}`
+    ),
+  },
+  {
+    key: 'auchan',
+    matches: ['auchan'],
+    checkoutUrl: 'https://www.auchan.pt/pt/checkout-begin',
+    addToCartUrl: (productId, quantity) => (
+      `https://www.auchan.pt/on/demandware.store/Sites-AuchanPT-Site/pt_PT/Cart-AddProduct?pid=${encodeURIComponent(productId)}&quantity=${Math.max(1, Number(quantity || 1))}`
+    ),
+  },
+  {
+    key: 'pingo-doce',
+    matches: ['pingo doce', 'pingodoce'],
+    checkoutUrl: 'https://www.pingodoce.pt/checkout',
+    addToCartUrl: (productId, quantity) => (
+      `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Cart-AddProduct?pid=${encodeURIComponent(productId)}&quantity=${Math.max(1, Number(quantity || 1))}`
+    ),
+  },
+  {
+    key: 'lidl',
+    matches: ['lidl'],
+    checkoutUrl: 'https://www.lidl.pt',
+    addToCartUrl: null,
+  },
+];
 
 function formatCurrency(value, currency = 'EUR') {
   return Number(value || 0).toLocaleString('pt-PT', {
@@ -32,6 +64,73 @@ function slugify(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '');
+}
+
+
+function normalizeMarketName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function resolveMarketCheckoutRule(marketName) {
+  const normalized = normalizeMarketName(marketName);
+  if (!normalized) return null;
+  return (
+    MARKET_CHECKOUT_RULES.find((rule) => rule.matches.some((token) => normalized.includes(token)))
+    || null
+  );
+}
+
+function extractProductIdFromUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+
+  const parsedFromQuery = value.match(/[?&](?:pid|product_id|productId)=([^&#]+)/i);
+  if (parsedFromQuery?.[1]) {
+    return decodeURIComponent(parsedFromQuery[1]).trim();
+  }
+
+  const pathname = value.split('?')[0] || '';
+  const allNumericMatches = pathname.match(/(\d{5,})/g);
+  if (Array.isArray(allNumericMatches) && allNumericMatches.length > 0) {
+    return String(allNumericMatches[allNumericMatches.length - 1] || '').trim();
+  }
+
+  return '';
+}
+
+function buildMarketCheckoutPlan(marketName, items) {
+  const checkoutRule = resolveMarketCheckoutRule(marketName);
+  const checkoutUrl = checkoutRule?.checkoutUrl || '';
+  const addToCartUrls = [];
+  const fallbackProductUrls = [];
+  let unresolvedCount = 0;
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const productUrl = String(item?.productUrl || '').trim();
+    if (!productUrl) {
+      unresolvedCount += 1;
+      return;
+    }
+
+    const productId = extractProductIdFromUrl(productUrl);
+    if (checkoutRule?.addToCartUrl && productId) {
+      addToCartUrls.push(checkoutRule.addToCartUrl(productId, item?.quantity));
+      return;
+    }
+
+    fallbackProductUrls.push(productUrl);
+  });
+
+  return {
+    checkoutUrl,
+    addToCartUrls,
+    fallbackProductUrls,
+    unresolvedCount,
+  };
 }
 
 function normalizeIngredientKey(value) {
@@ -449,9 +548,6 @@ export default function Shopping() {
   const [queryError, setQueryError] = useState('');
   const [cheapestResult, setCheapestResult] = useState(null);
   const [ingredientMatches, setIngredientMatches] = useState(EMPTY_ITEMS);
-  const [importPayload, setImportPayload] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState('');
   const [weeklyPlan, setWeeklyPlan] = useState(() => parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null));
   const [comparison, setComparison] = useState([]);
   const [optimizedTotal, setOptimizedTotal] = useState(0);
@@ -459,6 +555,7 @@ export default function Shopping() {
   const [isGeneratingCart, setIsGeneratingCart] = useState(false);
   const [cartSource, setCartSource] = useState('manual');
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState('');
+  const [checkoutStatus, setCheckoutStatus] = useState('');
   const generateCartRef = useRef(null);
 
   const loadPrices = useCallback(async () => {
@@ -873,31 +970,6 @@ export default function Shopping() {
     }
   };
 
-  const importReportPayload = async (event) => {
-    event.preventDefault();
-    const cleanedPayload = String(importPayload || '').trim();
-    setImportStatus('');
-
-    if (!cleanedPayload) {
-      setImportStatus('Cola aqui o JSON do report antes de importar.');
-      return;
-    }
-
-    setIsImporting(true);
-    try {
-      const response = await importPriceReport(cleanedPayload);
-      await loadPrices();
-      const imported = Number(response?.importedEntries || 0);
-      const deduped = Number(response?.dedupedEntries || 0);
-      setImportStatus(`Importação concluída: ${imported} gravados (${deduped} deduplicados).`);
-      setImportPayload('');
-    } catch (error) {
-      setImportStatus(error.message || 'Falha ao importar report.');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   const summary = useMemo(() => {
     const subtotal = activeItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
     const checkedItems = activeItems.filter((item) => item.checked).length;
@@ -920,6 +992,54 @@ export default function Shopping() {
   const hasData = marketEntries.length > 0;
 
   const bestComparison = comparison.length ? comparison[0] : null;
+
+
+  const handleProceedToCheckout = () => {
+    const marketName = String(activeList?.name || '').trim();
+    const cartItems = Array.isArray(activeItems) ? activeItems : [];
+
+    if (!marketName || !cartItems.length) {
+      setCheckoutStatus('Seleciona um supermercado com produtos antes de avançar para checkout.');
+      return;
+    }
+
+    const plan = buildMarketCheckoutPlan(marketName, cartItems);
+    const navigationQueue = [
+      ...plan.addToCartUrls,
+      ...plan.fallbackProductUrls,
+      ...(plan.checkoutUrl ? [plan.checkoutUrl] : []),
+    ];
+
+    if (!navigationQueue.length) {
+      setCheckoutStatus('Não existem links de produto válidos para enviar automaticamente para o checkout.');
+      return;
+    }
+
+    const checkoutWindow = window.open(navigationQueue[0], '_blank');
+    if (!checkoutWindow) {
+      setCheckoutStatus('O browser bloqueou a abertura. Permite pop-ups para continuar com o checkout.');
+      return;
+    }
+
+    navigationQueue.slice(1).forEach((url, index) => {
+      window.setTimeout(() => {
+        try {
+          checkoutWindow.location.href = url;
+        } catch {
+          window.open(url, '_blank');
+        }
+      }, 900 * (index + 1));
+    });
+
+    if (plan.unresolvedCount > 0) {
+      setCheckoutStatus(
+        `A abrir ${marketName} com os produtos disponíveis. ${plan.unresolvedCount} item(ns) não têm link de compra direto.`,
+      );
+      return;
+    }
+
+    setCheckoutStatus(`A abrir ${marketName} com os produtos do carrinho para finalizar checkout.`);
+  };
 
   return (
     <Layout>
@@ -1062,20 +1182,6 @@ export default function Shopping() {
               ) : null}
             </div>
 
-            <div className="shopping-import-panel">
-              <h3>Importar report.json</h3>
-              <form className="shopping-import-form" onSubmit={importReportPayload}>
-                <textarea
-                  value={importPayload}
-                  onChange={(event) => setImportPayload(event.target.value)}
-                  placeholder="Cola aqui o JSON do report do scraper..."
-                />
-                <button type="submit" className="suggestion-chip" disabled={isImporting}>
-                  {isImporting ? 'A importar...' : 'Importar para backend'}
-                </button>
-              </form>
-              {importStatus ? <p className="shopping-feedback">{importStatus}</p> : null}
-            </div>
               </section>
 
               <section className="shopping-cart-panel card">
@@ -1174,10 +1280,17 @@ export default function Shopping() {
                 <strong>{formatCurrency(summary.subtotal, summary.currency)}</strong>
               </div>
 
-              <button type="button" className="checkout-btn btn btn-success" disabled={!activeItems.length}>
+              <button
+                type="button"
+                className="checkout-btn btn btn-success"
+                disabled={!activeItems.length}
+                onClick={handleProceedToCheckout}
+              >
                 Avançar para checkout
               </button>
-              <p className="checkout-note">Esta lista usa os últimos preços importados em `/api/prices`.</p>
+              <p className="checkout-note">
+                {checkoutStatus || 'Esta lista usa os últimos preços importados em `/api/prices`.'}
+              </p>
             </footer>
               </section>
             </div>
