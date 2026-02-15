@@ -19,59 +19,123 @@ from recipe_scraper.sources import default_sources
 from recipe_scraper.storage import load_recipes, upsert_recipes
 
 
+from __future__ import annotations
+import random
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+from threading import Lock
+from typing import Any
+
+# ... (imports mantidos)
+
 class RecipePlannerService:
     SLOT_SEQUENCE = ["Pequeno-almoço", "Almoço", "Jantar"]
+    
+    # Palavras-chave para categorização
+    BREAKFAST_KEYWORDS = {"papas", "aveia", "panquecas", "iogurte", "batido", "muesli", "torrada", "omelete", "fruta", "granola", "cereais"}
+    LIGHT_KEYWORDS = {"salada", "grelhado", "vapor", "sopa", "creme", "cozido", "leve", "peixe", "frango"}
 
     def __init__(self) -> None:
         self._recipes: list[RecipeRecord] = []
         self._lock = Lock()
-        self._db_path = WORKSPACE_ROOT / "recipes.db"
-        self._json_path = WORKSPACE_ROOT / "recipes_scraped.json"
+        self._db_path = Path("recipes.db")
+        self._json_path = Path("recipes_scraped.json")
 
     def generate_weekly_plan(self, constraints: dict[str, Any]) -> dict[str, Any]:
         recipes = self._load_recipes_pool()
         planning_days = self._safe_days(constraints.get("planning_days"))
-
-        liked = self._normalize_values(
-            [
-                *(constraints.get("favorite_foods") or []),
-                *(constraints.get("new_liked_ingredients") or []),
-                *(constraints.get("requested_extra_ingredients") or []),
-            ]
-        )
-        disliked = self._normalize_values(constraints.get("disliked_ingredients") or [])
+        
+        # Novos inputs dinâmicos
+        calories_offset = constraints.get("calories_offset", 0)
+        missing_ingredients = constraints.get("missing_ingredients", [])
+        
+        liked = self._normalize_values(constraints.get("favorite_foods") or [])
+        # Fundir ingredientes que não gosta com ingredientes que faltam no supermercado
+        disliked = self._normalize_values((constraints.get("disliked_ingredients") or []) + missing_ingredients)
 
         if not recipes:
-            return {
-                "status": "empty",
-                "planning_days": planning_days,
-                "week_start": self._current_week_start().isoformat(),
-                "excluded_ingredients": disliked,
-                "liked_ingredients": liked,
-                "days": [],
-                "notes": "Não foi possível obter receitas do scraper.",
-            }
+            return {"status": "empty", "days": []}
 
+        # Filtrar candidatos base (exclui logo o que o user não gosta ou o que falta no stock)
         candidates = [
-            recipe
-            for recipe in recipes
+            recipe for recipe in recipes 
             if recipe.title and recipe.url and self._is_recipe_allowed(recipe, disliked)
         ]
 
-        ranked = self._rank_recipes(candidates, liked)
+        # Se houver um offset calórico positivo alto (> 300kcal), priorizar receitas leves
+        needs_light_meals = calories_offset > 300
+        ranked = self._rank_recipes(candidates, liked, prioritize_light=needs_light_meals)
+        
         days_payload = self._build_days_payload(ranked, planning_days)
 
         return {
             "status": "generated",
             "planning_days": planning_days,
-            "week_start": self._current_week_start().isoformat(),
-            "excluded_ingredients": disliked,
-            "liked_ingredients": liked,
-            "source": "recipe_scraper",
-            "total_candidates": len(ranked),
+            "calories_adjustment_active": needs_light_meals,
             "days": days_payload,
-            "notes": "Plano gerado com receitas scraped, excluindo ingredientes não gostados.",
+            "notes": "Plano ajustado dinamicamente com base em preferências e inventário."
         }
+
+    def _categorize_recipe(self, recipe: RecipeRecord) -> str:
+        title = recipe.title.lower()
+        if any(kw in title for kw in self.BREAKFAST_KEYWORDS):
+            return "Pequeno-almoço"
+        return "Principal"
+
+    def _rank_recipes(self, recipes: list[RecipeRecord], liked_ingredients: list[str], prioritize_light: bool = False) -> list[tuple[RecipeRecord, float]]:
+        ranked = []
+        for recipe in recipes:
+            score = 0.0
+            # Relevância por ingredientes favoritos
+            if liked_ingredients:
+                matched = self._liked_matches(recipe, liked_ingredients)
+                score = matched / len(liked_ingredients)
+            
+            # Bonus por ser "leve" se o utilizador abusou nas calorias
+            if prioritize_light:
+                if any(kw in recipe.title.lower() for kw in self.LIGHT_KEYWORDS):
+                    score += 0.5 
+
+            ranked.append((recipe, score))
+
+        return sorted(ranked, key=lambda x: x[1], reverse=True)
+
+    def _build_days_payload(self, ranked: list[tuple[RecipeRecord, float]], planning_days: int) -> list[dict[str, Any]]:
+        # Separar pools para evitar bacalhau ao pequeno-almoço
+        breakfast_pool = [r for r in ranked if self._categorize_recipe(r[0]) == "Pequeno-almoço"]
+        main_pool = [r for r in ranked if self._categorize_recipe(r[0]) == "Principal"]
+
+        # Fallback se um pool estiver vazio
+        if not breakfast_pool: breakfast_pool = main_pool
+        if not main_pool: main_pool = breakfast_pool
+
+        days = []
+        used_urls = set()
+        
+        for offset in range(planning_days):
+            meal_date = date.today() + timedelta(days=offset)
+            day_meals = []
+            
+            for slot in self.SLOT_SEQUENCE:
+                pool = breakfast_pool if slot == "Pequeno-almoço" else main_pool
+                
+                # Selecionar a melhor que ainda não foi usada
+                selection = next((r for r in pool if r[0].url not in used_urls), pool[0])
+                used_urls.add(selection[0].url)
+                
+                day_meals.append({
+                    "slot": slot,
+                    "title": selection[0].title,
+                    "url": selection[0].url,
+                    "score": round(selection[1], 2)
+                })
+            
+            days.append({
+                "date": meal_date.isoformat(),
+                "meals": day_meals
+            })
+        return days
 
     def _load_recipes_pool(self) -> list[RecipeRecord]:
         with self._lock:
