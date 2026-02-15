@@ -4,14 +4,10 @@ import {
   Check,
   Copy,
   Camera,
-  Droplets,
   Flame,
   MapPin,
-  Moon,
   PencilLine,
-  Salad,
   Target,
-  Bike,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { PROFILE_KEY } from '../constants/storageKeys';
@@ -196,34 +192,6 @@ export default function Profile() {
     };
   }, [token]);
 
-  const routine = useMemo(() => {
-    const weight = toFloatOrNull(formState.weightKg);
-    const hydration = weight ? `${Math.max(1.8, weight * 0.035).toFixed(1)}L por dia` : '2.2L por dia';
-    const goalLabel = GOAL_LABELS[formState.goal] || 'Definir objetivo';
-
-    return [
-      { icon: Droplets, title: 'Hidratação', detail: hydration, trend: '+8%' },
-      { icon: Moon, title: 'Sono', detail: '7h 20m média', trend: '+5%' },
-      { icon: Bike, title: 'Atividade', detail: '4 sessões por semana', trend: '+12%' },
-      { icon: Salad, title: 'Plano alimentar', detail: goalLabel, trend: '+9%' },
-    ];
-  }, [formState.goal, formState.weightKg]);
-
-  const snapshots = [
-    {
-      title: 'Pré-preparo de domingo',
-      image: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      title: 'Almoço equilibrado',
-      image: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      title: 'Jantar leve',
-      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80',
-    },
-  ];
-
   const initials = useMemo(() => {
     const parts = String(formState.name || '').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) {
@@ -291,7 +259,6 @@ export default function Profile() {
   };
 
   const dailyCalories = toIntOrNull(formState.dailyCalories);
-  const weeklyBudget = toFloatOrNull(formState.maxWeeklyBudget);
   const goalLabel = GOAL_LABELS[formState.goal] || 'Objetivo não definido';
   const profileBio = GOAL_BIOS[formState.goal] || 'Completa o teu perfil para recomendações melhores';
 
@@ -305,15 +272,15 @@ export default function Profile() {
               <button className="prof-avatar-btn" type="button" aria-label="Alterar foto">
                 <Camera size={14} />
               </button>
-              <span className="prof-streak-pill" aria-label={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`} title={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`}>
+              <span className="prof-streak-mobile" aria-label={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`} title={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`}>
                 <Flame size={14} />
-                <span className="prof-streak-value">{Math.max(0, Number(formState.streakCount || 0))}</span>
               </span>
             </div>
 
             <div className="prof-id">
               <div className="prof-name-row">
                 <h1>{formState.name || 'Utilizador'}</h1>
+                <span className="prof-streak-pill"><Flame size={16} /> Streak {Math.max(0, Number(formState.streakCount || 0))} dias</span>
               </div>
               <p className="prof-location">
                 <MapPin size={14} />
@@ -328,14 +295,6 @@ export default function Profile() {
                     {copyStatus === 'ID copiado!' ? <Check size={14} /> : <Copy size={14} />}
                     {copyStatus || 'Copiar ID'}
                   </button>
-                </div>
-                <div className="prof-mini-metrics">
-                  <span>{dailyCalories ? `${dailyCalories} kcal alvo` : 'Sem calorias definidas'}</span>
-                  <span>
-                    {weeklyBudget !== null
-                      ? `${weeklyBudget.toFixed(2)} EUR / semana`
-                      : 'Sem orçamento semanal'}
-                  </span>
                 </div>
               </div>
             </div>
@@ -354,33 +313,7 @@ export default function Profile() {
                 <Target size={16} /> {goalLabel}
               </button>
             </div>
-
-            <div className="prof-journey-inline">
-              <span className="prof-journey-label">Jornada atual</span>
-              <ul className="prof-journey-list">
-              {routine.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <li key={item.title}>
-                    <span className="prof-journey-ic"><Icon size={13} /></span>
-                    <span className="prof-journey-title">{item.title}</span>
-                    <strong>{item.trend}</strong>
-                  </li>
-                );
-              })}
-              </ul>
-            </div>
           </div>
-        </motion.section>
-
-        <motion.section className="prof-gallery" {...fade}>
-          {snapshots.map((shot) => (
-            <article key={shot.title} className="prof-gallery-item">
-              <img src={shot.image} alt={shot.title} loading="lazy" />
-              <div className="prof-gallery-overlay" />
-              <h3>{shot.title}</h3>
-            </article>
-          ))}
         </motion.section>
 
         <motion.section className="prof-timeline" {...fade}>

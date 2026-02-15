@@ -46,10 +46,26 @@ const SLOT_ORDER = {
 };
 
 const SLOT_META = {
-  'Pequeno-almoço': { icon: Sunrise, fallbackMinutes: 15, fallbackImage: 'https://picsum.photos/seed/breakfast-nutriq/1200/800' },
-  Almoço: { icon: Sun, fallbackMinutes: 25, fallbackImage: 'https://picsum.photos/seed/lunch-nutriq/1200/800' },
-  Jantar: { icon: Moon, fallbackMinutes: 20, fallbackImage: 'https://picsum.photos/seed/dinner-nutriq/1200/800' },
-  Snack: { icon: Sun, fallbackMinutes: 10, fallbackImage: 'https://picsum.photos/seed/snack-nutriq/1200/800' },
+  'Pequeno-almoço': {
+    icon: Sunrise,
+    fallbackMinutes: 15,
+    fallbackImage: 'https://picsum.photos/seed/breakfast-nutriq/1200/800',
+  },
+  Almoço: {
+    icon: Sun,
+    fallbackMinutes: 25,
+    fallbackImage: 'https://picsum.photos/seed/lunch-nutriq/1200/800',
+  },
+  Jantar: {
+    icon: Moon,
+    fallbackMinutes: 20,
+    fallbackImage: 'https://picsum.photos/seed/dinner-nutriq/1200/800',
+  },
+  Snack: {
+    icon: Sun,
+    fallbackMinutes: 10,
+    fallbackImage: 'https://picsum.photos/seed/snack-nutriq/1200/800',
+  },
 };
 
 function toName(value) {
@@ -89,11 +105,7 @@ function formatMinutes(totalMinutes) {
 }
 
 function extractSourceUrl(recipe) {
-  const candidates = [
-    recipe?.sourceUrl,
-    recipe?.source_url,
-    recipe?.url,
-  ];
+  const candidates = [recipe?.sourceUrl, recipe?.source_url, recipe?.url];
 
   for (const candidate of candidates) {
     const value = String(candidate || '').trim();
@@ -141,10 +153,21 @@ const CalorieRing = ({ consumed, goal }) => {
   return (
     <div className="cal-ring">
       <svg viewBox="0 0 160 160" className="cal-ring-svg">
-        <circle cx="80" cy="80" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+        <circle
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth="10"
+        />
         <motion.circle
-          cx="80" cy="80" r={radius} fill="none"
-          stroke="url(#ringGrad)" strokeWidth="10"
+          cx="80"
+          cy="80"
+          r={radius}
+          fill="none"
+          stroke="url(#ringGrad)"
+          strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
@@ -160,7 +183,10 @@ const CalorieRing = ({ consumed, goal }) => {
           </linearGradient>
         </defs>
       </svg>
-      <div className="cal-ring-inner"><strong>{consumed}</strong><span>/ {goal} kcal</span></div>
+      <div className="cal-ring-inner">
+        <strong>{consumed}</strong>
+        <span>/ {goal} kcal</span>
+      </div>
     </div>
   );
 };
@@ -204,9 +230,11 @@ export default function Dashboard() {
         const estimatedSpendByPrices = estimateWeeklySpend(prices);
 
         const planDays = Array.isArray(activePlan?.days) ? activePlan.days : [];
-        const flatMeals = planDays.flatMap((day) => (Array.isArray(day?.meals)
-          ? day.meals.map((meal) => ({ ...meal, date: day.date, dayLabel: day.day_label }))
-          : []));
+        const flatMeals = planDays.flatMap((day) =>
+          Array.isArray(day?.meals)
+            ? day.meals.map((meal) => ({ ...meal, date: day.date, dayLabel: day.day_label }))
+            : [],
+        );
 
         const uniqueRecipeIds = Array.from(
           new Set(
@@ -230,10 +258,12 @@ export default function Dashboard() {
 
         const weeklyCalories = WEEK_DAYS.map((dayLabel) => {
           const dayMeals = flatMeals.filter((meal) => meal?.dayLabel === dayLabel);
-          const real = Math.round(dayMeals.reduce((sum, meal) => {
-            const recipe = recipeById.get(Number(meal?.recipe_id));
-            return sum + toNumberOr(0, recipe?.nutritionalInfo?.calories);
-          }, 0));
+          const real = Math.round(
+            dayMeals.reduce((sum, meal) => {
+              const recipe = recipeById.get(Number(meal?.recipe_id));
+              return sum + toNumberOr(0, recipe?.nutritionalInfo?.calories);
+            }, 0),
+          );
           return { day: dayLabel, real, meta: dailyGoal };
         });
 
@@ -264,9 +294,8 @@ export default function Dashboard() {
 
         const weeklyTotalMeals = flatMeals.length;
         const weeklyCompletedMeals = flatMeals.filter((meal) => Boolean(meal?.completed)).length;
-        const weeklyAdherencePct = weeklyTotalMeals > 0
-          ? Math.round((weeklyCompletedMeals / weeklyTotalMeals) * 100)
-          : 0;
+        const weeklyAdherencePct =
+          weeklyTotalMeals > 0 ? Math.round((weeklyCompletedMeals / weeklyTotalMeals) * 100) : 0;
 
         const weeklyPlanCost = toNumberOr(0, activePlan?.total_cost);
         const estimatedWeeklySpend = weeklyPlanCost > 0 ? weeklyPlanCost : estimatedSpendByPrices;
@@ -392,17 +421,15 @@ export default function Dashboard() {
   };
 
   const openChatbotForPlan = () => {
-    window.dispatchEvent(new CustomEvent('nutribot:open-chat', {
-      detail: {
-        focusInput: true,
-        seedMessage: 'Quero gerar um novo plano alimentar.',
-      },
-    }));
+    window.dispatchEvent(
+      new CustomEvent('nutribot:open-chat', {
+        detail: {
+          focusInput: true,
+          seedMessage: 'Quero gerar um novo plano alimentar.',
+        },
+      }),
+    );
   };
-
-  const waterDrank = 1.5;
-  const waterGoal = 3;
-  const hydrationPct = Math.min((waterDrank / waterGoal) * 100, 100);
 
   return (
     <Layout>
@@ -415,70 +442,47 @@ export default function Dashboard() {
 
             <div className="dash-hero-content">
               <div className="dash-hero-left">
-                <span className="dash-streak-pill"><Flame size={17} /> Streak {dashboardData.streakCount} dias</span>
+                <span className="dash-streak-pill">
+                  <Flame size={17} /> Streak {dashboardData.streakCount} dias
+                </span>
                 <h1>Boa tarde, {dashboardData.userName}</h1>
-                <p>Estás no caminho certo. Planea as tuas refeições de forma simples, com os carrinhos de compras automáticos.</p>
-              <motion.button
-                className="dash-hero-cta"
-                whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(52,211,153,0.4)' }}
-                whileTap={{ scale: 0.97 }}
-                onClick={openChatbotForPlan}
-              >
+                <p>
+                  Estás no caminho certo. Planea as tuas refeições de forma simples, com os carrinhos de compras
+                  automáticos.
+                </p>
+                <motion.button
+                  className="dash-hero-cta"
+                  whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(52,211,153,0.4)' }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={openChatbotForPlan}
+                >
                   Gerar Novo Plano <ArrowRight size={16} />
                 </motion.button>
               </div>
 
               <div className="dash-hero-right">
-              <div className="dash-hero-meters">
-                <CalorieRing consumed={dashboardData.consumedCalories} goal={dashboardData.dailyGoal} />
-                <motion.div
-                  className="dash-hydration-card"
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }}
-                  viewport={{ once: true }}
-                >
-                  <div className="hydration-body">
-                    <div className="water-bottle" role="img" aria-label={`${waterDrank.toFixed(1)} litros de ${waterGoal} litros`}>
-                      <div className="water-bottle-top" />
-                      <div className="water-bottle-neck" />
-                      <div className="water-bottle-body">
-                        <motion.div
-                          className="water-bottle-fill"
-                          initial={{ height: 0 }}
-                          whileInView={{ height: `${hydrationPct}%` }}
-                          transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
-                          viewport={{ once: true }}
-                        />
-                        <div className="water-bottle-rings" />
-                        <div className="water-bottle-gloss" />
-                        <div className="water-bottle-reading">
-                          <strong>{waterDrank.toFixed(1)}L</strong>
-                          <span>/ {waterGoal}L</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
+                <div className="dash-hero-meters">
+                  <CalorieRing consumed={dashboardData.consumedCalories} goal={dashboardData.dailyGoal} />
+                </div>
+
                 <div className="dash-hero-macros">
                   {macros.map((m) => (
                     <div className="macro-bar" key={m.label}>
-                    <div className="macro-bar-head">
-                      <span>{m.label}</span>
-                      <span>{m.value}g</span>
+                      <div className="macro-bar-head">
+                        <span>{m.label}</span>
+                        <span>{m.value}g</span>
                       </div>
-                    <div className="macro-bar-track">
-                      <motion.div
-                        className="macro-bar-fill"
-                        style={{ background: m.color }}
-                        initial={{ width: 0 }}
-                        whileInView={{ width: `${(m.value / m.max) * 100}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
-                        viewport={{ once: true }}
-                      />
+                      <div className="macro-bar-track">
+                        <motion.div
+                          className="macro-bar-fill"
+                          style={{ background: m.color }}
+                          initial={{ width: 0 }}
+                          whileInView={{ width: `${(m.value / m.max) * 100}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+                          viewport={{ once: true }}
+                        />
+                      </div>
                     </div>
-                  </div>
                   ))}
                 </div>
               </div>
@@ -486,22 +490,22 @@ export default function Dashboard() {
           </motion.section>
 
           <motion.section className="dash-meals" {...fade}>
-          <div className="dash-meals-head">
-            <h2>Refeições de hoje</h2>
-            <span className="dash-meals-total">{consumedKcal} kcal total</span>
-          </div>
+            <div className="dash-meals-head">
+              <h2>Refeições de hoje</h2>
+              <span className="dash-meals-total">{consumedKcal} kcal total</span>
+            </div>
 
             <div className="dash-meal-tabs">
               {meals.map((meal, i) => {
                 const Icon = meal.icon;
                 return (
-                <button
-                  key={`${meal.period}-${i}`}
-                  className={`dash-meal-tab ${activeMeal === i ? 'active' : ''}`}
-                  onClick={() => setActiveMeal(i)}
-                >
-                  <Icon size={16} />
-                  <span>{meal.period}</span>
+                  <button
+                    key={`${meal.period}-${i}`}
+                    className={`dash-meal-tab ${activeMeal === i ? 'active' : ''}`}
+                    onClick={() => setActiveMeal(i)}
+                  >
+                    <Icon size={16} />
+                    <span>{meal.period}</span>
                   </button>
                 );
               })}
@@ -511,38 +515,47 @@ export default function Dashboard() {
               <div className="dash-meal-card">
                 <h3>Sem refeições planeadas para hoje</h3>
                 <div className="dash-meal-actions">
-                <button type="button" className="dash-meal-view" onClick={openChatbotForPlan}>
-                  Gerar plano no chatbot <ChevronRight size={15} />
-                </button>
+                  <button type="button" className="dash-meal-view" onClick={openChatbotForPlan}>
+                    Gerar plano no chatbot <ChevronRight size={15} />
+                  </button>
                 </div>
               </div>
             ) : (
               <AnimatePresence mode="wait">
-              <motion.div
-                className="dash-meal-card"
-                key={activeMeal}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.25 }}
-              >
-                  <img src={activeMealData.image} alt={activeMealData.name} loading="lazy" className="dash-meal-image" />
-                  <div className="dash-meal-icon"><MealIcon size={24} /></div>
+                <motion.div
+                  className="dash-meal-card"
+                  key={activeMeal}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <img
+                    src={activeMealData.image}
+                    alt={activeMealData.name}
+                    loading="lazy"
+                    className="dash-meal-image"
+                  />
+                  <div className="dash-meal-icon">
+                    <MealIcon size={24} />
+                  </div>
                   <h3>{activeMealData.name}</h3>
                   <div className="dash-meal-meta">
-                    <span><Clock3 size={13} /> {activeMealData.time}</span>
-                    <span><Flame size={13} /> {activeMealData.kcal} kcal</span>
+                    <span>
+                      <Clock3 size={13} /> {activeMealData.time}
+                    </span>
+                    <span>
+                      <Flame size={13} /> {activeMealData.kcal} kcal
+                    </span>
                     <span>{activeMealData.cost}</span>
                   </div>
                   <div className="dash-meal-actions">
-                    <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>Ver receita completa <ChevronRight size={15} /></button>
-                  <button
-                    type="button"
-                    className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`}
-                    disabled
-                  >
-                    <CheckCircle2 size={14} />
-                    <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Por concluir'}</span>
+                    <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>
+                      Ver receita completa <ChevronRight size={15} />
+                    </button>
+                    <button type="button" className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`} disabled>
+                      <CheckCircle2 size={14} />
+                      <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Por concluir'}</span>
                     </button>
                   </div>
                 </motion.div>
@@ -551,14 +564,16 @@ export default function Dashboard() {
 
             <div className="dash-meal-progress">
               <div className="dash-meal-progress-track">
-              <motion.div
-                className="dash-meal-progress-fill"
-                initial={false}
-                animate={{ width: `${completedPct}%` }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-              />
+                <motion.div
+                  className="dash-meal-progress-fill"
+                  initial={false}
+                  animate={{ width: `${completedPct}%` }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                />
               </div>
-              <span>{completedCount} de {meals.length} concluídas</span>
+              <span>
+                {completedCount} de {meals.length} concluídas
+              </span>
             </div>
           </motion.section>
 
@@ -570,39 +585,51 @@ export default function Dashboard() {
                   <h2>{weeklySummaryTitle}</h2>
                   <p>{weeklySummaryText}</p>
                 </div>
-              <div className="dash-insight-art">
-                <img src="https://picsum.photos/seed/summary-nutriq/520/360" alt="Prato saudável" loading="lazy" className="dash-insight-image" />
-              </div>
+                <div className="dash-insight-art">
+                  <img
+                    src="https://picsum.photos/seed/summary-nutriq/520/360"
+                    alt="Prato saudável"
+                    loading="lazy"
+                    className="dash-insight-image"
+                  />
+                </div>
               </div>
 
               <div className="dash-insight-bento">
                 <motion.div className="bento-cell bento-budget" {...fade}>
-                <Wallet size={20} />
-                <strong>{formatEuro(dashboardData.estimatedWeeklySpend)}</strong>
-                <span>gasto esta semana</span>
-                <div className="bento-budget-bar">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    whileInView={{ width: `${budgetPercent}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                    viewport={{ once: true }}
-                  />
-                </div>
-                <span className="bento-budget-label">
-                  {dashboardData.weeklyBudget > 0 ? `${budgetPercent}% do orçamento` : 'Orçamento não definido'}
-                </span>
+                  <Wallet size={20} />
+                  <strong>{formatEuro(dashboardData.estimatedWeeklySpend)}</strong>
+                  <span>gasto esta semana</span>
+                  <div className="bento-budget-bar">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${budgetPercent}%` }}
+                      transition={{ duration: 0.8, ease: 'easeOut' }}
+                      viewport={{ once: true }}
+                    />
+                  </div>
+                  <span className="bento-budget-label">
+                    {dashboardData.weeklyBudget > 0 ? `${budgetPercent}% do orçamento` : 'Orçamento não definido'}
+                  </span>
                 </motion.div>
 
                 <motion.div className="bento-cell bento-score" {...fade}>
-                <Target size={20} />
-                <strong>{dashboardData.weeklyAdherencePct}<span className="score-pct">%</span></strong>
-                <span>adesão semanal</span>
+                  <Target size={20} />
+                  <strong>
+                    {dashboardData.weeklyAdherencePct}
+                    <span className="score-pct">%</span>
+                  </strong>
+                  <span>adesão semanal</span>
                 </motion.div>
 
                 <motion.div className="bento-cell bento-meals-done" {...fade}>
-                <CheckCircle2 size={20} />
-                <strong>{dashboardData.weeklyCompletedMeals}<span className="score-sep">/</span>{dashboardData.weeklyTotalMeals}</strong>
-                <span>refeições concluídas</span>
+                  <CheckCircle2 size={20} />
+                  <strong>
+                    {dashboardData.weeklyCompletedMeals}
+                    <span className="score-sep">/</span>
+                    {dashboardData.weeklyTotalMeals}
+                  </strong>
+                  <span>refeições concluídas</span>
                 </motion.div>
               </div>
             </motion.section>
@@ -610,40 +637,72 @@ export default function Dashboard() {
             <motion.section className="dash-chart-section" {...fade}>
               <div className="dash-chart-noise" />
               <div className="dash-chart-head">
-              <div>
-                <h2>Calorias vs objetivo</h2>
-                <span>Últimos 7 dias</span>
-              </div>
-              <div className="dash-chart-legend">
-                <span className="legend-real" />Real
-                <span className="legend-meta" />Meta
-              </div>
+                <div>
+                  <h2>Calorias vs objetivo</h2>
+                  <span>Últimos 7 dias</span>
+                </div>
+                <div className="dash-chart-legend">
+                  <span className="legend-real" />
+                  Real
+                  <span className="legend-meta" />
+                  Meta
+                </div>
               </div>
               <div className="dash-chart-canvas">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={dashboardData.weeklyCalories}>
-                  <defs>
-                    <linearGradient id="calGradDark" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                    <defs>
+                      <linearGradient id="calGradDark" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid stroke="rgba(148,163,184,0.25)" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fill: '#cbd5e1', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={34} domain={['dataMin - 100', 'dataMax + 100']} />
-                  <Tooltip
-                    cursor={{ stroke: '#34d399', strokeWidth: 1 }}
-                    contentStyle={{ background: '#f8fafc', border: '1px solid #d9e2ec', borderRadius: '12px', color: '#0f172a' }}
-                    labelStyle={{ color: '#475569' }}
-                  />
-                    <Area type="monotone" dataKey="meta" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="6 4" fill="transparent" name="Meta" />
-                    <Area type="monotone" dataKey="real" stroke="#34d399" strokeWidth={2.5} fill="url(#calGradDark)" name="Real" />
+                    <XAxis
+                      dataKey="day"
+                      tick={{ fill: '#cbd5e1', fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: '#94a3b8', fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={34}
+                      domain={['dataMin - 100', 'dataMax + 100']}
+                    />
+                    <Tooltip
+                      cursor={{ stroke: '#34d399', strokeWidth: 1 }}
+                      contentStyle={{
+                        background: '#f8fafc',
+                        border: '1px solid #d9e2ec',
+                        borderRadius: '12px',
+                        color: '#0f172a',
+                      }}
+                      labelStyle={{ color: '#475569' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="meta"
+                      stroke="#94a3b8"
+                      strokeWidth={1.5}
+                      strokeDasharray="6 4"
+                      fill="transparent"
+                      name="Meta"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="real"
+                      stroke="#34d399"
+                      strokeWidth={2.5}
+                      fill="url(#calGradDark)"
+                      name="Real"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </motion.section>
           </div>
-
         </div>
       </div>
     </Layout>
