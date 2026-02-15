@@ -1,16 +1,24 @@
 import asyncio
 from typing import Any, Dict, Optional
+import logging
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import get_settings
-from models.schemas import ChatRequest, ChatResponse
+from models.schemas import (
+    ChatRequest,
+    ChatResponse,
+    FoodImageAnalysisRequest,
+    FoodImageAnalysisResponse,
+)
 from services.backend_service import BackendService
 from services.openai_service import OpenAIService
 
 settings = get_settings()
 app = FastAPI(title="Meal Planner Chatbot (OpenAI)")
+logger = logging.getLogger(__name__)
 
 origins = ["*"] if settings.allowed_origins == "*" else [x.strip() for x in settings.allowed_origins.split(",")]
 app.add_middleware(
@@ -23,6 +31,49 @@ app.add_middleware(
 
 chat_service = OpenAIService()
 backend_service = BackendService()
+
+
+def _apply_plan_persistence_and_cart(response: ChatResponse, backend_token: Optional[str]) -> ChatResponse:
+    constraints = ((response.meal_plan_draft or {}).get("constraints") or {})
+    if constraints:
+        backend_service.persist_user_chat_data(backend_token, constraints)
+
+    if response.meal_plan:
+        generated_plan = dict(response.meal_plan)
+        persisted_plan = backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
+        if persisted_plan:
+            response.meal_plan = persisted_plan
+            response.meal_plan_persisted = True
+        else:
+            logger.warning(
+                "Plano gerado mas não persistido no backend (token=%s)",
+                "present" if backend_token else "missing",
+            )
+            response.meal_plan = None
+            response.meal_plan_persisted = False
+            response.response = (
+                "Consegui gerar o plano, mas não foi possível guardá-lo na base de dados. "
+                "Tenta novamente dentro de instantes."
+            )
+
+        if response.meal_plan_persisted:
+            cart_plan_input = dict(response.meal_plan or {})
+            for key in ("max_weekly_budget", "goal_daily_calories", "planning_days", "goal"):
+                if key not in cart_plan_input and key in generated_plan:
+                    cart_plan_input[key] = generated_plan[key]
+
+            shopping_cart = backend_service.generate_and_persist_shopping_cart(
+                backend_token,
+                cart_plan_input,
+            )
+            if shopping_cart:
+                response.shopping_cart = shopping_cart
+                response.response = (
+                    f"{response.response} Também otimizei o carrinho para ficar mais barato e mais saudável "
+                    "com base no teu orçamento e objetivo calórico semanal."
+                ).strip()
+
+    return response
 
 
 @app.get("/")
@@ -119,13 +170,54 @@ async def onboarding_chat(request: ChatRequest, http_request: Request):
     history = request.conversation_history or []
 
     try:
-        response = await chat_service.onboarding_chat(request.message, history)
+        response = await chat_service.onboarding_chat(
+            request.message,
+            history,
+            user_id=request.user_id,
+            user_context=request.user_context,
+        )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
     backend_token = _resolve_backend_token(request, http_request)
+    persisted = False
     if response.extracted_preferences:
-        backend_service.persist_user_chat_data(backend_token, response.extracted_preferences)
+        persisted = backend_service.persist_user_chat_data(backend_token, response.extracted_preferences)
+        if response.onboarding_complete and not persisted:
+            logger.warning(
+                "Onboarding completo mas sem persistência no backend (token=%s)",
+                "present" if backend_token else "missing",
+            )
+            response.onboarding_complete = False
+            response.extracted_preferences = None
+            response.response = (
+                "Ainda não consegui guardar as tuas preferências na base de dados. "
+                "Confirma a sessão e tenta novamente para eu gerar o plano."
+            )
+
+    if response.onboarding_complete and persisted and backend_token:
+        try:
+            auto_plan_response = await chat_service.assistant_chat(
+                "Com base no meu onboarding, gera agora o meu plano semanal de refeições.",
+                {
+                    **(response.extracted_preferences or {}),
+                    "is_first_time": False,
+                },
+                history,
+                auth_token=backend_token,
+                user_id=request.user_id,
+            )
+            auto_plan_response = _apply_plan_persistence_and_cart(auto_plan_response, backend_token)
+
+            response.meal_plan_draft = auto_plan_response.meal_plan_draft
+            response.meal_plan = auto_plan_response.meal_plan
+            response.meal_plan_persisted = auto_plan_response.meal_plan_persisted
+            response.shopping_cart = auto_plan_response.shopping_cart
+
+            if auto_plan_response.response:
+                response.response = f"{response.response}\n{auto_plan_response.response}".strip()
+        except Exception as exc:
+            logger.warning("Falha ao auto-gerar plano pós-onboarding: %s", exc)
 
     return response
 
@@ -141,23 +233,25 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
         normalized_context["is_first_time"] = True
 
     backend_token = _resolve_backend_token(request, http_request)
+    if backend_token:
+        active_plan = backend_service.fetch_active_meal_plan(backend_token)
+        if active_plan and "active_meal_plan" not in normalized_context:
+            normalized_context["active_meal_plan"] = active_plan
 
     try:
         response = await chat_service.assistant_chat(
-            request.message, normalized_context, history, auth_token=backend_token
+            request.message,
+            normalized_context,
+            history,
+            auth_token=backend_token,
+            user_id=request.user_id,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
-    constraints = ((response.meal_plan_draft or {}).get("constraints") or {})
-    if constraints:
-        backend_service.persist_user_chat_data(backend_token, constraints)
+    response = _apply_plan_persistence_and_cart(response, backend_token)
 
-    if response.meal_plan:
-        generated_plan = dict(response.meal_plan)
-        persisted_plan = backend_service.persist_generated_meal_plan(backend_token, response.meal_plan)
-        if persisted_plan:
-            response.meal_plan = persisted_plan
+    return response
 
         # Primeiro tenta sempre o plano ativo persistido (BD), como fonte de verdade.
         cart_plan_input = persisted_plan if isinstance(persisted_plan, dict) else None
@@ -171,18 +265,18 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
             if key not in cart_plan_input and key in generated_plan:
                 cart_plan_input[key] = generated_plan[key]
 
-        shopping_cart = backend_service.generate_and_persist_shopping_cart(
-            backend_token,
-            cart_plan_input,
+@app.post("/chat/analyze-food-image", response_model=FoodImageAnalysisResponse)
+async def analyze_food_image(request: FoodImageAnalysisRequest):
+    try:
+        result = await chat_service.analyze_food_image(
+            image_base64=request.image_base64,
+            mime_type=request.mime_type,
+            user_message=request.user_message,
         )
-        if shopping_cart:
-            response.shopping_cart = shopping_cart
-            response.response = (
-                f"{response.response} Também otimizei o carrinho para ficar mais barato e mais saudável "
-                "com base no teu orçamento e objetivo calórico semanal."
-            ).strip()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Vision provider error: {exc}") from exc
 
-    return response
+    return FoodImageAnalysisResponse(**result)
 
 
 if __name__ == "__main__":

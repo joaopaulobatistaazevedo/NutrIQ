@@ -14,6 +14,9 @@ from config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+logger = logging.getLogger(__name__)
+
+
 class BackendService:
     CARD_ACCENTS = ["is-pingo", "is-continente", "is-lidl"]
     FRESH_TOKENS = {
@@ -101,6 +104,51 @@ class BackendService:
         "HIGH_PROTEIN",
     }
 
+    GOAL_ALIASES = {
+        "LOSE_WEIGHT": "LOSE_WEIGHT",
+        "EMAGRECER": "LOSE_WEIGHT",
+        "PERDER_PESO": "LOSE_WEIGHT",
+        "LOSEWEIGHT": "LOSE_WEIGHT",
+        "MAINTAIN": "MAINTAIN",
+        "MANTER": "MAINTAIN",
+        "MANTER_A_FORMA": "MAINTAIN",
+        "GAIN_WEIGHT": "BULK",
+        "GAIN_MUSCLE": "BULK",
+        "GANHAR_PESO": "BULK",
+        "GANHAR_MASSA": "BULK",
+        "GANHAR_MASSA_MUSCULAR": "BULK",
+        "BULK": "BULK",
+    }
+
+    RESTRICTION_ALIASES = {
+        "VEGETARIANO": "VEGETARIAN",
+        "VEGETARIANA": "VEGETARIAN",
+        "GLUTENFREE": "GLUTEN_FREE",
+        "SEM_GLUTEN": "GLUTEN_FREE",
+        "LACTOSEFREE": "LACTOSE_FREE",
+        "SEM_LACTOSE": "LACTOSE_FREE",
+        "LOWCARB": "LOW_CARB",
+        "BAIXO_CARBO": "LOW_CARB",
+        "LOWFAT": "LOW_FAT",
+        "BAIXA_GORDURA": "LOW_FAT",
+        "HIGHPROTEIN": "HIGH_PROTEIN",
+        "ALTA_PROTEINA": "HIGH_PROTEIN",
+    }
+
+    ALLERGEN_ALIASES = {
+        "CRUSTACEOS": "CRUSTACEANS",
+        "OVOS": "EGGS",
+        "PEIXE": "FISH",
+        "AMENDOINS": "PEANUTS",
+        "SOJA": "SOYBEANS",
+        "LEITE": "MILK",
+        "FRUTOS_SECOS": "NUTS",
+        "AIPO": "CELERY",
+        "MOSTARDA": "MUSTARD",
+        "SULFITOS": "SULPHITES",
+        "MOLUSCOS": "MOLLUSCS",
+    }
+
     VALID_ALLERGENS = {
         "GLUTEN",
         "CRUSTACEANS",
@@ -129,7 +177,17 @@ class BackendService:
         if not payload:
             return False
 
-        return self._update_profile(auth_token, payload)
+        if self._update_profile(auth_token, payload):
+            return True
+
+        # Fallback: alguns backends rejeitam campos opcionais novos.
+        # Tentamos payloads mais restritos para não bloquear o onboarding.
+        fallback_payloads = self._build_profile_fallback_payloads(payload)
+        for fallback in fallback_payloads:
+            if self._update_profile(auth_token, fallback):
+                return True
+
+        return False
 
     def persist_generated_meal_plan(
         self,
@@ -148,7 +206,13 @@ class BackendService:
 
         created_plan = self._create_meal_plan(auth_token, week_start)
         if not created_plan:
-            return None
+            created_plan = self._request_json(
+                auth_token,
+                method="GET",
+                path="/api/meal-plans/active",
+            )
+            if not isinstance(created_plan, dict):
+                return None
 
         plan_id = created_plan.get("id")
         if not isinstance(plan_id, int):
@@ -386,22 +450,25 @@ class BackendService:
         if isinstance(max_budget, (int, float)):
             payload["maxWeeklyBudget"] = float(max_budget)
 
-        restrictions = self._normalize_items(data.get("restrictions"), self.VALID_RESTRICTIONS)
+        goal = self._normalize_goal(data.get("goal"))
+        if goal:
+            payload["goal"] = goal
+
+        restrictions = self._normalize_items(
+            data.get("restrictions"),
+            self.VALID_RESTRICTIONS,
+            aliases=self.RESTRICTION_ALIASES,
+        )
         if restrictions:
             payload["restrictions"] = restrictions
 
-        allergens = self._normalize_items(data.get("allergens"), self.VALID_ALLERGENS)
+        allergens = self._normalize_items(
+            data.get("allergens"),
+            self.VALID_ALLERGENS,
+            aliases=self.ALLERGEN_ALIASES,
+        )
         if allergens:
             payload["allergens"] = allergens
-
-        # ignorados e nunca chegavam ao backend
-        favorite_foods = self._normalize_string_list(data.get("favorite_foods"))
-        if favorite_foods:
-            payload["favoriteFoods"] = favorite_foods
-
-        disliked_ingredients = self._normalize_string_list(data.get("disliked_ingredients"))
-        if disliked_ingredients:
-            payload["dislikedIngredients"] = disliked_ingredients
 
         return payload
 
@@ -421,7 +488,12 @@ class BackendService:
                 result.append(clean)
         return result
 
-    def _normalize_items(self, raw: Any, allowed_values: set[str]) -> list[str]:
+    def _normalize_items(
+        self,
+        raw: Any,
+        allowed_values: set[str],
+        aliases: Optional[Dict[str, str]] = None,
+    ) -> list[str]:
         if raw is None:
             return []
 
@@ -436,10 +508,45 @@ class BackendService:
             if not isinstance(item, str):
                 continue
             key = item.strip().upper().replace("-", "_").replace(" ", "_")
+            if aliases and key in aliases:
+                key = aliases[key]
             if key in allowed_values:
                 normalized.append(key)
 
         return sorted(set(normalized))
+
+    def _normalize_goal(self, raw: Any) -> Optional[str]:
+        if not isinstance(raw, str):
+            return None
+        key = raw.strip().upper().replace("-", "_").replace(" ", "_")
+        key = self.GOAL_ALIASES.get(key, key)
+        return key if key in {"LOSE_WEIGHT", "MAINTAIN", "BULK"} else None
+
+    def _build_profile_fallback_payloads(self, payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+        fallbacks: list[Dict[str, Any]] = []
+
+        # Primeiro remove os campos mais suscetíveis de não existir no schema do backend.
+        optional_food_fields = {
+            key: value
+            for key, value in payload.items()
+            if key not in {"favoriteFoods", "dislikedIngredients"}
+        }
+        if optional_food_fields and optional_food_fields != payload:
+            fallbacks.append(optional_food_fields)
+
+        # Depois tenta só os campos clássicos de onboarding suportados historicamente.
+        conservative_keys = ("maxWeeklyBudget", "restrictions", "allergens")
+        conservative = {key: payload[key] for key in conservative_keys if key in payload}
+        if conservative and conservative not in fallbacks:
+            fallbacks.append(conservative)
+
+        # Último recurso: tentar cada campo isoladamente.
+        for key, value in payload.items():
+            single = {key: value}
+            if single not in fallbacks:
+                fallbacks.append(single)
+
+        return fallbacks
 
     def _extract_ingredient_demand_from_plan(
         self,
@@ -997,9 +1104,10 @@ class BackendService:
     def _resolve_recipe_id(self, auth_token: str, meal: Dict[str, Any]) -> Optional[int]:
         raw_id = meal.get("recipe_id")
         if isinstance(raw_id, int):
-            return raw_id
+            return raw_id if self._recipe_exists(auth_token, raw_id) else None
         if isinstance(raw_id, str) and raw_id.isdigit():
-            return int(raw_id)
+            parsed = int(raw_id)
+            return parsed if self._recipe_exists(auth_token, parsed) else None
 
         title = str(meal.get("title") or "").strip()
         if not title:
@@ -1032,6 +1140,17 @@ class BackendService:
         if isinstance(first, dict) and isinstance(first.get("id"), int):
             return first["id"]
         return None
+
+    def _recipe_exists(self, auth_token: str, recipe_id: int) -> bool:
+        if recipe_id <= 0:
+            return False
+
+        recipe = self._request_json(
+            auth_token,
+            method="GET",
+            path=f"/api/recipes/{recipe_id}",
+        )
+        return isinstance(recipe, dict) and isinstance(recipe.get("id"), int)
 
     def _create_recipe_from_generated_meal(
         self,
@@ -1263,6 +1382,27 @@ class BackendService:
             return None
         except ValueError:
             logger.warning("Backend returned invalid JSON on %s %s", method, path)
+            try:
+                detail = exc.read().decode("utf-8", errors="ignore")
+            except Exception:
+                detail = ""
+            logger.warning(
+                "Backend HTTPError %s em %s %s payload=%s detail=%s",
+                exc.code,
+                method,
+                path,
+                payload,
+                detail,
+            )
+            return None
+        except error.URLError as exc:
+            logger.warning("Backend URLError em %s %s: %s", method, path, exc)
+            return None
+        except TimeoutError:
+            logger.warning("Backend timeout em %s %s", method, path)
+            return None
+        except ValueError as exc:
+            logger.warning("Backend resposta JSON inválida em %s %s: %s", method, path, exc)
             return None
 
     def _update_profile(self, auth_token: str, payload: Dict[str, Any]) -> bool:

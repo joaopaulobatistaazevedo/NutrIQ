@@ -27,4 +27,25 @@ class ChatResponse(BaseModel):
     extracted_preferences: Optional[Dict[str, Any]] = None
     meal_plan_draft: Optional[Dict[str, Any]] = None
     meal_plan: Optional[Dict[str, Any]] = None
+    meal_plan_persisted: bool = False
     shopping_cart: Optional[Dict[str, Any]] = None
+
+
+class FoodImageAnalysisRequest(BaseModel):
+    image_base64: str
+    mime_type: str = "image/jpeg"
+    user_message: str = ""
+
+
+class FoodImageAnalysisResponse(BaseModel):
+    status: str
+    dish_name: Optional[str] = None
+    estimated_kcal: Optional[float] = None
+    portion_description: Optional[str] = None
+    kcal_range: Optional[Dict[str, float]] = None
+    macros: Optional[Dict[str, float]] = None
+    confidence: Optional[str] = None
+    tips: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    disclaimer: Optional[str] = None
+    message: Optional[str] = None

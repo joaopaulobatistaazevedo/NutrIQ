@@ -59,6 +59,15 @@ services:
         condition: service_started
     ports:
       - "${CHATBOT_HOST_PORT:-8000}:8000"
+    volumes:
+      - ./.run-batista/logs:/logs
+      - chatbot_data:/app/data
+    command:
+      [
+        "sh",
+        "-lc",
+        "mkdir -p /logs && python -m uvicorn main:app --host 0.0.0.0 --port 8000 2>&1 | tee -a /logs/chatbot.log",
+      ]
 
   frontend:
     image: node:20-alpine
@@ -155,3 +164,4 @@ volumes:
   mysql_data:
   backend_sqlite_data:
   frontend_node_modules:
+  chatbot_data:

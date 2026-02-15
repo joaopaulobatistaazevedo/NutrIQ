@@ -9,8 +9,14 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
   padding-bottom: 0;
+}
+
+.dash .container-xl {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
 }
 
 /* ---- NOISE OVERLAY util ---- */
@@ -33,7 +39,6 @@
   background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%);
   border-radius: 24px;
   padding: clamp(32px, 5vw, 52px) clamp(28px, 4vw, 48px);
-  color: #fff;
 }
 
 .dash-hero-blob {
@@ -193,150 +198,6 @@
   gap: 8px;
 }
 
-/* ---- Hydration canister ---- */
-.dash-hydration-card {
-  width: 144px;
-  background: transparent;
-  border: none;
-  padding: 0;
-}
-
-.hydration-body {
-  display: flex;
-  justify-content: center;
-}
-
-.water-bottle {
-  width: 124px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-  filter: drop-shadow(0 12px 16px rgba(15, 23, 42, 0.18));
-}
-
-.water-bottle-top {
-  width: 34px;
-  height: 20px;
-  border-radius: 6px 6px 4px 4px;
-  background: linear-gradient(180deg, #d9e1eb, #9aa4b2);
-  border: 2px solid rgba(0, 0, 0, 0.425);
-  margin-bottom: -3px;
-  position: relative;
-  z-index: 4;
-}
-
-.water-bottle-neck {
-  width: 30px;
-  height: 15px;
-  border-radius: 3px;
-  margin-bottom: 0;
-  background: rgba(97, 126, 234, 0.78);
-  border: 2px solid rgba(57, 82, 170, 0.86);
-  border-bottom: none;
-  box-shadow: none;
-  position: relative;
-  z-index: 2;
-}
-
-.water-bottle-neck::before,
-.water-bottle-neck::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  width: 0;
-  height: 6px;
-  border-bottom: 2px solid rgba(57, 82, 170, 0.86);
-  pointer-events: none;
-}
-
-.water-bottle-neck::before {
-  left: -2px;
-  border-left: 2px solid rgba(57, 82, 170, 0.86);
-  border-bottom-left-radius: 6px;
-}
-
-.water-bottle-neck::after {
-  right: -2px;
-  border-right: 2px solid rgba(57, 82, 170, 0.86);
-  border-bottom-right-radius: 6px;
-}
-
-.water-bottle-body {
-  width: 90px;
-  height: 160px;
-  border-radius: 36px 36px 14px 14px;
-  border: 2px solid rgba(57, 82, 170, 0.86);
-  border-top: none;
-  background: linear-gradient(180deg, rgba(97, 126, 234, 0.78), rgba(97, 126, 234, 0.78));
-  position: relative;
-  overflow: hidden;
-  z-index: 1;
-}
-
-.water-bottle-body::before,
-.water-bottle-body::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  width: 12px;
-  border-top: 2px solid rgba(57, 82, 170, 0.86);
-  pointer-events: none;
-  z-index: 3;
-}
-
-.water-bottle-body::before {
-  left: calc(50% - 17px);
-}
-
-.water-bottle-body::after {
-  right: calc(50% - 17px);
-}
-
-.water-bottle-fill {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, rgba(128, 231, 255, 0.78), rgba(77, 187, 255, 0.82));
-}
-
-.water-bottle-gloss {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  width: 20px;
-  height: 140px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.33), rgba(255, 255, 255, 0));
-  pointer-events: none;
-}
-
-.water-bottle-reading {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.1;
-  pointer-events: none;
-}
-
-.water-bottle-reading strong {
-  font-size: 20px;
-  font-weight: 800;
-  color: #eaf3ff;
-  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
-}
-
-.water-bottle-reading span {
-  font-size: 12px;
-  font-weight: 700;
-  color: #d9ebff;
-  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
-}
 
 .macro-bar-head {
   display: flex;
@@ -539,14 +400,14 @@
   color: #fff;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
 }
 
 .dash-insight-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
+  gap: 32px;
 }
 
 .dash-insight-content {
@@ -1010,7 +871,7 @@
    ========================================= */
 .dash-hero {
   background: #1e293b;
-  color: #f8fafc;
+  color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -1166,3 +1027,10 @@
   color: #64748b;
   opacity: 0.45;
 }
+
+.dash-hero.card {
+  background: #1d2a44 !important;
+  color: #f8fafc;
+  border-radius: 24px !important;
+  }
+
