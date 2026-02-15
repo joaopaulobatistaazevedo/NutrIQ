@@ -135,6 +135,10 @@ export async function generateShoppingCartFromMealPlan(mealPlan = null) {
       }
     }
 
+    throw new Error(normalizeError(error));
+  }
+}
+
 export async function analyzeFoodImage({ imageBase64, mimeType = 'image/jpeg', userMessage = '' }) {
   try {
     const { data } = await client.post('/chat/analyze-food-image', {
