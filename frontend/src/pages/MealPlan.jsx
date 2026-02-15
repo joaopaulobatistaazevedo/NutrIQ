@@ -62,13 +62,16 @@ function parseStorage(key, fallback) {
 }
 
 function slotMeta(slot) {
-  if (slot === 'Pequeno-almoço') {
+  const normalized = String(slot || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized.includes('pequeno')) {
     return { icon: Sunrise, time: '08:00', kcal: 380 };
   }
-  if (slot === 'Almoço') {
+  if (normalized === 'almoco' || normalized === 'lunch') {
     return { icon: Sun, time: '13:00', kcal: 620 };
   }
-  return { icon: Moon, time: '20:00', kcal: 540 };
+  return { icon: Moon, time: '20:30', kcal: 540 };
 }
 
 export default function MealPlan() {
