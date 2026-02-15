@@ -86,3 +86,30 @@ export async function createRecipe(payload) {
     throw new Error(normalizeError(error));
   }
 }
+
+export async function updateRecipe(recipeId, payload) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+
+  try {
+    const { data } = await client.put(`/api/recipes/${id}`, payload);
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function deleteRecipe(recipeId) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+
+  try {
+    await client.delete(`/api/recipes/${id}`);
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
