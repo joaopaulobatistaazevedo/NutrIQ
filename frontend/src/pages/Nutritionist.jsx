@@ -15,7 +15,7 @@ import { createRecipe } from '../services/recipeService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/nutritionist.css';
 
-const MEAL_TYPES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
+const MEAL_TYPES = ['MEAL', 'SNACK'];
 
 function parseStoredRecipes() {
   const raw = localStorage.getItem(NUTRITIONIST_RECIPES_KEY);
@@ -58,9 +58,7 @@ function toFirstName(nameOrEmail) {
 }
 
 function mealLabel(type) {
-  if (type === 'BREAKFAST') return 'Pequeno-almoço';
-  if (type === 'LUNCH') return 'Almoço';
-  if (type === 'DINNER') return 'Jantar';
+  if (type === 'MEAL') return 'Refeição';
   if (type === 'SNACK') return 'Snack';
   return type;
 }
@@ -72,7 +70,7 @@ export default function Nutritionist() {
   const [activeTab, setActiveTab] = useState('create');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [mealType, setMealType] = useState('DINNER');
+  const [mealType, setMealType] = useState('MEAL');
   const [prepTimeMin, setPrepTimeMin] = useState('15');
   const [cookTimeMin, setCookTimeMin] = useState('20');
   const [servings, setServings] = useState('2');
@@ -146,10 +144,12 @@ export default function Nutritionist() {
           durationMinutes: 0,
         }));
 
+      const normalizedMealType = mealType === 'SNACK' ? 'SNACK' : 'DINNER';
+
       const payload = {
         name: trimmedName,
         description: description.trim(),
-        mealType,
+        mealType: normalizedMealType,
         prepTimeMin: parsedPrep,
         cookTimeMin: parsedCook,
         servings: Math.max(1, Number(servings) || 1),
@@ -168,7 +168,7 @@ export default function Nutritionist() {
       setSuccessMessage('Receita criada e guardada na base de dados.');
       setName('');
       setDescription('');
-      setMealType('DINNER');
+      setMealType('MEAL');
       setPrepTimeMin('15');
       setCookTimeMin('20');
       setServings('2');

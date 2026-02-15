@@ -92,8 +92,12 @@ class GoalMealPlannerService:
           calories_offset      : int  (positive = overate; negative = skipped meals / ate less)
         """
         goal = _normalise_goal(constraints.get("goal"))
-        requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=7)
+        requested_planning_days = _safe_int(constraints.get("planning_days"), default=7, lo=1, hi=14)
         planning_days = requested_planning_days
+        week_start = _resolve_week_start(constraints)
+        today = date.today()
+        planning_start = max(today, week_start)
+        week_offset = _safe_int(constraints.get("week_offset"), default=0, lo=0, hi=52)
         max_budget = _safe_float(constraints.get("max_weekly_budget"), default=0.0)
         tdee = _safe_float(constraints.get("tdee"), default=2200.0)
         body_weight_kg = _safe_float(
@@ -159,6 +163,8 @@ class GoalMealPlannerService:
                 disliked,
                 liked,
                 "Sem receitas disponíveis no backend neste momento.",
+                week_start=week_start,
+                planning_start=planning_start,
             )
 
         # Filter disliked + dietary restrictions / allergens
@@ -196,10 +202,17 @@ class GoalMealPlannerService:
             best_slots = ga.run()
         except Exception as exc:
             logger.error("GA failed: %s", exc)
-            return _empty_plan(planning_days, goal, disliked, liked, f"Erro no algoritmo: {exc}")
+            return _empty_plan(
+                planning_days,
+                goal,
+                disliked,
+                liked,
+                f"Erro no algoritmo: {exc}",
+                week_start=week_start,
+                planning_start=planning_start,
+            )
 
-        today = date.today()
-        days_payload = _build_days_payload(best_slots, planning_days, today)
+        days_payload = _build_days_payload(best_slots, planning_days, planning_start)
         total_cost = sum(ms.recipe.cost_per_serving for ms in best_slots)
         goal_profile = GOAL_PROFILES[goal]
         goal_daily_calories = max(1200.0, tdee + float(goal_profile.get("calorie_delta", 0.0)) + calorie_adjustment_per_day)
@@ -210,8 +223,9 @@ class GoalMealPlannerService:
             "goal_daily_calories": round(goal_daily_calories, 0),
             "planning_days": planning_days,
             "requested_planning_days": requested_planning_days,
-            "planning_start": today.isoformat(),
-            "week_start": _current_week_start().isoformat(),
+            "planning_start": planning_start.isoformat(),
+            "week_start": week_start.isoformat(),
+            "requested_week_offset": week_offset,
             "max_weekly_budget": max_budget or None,
             "estimated_weekly_cost": round(total_cost, 2),
             "excluded_ingredients": disliked,
@@ -354,13 +368,20 @@ def _build_days_payload(
 
 
 def _empty_plan(
-    planning_days: int, goal: str, disliked: list[str], liked: list[str], reason: str
+    planning_days: int,
+    goal: str,
+    disliked: list[str],
+    liked: list[str],
+    reason: str,
+    week_start: date,
+    planning_start: date,
 ) -> dict[str, Any]:
     return {
         "status": "empty",
         "goal": goal,
         "planning_days": planning_days,
-        "week_start": _current_week_start().isoformat(),
+        "planning_start": planning_start.isoformat(),
+        "week_start": week_start.isoformat(),
         "excluded_ingredients": disliked,
         "liked_ingredients": liked,
         "days": [],
@@ -449,6 +470,28 @@ def _safe_float(val: Any, default: float) -> float:
         return float(val) if val is not None else default
     except (TypeError, ValueError):
         return default
+
+
+def _parse_iso_date(raw: Any) -> date | None:
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _resolve_week_start(constraints: dict[str, Any]) -> date:
+    explicit_week_start = _parse_iso_date(constraints.get("week_start"))
+    if explicit_week_start is not None:
+        return explicit_week_start - timedelta(days=explicit_week_start.weekday())
+
+    week_offset = _safe_int(constraints.get("week_offset"), default=0, lo=0, hi=52)
+    base = _current_week_start()
+    return base + timedelta(days=week_offset * 7)
 
 
 def _current_week_start() -> date:

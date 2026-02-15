@@ -18,17 +18,16 @@ const DAY_TO_OFFSET = {
 const OFFSET_TO_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const MEAL_TYPE_TO_SLOT = {
-  BREAKFAST: 'Pequeno-almoço',
-  LUNCH: 'Almoço',
-  DINNER: 'Jantar',
+  BREAKFAST: 'Refeição',
+  LUNCH: 'Refeição',
+  DINNER: 'Refeição',
+  MEAL: 'Refeição',
   SNACK: 'Snack',
 };
 
 const SLOT_ORDER = {
-  'Pequeno-almoço': 0,
-  Almoço: 1,
-  Jantar: 2,
-  Snack: 3,
+  Refeição: 0,
+  Snack: 1,
 };
 
 function normalizeError(error) {
@@ -156,10 +155,80 @@ function toUiPlan(plan) {
   };
 }
 
+function mergePlans(plans) {
+  if (!Array.isArray(plans) || plans.length <= 0) {
+    return null;
+  }
+
+  const uiPlans = plans
+    .map((plan) => toUiPlan(plan))
+    .filter(Boolean)
+    .sort((a, b) => String(a.week_start || '').localeCompare(String(b.week_start || '')));
+
+  if (!uiPlans.length) {
+    return null;
+  }
+
+  const byDate = new Map();
+  uiPlans.forEach((plan) => {
+    const dayList = Array.isArray(plan.days) ? plan.days : [];
+    dayList.forEach((day) => {
+      const dateKey = String(day?.date || '').trim();
+      if (!dateKey) {
+        return;
+      }
+
+      const meals = Array.isArray(day?.meals) ? day.meals : [];
+      const existing = byDate.get(dateKey);
+      if (!existing || (Array.isArray(existing.meals) && existing.meals.length <= 0 && meals.length > 0)) {
+        byDate.set(dateKey, {
+          date: dateKey,
+          day_label: day?.day_label || '',
+          meals,
+        });
+      }
+    });
+  });
+
+  const todayIso = toIsoDate(new Date());
+  const orderedDates = Array.from(byDate.keys()).sort();
+  const futureDates = orderedDates.filter((date) => date >= todayIso);
+  const selectedDates = futureDates.length > 0 ? futureDates : orderedDates;
+
+  const days = selectedDates
+    .map((dateKey) => byDate.get(dateKey))
+    .filter((day) => Array.isArray(day?.meals) && day.meals.length > 0);
+
+  if (!days.length) {
+    return null;
+  }
+
+  return {
+    status: 'generated',
+    source: 'backend_multi_plan',
+    week_start: uiPlans[0].week_start,
+    total_cost: uiPlans.reduce((sum, plan) => sum + (Number(plan.total_cost) || 0), 0),
+    days,
+  };
+}
+
 export async function fetchActiveMealPlan() {
   const headers = authHeadersOrNull();
   if (!headers) {
     return null;
+  }
+
+  try {
+    const { data } = await client.get('/api/meal-plans', { headers });
+    const merged = mergePlans(data);
+    if (merged) {
+      return merged;
+    }
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status && status !== 404 && status !== 400) {
+      throw new Error(normalizeError(error));
+    }
   }
 
   try {

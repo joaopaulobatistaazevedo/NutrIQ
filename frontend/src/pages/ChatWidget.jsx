@@ -604,23 +604,45 @@ export default function ChatWidget() {
           }, 0);
         };
 
+        const getDateBounds = (plan) => {
+          if (!plan || !Array.isArray(plan.days)) {
+            return { min: '', max: '' };
+          }
+          const dates = plan.days
+            .map((day) => String(day?.date || '').trim().slice(0, 10))
+            .filter(Boolean)
+            .sort();
+          if (!dates.length) {
+            return { min: '', max: '' };
+          }
+          return { min: dates[0], max: dates[dates.length - 1] };
+        };
+
         let planToStore = planPayload;
         const localMealCount = countMeals(planPayload);
-        const localWeekStart = String(planPayload?.week_start || '').trim();
         const localPreviewCount = countPreviewIngredients(planPayload);
+        const localBounds = getDateBounds(planPayload);
 
         try {
           const backendPlan = await fetchActiveMealPlan();
           const backendMealCount = countMeals(backendPlan);
-          const backendWeekStart = String(backendPlan?.week_start || '').trim();
           const backendPreviewCount = countPreviewIngredients(backendPlan);
-          const sameWeek = Boolean(localWeekStart && backendWeekStart && localWeekStart === backendWeekStart);
-          const backendHasComparableDetail = backendPreviewCount >= localPreviewCount;
+          const backendBounds = getDateBounds(backendPlan);
+          const backendCoversSameOrLongerRange = Boolean(
+            backendBounds.max && (!localBounds.max || backendBounds.max >= localBounds.max),
+          );
 
           if (
             backendPlan
             && backendMealCount > 0
-            && (localMealCount <= 0 || (sameWeek && backendHasComparableDetail))
+            && (
+              localMealCount <= 0
+              || (
+                backendMealCount >= localMealCount
+                && backendPreviewCount >= localPreviewCount
+                && backendCoversSameOrLongerRange
+              )
+            )
           ) {
             planToStore = backendPlan;
           }
@@ -718,8 +740,8 @@ export default function ChatWidget() {
           }));
         }
 
-        if (autoPlanResponse?.meal_plan_persisted !== false) {
-          await persistPlan(autoPlanResponse?.meal_plan);
+        if (autoPlanResponse?.meal_plan) {
+          await persistPlan(autoPlanResponse.meal_plan);
         }
         persistShoppingCart(autoPlanResponse?.shopping_cart);
       }
@@ -731,8 +753,8 @@ export default function ChatWidget() {
         }));
       }
 
-      if (response?.meal_plan_persisted !== false) {
-        await persistPlan(response?.meal_plan);
+      if (response?.meal_plan) {
+        await persistPlan(response.meal_plan);
       }
       persistShoppingCart(response?.shopping_cart);
 

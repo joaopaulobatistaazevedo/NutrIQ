@@ -6,20 +6,10 @@ import { MY_RECIPES_KEY } from '../constants/storageKeys';
 import '../styles/recipes.css';
 
 const CATEGORY_META = {
-  BREAKFAST: {
-    id: 'breakfast',
-    title: 'Base: Pequeno-almoço',
-    description: 'Receitas para começar o dia com energia.',
-  },
-  LUNCH: {
-    id: 'lunch',
-    title: 'Base: Almoço',
-    description: 'Pratos principais para meio do dia.',
-  },
-  DINNER: {
-    id: 'dinner',
-    title: 'Base: Jantar',
-    description: 'Receitas ideais para o final do dia.',
+  MEAL: {
+    id: 'meal',
+    title: 'Base: Refeição',
+    description: 'Pratos principais para qualquer refeição.',
   },
   SNACK: {
     id: 'snack',
@@ -28,20 +18,18 @@ const CATEGORY_META = {
   },
 };
 
-const CATEGORY_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
+const CATEGORY_ORDER = ['MEAL', 'SNACK'];
 
 function normalizeMealType(value) {
   const normalized = String(value || '').trim().toUpperCase();
-  if (CATEGORY_META[normalized]) return normalized;
-  return 'DINNER';
+  if (normalized === 'SNACK') return 'SNACK';
+  return 'MEAL';
 }
 
 function mealTypeLabel(value) {
   const normalized = normalizeMealType(value);
-  if (normalized === 'BREAKFAST') return 'Pequeno-almoço';
-  if (normalized === 'LUNCH') return 'Almoço';
-  if (normalized === 'DINNER') return 'Jantar';
-  return 'Snack';
+  if (normalized === 'SNACK') return 'Snack';
+  return 'Refeição';
 }
 
 function parseStoredMyRecipes() {
@@ -431,9 +419,7 @@ export default function Recipes() {
 
   const groupedCategories = useMemo(() => {
     const grouped = {
-      BREAKFAST: [],
-      LUNCH: [],
-      DINNER: [],
+      MEAL: [],
       SNACK: [],
     };
 
