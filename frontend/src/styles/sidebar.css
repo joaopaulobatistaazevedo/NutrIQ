@@ -191,55 +191,78 @@
   .sidebar { width: 220px; }
 }
 
-/* Mobile — horizontal bar */
-@media (max-width: 768px) {
+/* Mobile + narrow tablets — dock */
+@media (max-width: 1024px) {
   .sidebar {
-    width: 100%;
+    width: 360px;
+    max-width: calc(100vw - 20px);
     height: auto;
-    position: relative;
+    position: fixed;
+    top: auto;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    transform: translateX(-50%);
     flex-direction: row;
     align-items: center;
-    border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 8px 12px;
-    gap: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 18px 36px rgba(2, 6, 23, 0.38);
+    padding: 6px 8px;
+    gap: 0;
   }
 
-  .sidebar-logo { padding: 0; margin-right: auto; }
-  .sidebar-logo-text { font-size: 18px; }
+  .sidebar-logo {
+    display: none;
+  }
 
   .sidebar-nav {
-    flex-direction: row;
-    gap: 4px;
-    overflow-x: auto;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 42px;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
     padding: 0;
-    flex: 0 1 auto;
-    scrollbar-width: none;
+    flex: 1;
   }
-  .sidebar-nav::-webkit-scrollbar { display: none; }
 
   .sidebar-item {
-    min-width: fit-content;
-    padding: 6px 10px;
-    white-space: nowrap;
-    min-height: 34px;
-    font-size: 13px;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+    color: rgba(226, 232, 240, 0.7);
   }
 
-  .sidebar-item-arrow { display: none; }
+  .sidebar-item.active {
+    background: rgba(52, 211, 153, 0.2);
+    color: #34d399;
+    box-shadow: 0 6px 14px rgba(16, 185, 129, 0.2);
+  }
 
+  .sidebar-item-icon {
+    width: 18px;
+    height: 18px;
+    opacity: 1;
+  }
+
+  .sidebar-item:hover {
+    transform: translateY(-1px);
+  }
+
+  .sidebar-item-label,
+  .sidebar-item-arrow,
   .sidebar-item-kbd {
     display: none;
   }
 
   .sidebar-footer {
-    border-top: none;
-    padding: 0;
-  }
-
-  .sidebar-logout {
-    min-height: 34px;
-    padding: 6px 10px;
-    font-size: 13px;
+    display: none;
   }
 }

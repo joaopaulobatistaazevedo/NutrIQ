@@ -405,6 +405,18 @@ export default function ChatWidget() {
   }, []);
 
   useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('chat-open');
+    } else {
+      document.body.classList.remove('chat-open');
+    }
+
+    return () => {
+      document.body.classList.remove('chat-open');
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     localStorage.setItem(scopedKey(CHAT_MESSAGES_KEY, accountId), JSON.stringify(messages));
   }, [messages, accountId]);
 
@@ -749,7 +761,16 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="chat-widget">
+    <div className={`chat-widget ${isOpen ? 'chat-widget-open' : ''}`}>
+      {isOpen ? (
+        <button
+          type="button"
+          className="chat-backdrop"
+          aria-label="Fechar chat"
+          onClick={() => setIsOpen(false)}
+        />
+      ) : null}
+
       {isOpen && (
         <section
           className={`chat-panel ${!chatContext?.onboarding_complete ? 'onboarding' : ''}`}

@@ -278,7 +278,7 @@
 .recipe-summary-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 4200;
   background: rgba(15, 23, 42, 0.55);
   display: flex;
   align-items: center;
@@ -696,7 +696,7 @@
 .recipes-confirm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1250;
+  z-index: 4300;
   background: rgba(15, 23, 42, 0.58);
   display: flex;
   align-items: center;
@@ -739,12 +739,23 @@
 .recipes-edit-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1260;
+  z-index: 4400;
   background: rgba(15, 23, 42, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+body.modal-open .sidebar,
+body.modal-open .chat-widget {
+  pointer-events: none;
+  opacity: 0.14;
+  filter: saturate(0.65);
 }
 
 .recipes-edit-card {
@@ -860,4 +871,3 @@
     justify-content: flex-end;
   }
 }
-

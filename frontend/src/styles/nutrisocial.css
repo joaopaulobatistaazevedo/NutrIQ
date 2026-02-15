@@ -532,3 +532,56 @@
   font-size: 11px;
   color: var(--app-text-muted);
 }
+
+/* Mobile fix: header/actions stacking and card controls */
+@media (max-width: 768px) {
+  .nutri-social-page .page-header {
+    margin-bottom: 10px;
+  }
+
+  .nutri-social-page .page-header .row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+
+  .nutri-social-page .page-header .col,
+  .nutri-social-page .page-header .col-auto {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .nutri-social-page .page-header .col .text-secondary {
+    max-width: none;
+    line-height: 1.35;
+  }
+
+  .nutri-social-page .page-header .col-auto {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nutri-social-page .page-header .badge,
+  .nutri-social-page .page-header .btn {
+    max-width: 100%;
+  }
+
+  .nutri-social-page .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .nutri-social-page .card-header > .d-flex {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .nutri-social-page .card-body {
+    padding: 12px;
+  }
+}
