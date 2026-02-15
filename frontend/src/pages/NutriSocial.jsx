@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock3, Flame, MessageCircle, Pencil, Send, ThumbsUp, Trash2, UserMinus, UserPlus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
   acceptFriendRequest,
@@ -9,6 +9,7 @@ import {
   deleteSocialPost,
   fetchFriends,
   fetchNutriSocialFeed,
+  fetchNutriSocialUserPosts,
   fetchPostInteractionsMap,
   fetchPendingReceivedRequests,
   fetchPendingSentRequests,
@@ -233,6 +234,7 @@ function encodeFriendshipId(requesterId, addresseeId) {
 }
 
 export default function NutriSocial() {
+  const location = useLocation();
   const authSession = getAuthSession();
   const token = String(authSession?.token || '').trim();
   const currentUserId = Number(authSession?.userId || 0);
@@ -258,6 +260,7 @@ export default function NutriSocial() {
   const [communityInviteDraftById, setCommunityInviteDraftById] = useState({});
 
   const [feedPosts, setFeedPosts] = useState([]);
+  const [profileFeedPosts, setProfileFeedPosts] = useState([]);
   const [friendIds, setFriendIds] = useState([]);
   const [friendUsers, setFriendUsers] = useState([]);
   const [pendingReceived, setPendingReceived] = useState([]);
@@ -310,8 +313,9 @@ export default function NutriSocial() {
     }
 
     try {
-      const [feed, profile, friends, receivedRequests, sentRequests] = await Promise.all([
+      const [feed, myPosts, profile, friends, receivedRequests, sentRequests] = await Promise.all([
         fetchNutriSocialFeed(token),
+        fetchNutriSocialUserPosts(token, currentUserId),
         fetchMyProfile(token),
         fetchFriends(token),
         fetchPendingReceivedRequests(token),
@@ -326,6 +330,17 @@ export default function NutriSocial() {
           createdAt: normalizeDateTimeValue(post?.createdAt, post?.created_at, post?.currentTime, post?.current_time),
           currentTime: normalizeDateTimeValue(post?.currentTime, post?.current_time, post?.createdAt, post?.created_at),
         }));
+
+      const normalizedMyPosts = (Array.isArray(myPosts) ? myPosts : [])
+        .filter((post) => !isInvalidLegacyBlobPath(post))
+        .map((post) => ({
+          ...post,
+          userId: Number(post?.userId || post?.user_id || 0),
+          createdAt: normalizeDateTimeValue(post?.createdAt, post?.created_at, post?.currentTime, post?.current_time),
+          currentTime: normalizeDateTimeValue(post?.currentTime, post?.current_time, post?.createdAt, post?.created_at),
+        }));
+      setProfileFeedPosts(normalizedMyPosts);
+
       setFeedPosts((previous) => {
         if (silent) {
           const previousIds = new Set(previous.map((post) => String(post?.id || '')));
@@ -361,7 +376,7 @@ export default function NutriSocial() {
       setPendingReceived(Array.isArray(receivedRequests) ? receivedRequests : []);
       setPendingSent(Array.isArray(sentRequests) ? sentRequests : []);
       announceFriendRequestRefresh();
-      void hydratePostInteractions(normalizedFeed);
+      void hydratePostInteractions([...normalizedFeed, ...normalizedMyPosts]);
     } catch (error) {
       if (!silent) {
         setFeedError(error?.message || 'Não foi possível carregar o NutriSocial.');
@@ -377,6 +392,15 @@ export default function NutriSocial() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = String(params.get('tab') || '').trim().toLowerCase();
+    const allowedTabs = new Set(['feed', 'friends', 'meal', 'profile']);
+    if (allowedTabs.has(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (!token) {
@@ -559,12 +583,12 @@ export default function NutriSocial() {
 
   const visibleFeedPosts = useMemo(
     () => feedPosts.filter((post) => friendIds.includes(Number(post?.userId)) && Number(post?.userId) !== Number(currentUserId)),
-    [feedPosts, friendIds],
+    [feedPosts, friendIds, currentUserId],
   );
 
   const profilePosts = useMemo(
-    () => feedPosts.filter((post) => Number(post?.userId) === Number(currentUserId)),
-    [feedPosts, currentUserId],
+    () => profileFeedPosts.filter((post) => Number(post?.userId) === Number(currentUserId)),
+    [profileFeedPosts, currentUserId],
   );
 
   const activePostList = useMemo(
@@ -777,6 +801,16 @@ export default function NutriSocial() {
           : post
       )));
 
+      setProfileFeedPosts((previous) => previous.map((post) => (
+        String(post?.id) === normalizedPostId
+          ? {
+            ...post,
+            description: updated?.description ?? String(editingDraft.description || '').trim(),
+            rating: Number(updated?.rating || editingDraft.rating || post?.rating || 5),
+          }
+          : post
+      )));
+
       setFeedStatus('Publicação atualizada com sucesso.');
       handleCancelEditPost();
     } catch (error) {
@@ -796,6 +830,7 @@ export default function NutriSocial() {
     try {
       await deleteSocialPost(token, normalizedPostId);
       setFeedPosts((previous) => previous.filter((post) => String(post?.id) !== normalizedPostId));
+      setProfileFeedPosts((previous) => previous.filter((post) => String(post?.id) !== normalizedPostId));
       setInteractionsByPost((previous) => {
         const next = { ...previous };
         delete next[normalizedPostId];
@@ -1223,7 +1258,7 @@ export default function NutriSocial() {
                   const isOwnPost = Number(post?.userId) === Number(currentUserId);
                   const mealType = mealTypeFromPost(post);
                   const mealTypeDisplay = mealTypeLabel(mealType) || 'Refeição';
-                  const createdLabel = dayHourLabel(post?.createdAt);
+                  const createdLabel = dayHourLabel(post?.currentTime || post?.createdAt);
                   const isEditingPost = editingPostId === draftKey;
 
                   return (

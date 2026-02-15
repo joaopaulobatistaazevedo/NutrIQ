@@ -29,6 +29,7 @@ export const MAIN_NAV_ITEMS = USER_NAV_ITEMS;
 
 export const PRIVATE_PATHS = [
   ...USER_NAV_ITEMS.map((item) => item.path),
+  '/progress',
   '/nutritionist',
 ];
 
