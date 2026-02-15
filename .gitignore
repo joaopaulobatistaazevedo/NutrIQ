@@ -11,6 +11,7 @@ report.json
 !backend/database/meal_planner.db
 .run/logs/
 .run/pids/
+.run-batista/
 .run-*/
 .log
 .pid
