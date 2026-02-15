@@ -169,6 +169,7 @@ class MealPlanGA:
         liked: list[str],
         disliked: list[str],
         max_weekly_budget: float = 0.0,
+        excluded_recipe_ids: list[str] | None = None,
         population_size: int = 120,
         generations: int = 180,
         elite_k: int = 12,
@@ -176,13 +177,18 @@ class MealPlanGA:
         tdee: float | None = None,
         body_weight_kg: float | None = None,
     ) -> None:
-        self.recipes = [r for r in recipes if r.title]
+        planning_days_sanitized = max(1, min(planning_days, 7))
+        requested_exclusions = {str(x).strip() for x in (excluded_recipe_ids or []) if str(x).strip()}
+        usable = [r for r in recipes if r.title and str(r.id).strip() not in requested_exclusions]
+        if len(usable) < max(9, planning_days_sanitized * 2):
+            usable = [r for r in recipes if r.title]
+        self.recipes = usable
         if not self.recipes:
             raise ValueError("No valid recipes supplied to MealPlanGA.")
 
         self.goal = goal if goal in GOAL_PROFILES else "maintain"
         self.profile = GOAL_PROFILES[self.goal]
-        self.planning_days = max(1, min(planning_days, 7))
+        self.planning_days = planning_days_sanitized
 
         self.liked = _normalise_text_list(liked)
         self.disliked = _normalise_text_list(disliked)
@@ -322,8 +328,9 @@ class MealPlanGA:
             + 0.15 * score_validation
             + 0.10 * score_quality
         )
+        repeat_penalty = self._repeat_penalty(ind)
 
-        return (weighted_100 * 10.0) + bonus_practicality
+        return (weighted_100 * 10.0) + bonus_practicality - repeat_penalty
 
     def _violates_hard_constraints(self, ind: Individual) -> bool:
         days = self._group_by_day(ind.slots)
@@ -587,6 +594,34 @@ class MealPlanGA:
 
         return max(0.0, min(50.0, bonus))
 
+    def _repeat_penalty(self, ind: Individual) -> float:
+        recipe_count: dict[str, int] = {}
+        for ms in ind.slots:
+            rid = str(ms.recipe.id or ms.recipe.url or "")
+            recipe_count[rid] = recipe_count.get(rid, 0) + 1
+
+        penalty = 0.0
+        for count in recipe_count.values():
+            if count <= 1:
+                continue
+            penalty += (count - 1) * 20.0
+            if count >= 4:
+                penalty += 25.0
+
+        by_slot: dict[str, dict[int, str]] = {slot: {} for slot in SLOTS}
+        for ms in ind.slots:
+            rid = str(ms.recipe.id or ms.recipe.url or "")
+            by_slot.setdefault(ms.slot, {})[ms.day] = rid
+
+        for slot, mapping in by_slot.items():
+            for day in range(1, self.planning_days):
+                prev_id = mapping.get(day - 1)
+                curr_id = mapping.get(day)
+                if prev_id and curr_id and prev_id == curr_id:
+                    penalty += 15.0
+
+        return min(300.0, penalty)
+
     def _tournament(self, population: list[Individual], k: int = 4) -> Individual:
         sampled = random.sample(population, min(k, len(population)))
         return max(sampled, key=lambda x: x.fitness)
@@ -626,7 +661,18 @@ class MealPlanGA:
 
         if mode < 0.50:
             idx = random.randrange(len(slots))
-            slots[idx].recipe = random.choice(self.recipes)
+            current = slots[idx]
+            day_used = {
+                str(ms.recipe.id or ms.recipe.url or "")
+                for ms in slots
+                if ms.day == current.day
+            }
+            pool = [
+                recipe
+                for recipe in self.recipes
+                if str(recipe.id or recipe.url or "") not in day_used
+            ]
+            slots[idx].recipe = random.choice(pool or self.recipes)
         elif mode < 0.80:
             day = random.randrange(self.planning_days)
             day_indices = [i for i, ms in enumerate(slots) if ms.day == day]
@@ -652,21 +698,51 @@ class MealPlanGA:
     def _repair(self, ind: Individual) -> Individual:
         grouped = self._group_by_day(ind.slots)
         repaired_slots: list[MealSlot] = []
+        usage: dict[str, int] = {}
+        for ms in ind.slots:
+            rid = str(ms.recipe.id or ms.recipe.url or "")
+            usage[rid] = usage.get(rid, 0) + 1
 
         for day in range(self.planning_days):
             day_slots = grouped.get(day, [])
+            day_used: set[str] = set()
 
             slot_map = {ms.slot: ms for ms in day_slots if ms.slot in SLOTS}
             for slot in SLOTS:
                 ms = slot_map.get(slot)
                 if ms is None:
-                    candidate = random.choice(self.recipes)
+                    candidate = self._pick_low_repetition_recipe(day_used, usage)
                     repaired_slots.append(MealSlot(day=day, slot=slot, recipe=candidate))
+                    rid = str(candidate.id or candidate.url or "")
+                    day_used.add(rid)
+                    usage[rid] = usage.get(rid, 0) + 1
                 else:
-                    repaired_slots.append(MealSlot(day=day, slot=slot, recipe=ms.recipe))
+                    rid = str(ms.recipe.id or ms.recipe.url or "")
+                    if rid in day_used:
+                        candidate = self._pick_low_repetition_recipe(day_used, usage)
+                        repaired_slots.append(MealSlot(day=day, slot=slot, recipe=candidate))
+                        rid = str(candidate.id or candidate.url or "")
+                        usage[rid] = usage.get(rid, 0) + 1
+                    else:
+                        repaired_slots.append(MealSlot(day=day, slot=slot, recipe=ms.recipe))
+                    day_used.add(rid)
 
         ind.slots = repaired_slots
         return ind
+
+    def _pick_low_repetition_recipe(self, day_used: set[str], usage: dict[str, int]) -> PricedRecipe:
+        candidates = [
+            recipe
+            for recipe in self.recipes
+            if str(recipe.id or recipe.url or "") not in day_used
+        ]
+        if not candidates:
+            candidates = list(self.recipes)
+
+        return min(
+            candidates,
+            key=lambda recipe: usage.get(str(recipe.id or recipe.url or ""), 0),
+        )
 
     def _group_by_day(self, slots: list[MealSlot]) -> dict[int, list[MealSlot]]:
         grouped: dict[int, list[MealSlot]] = {}

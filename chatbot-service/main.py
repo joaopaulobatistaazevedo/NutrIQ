@@ -5,7 +5,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import get_settings
-from models.schemas import ChatRequest, ChatResponse
+from models.schemas import (
+    ChatRequest,
+    ChatResponse,
+    FoodImageAnalysisRequest,
+    FoodImageAnalysisResponse,
+)
 from services.backend_service import BackendService
 from services.openai_service import OpenAIService
 
@@ -99,7 +104,12 @@ async def onboarding_chat(request: ChatRequest, http_request: Request):
     history = request.conversation_history or []
 
     try:
-        response = await chat_service.onboarding_chat(request.message, history)
+        response = await chat_service.onboarding_chat(
+            request.message,
+            history,
+            user_id=request.user_id,
+            user_context=request.user_context,
+        )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
 
@@ -129,6 +139,7 @@ async def onboarding_chat(request: ChatRequest, http_request: Request):
                 },
                 history,
                 auth_token=backend_token,
+                user_id=request.user_id,
             )
             auto_plan_response = _apply_plan_persistence_and_cart(auto_plan_response, backend_token)
 
@@ -156,10 +167,18 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
         normalized_context["is_first_time"] = True
 
     backend_token = _resolve_backend_token(request, http_request)
+    if backend_token:
+        active_plan = backend_service.fetch_active_meal_plan(backend_token)
+        if active_plan and "active_meal_plan" not in normalized_context:
+            normalized_context["active_meal_plan"] = active_plan
 
     try:
         response = await chat_service.assistant_chat(
-            request.message, normalized_context, history, auth_token=backend_token
+            request.message,
+            normalized_context,
+            history,
+            auth_token=backend_token,
+            user_id=request.user_id,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI provider error: {exc}") from exc
@@ -167,6 +186,20 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
     response = _apply_plan_persistence_and_cart(response, backend_token)
 
     return response
+
+
+@app.post("/chat/analyze-food-image", response_model=FoodImageAnalysisResponse)
+async def analyze_food_image(request: FoodImageAnalysisRequest):
+    try:
+        result = await chat_service.analyze_food_image(
+            image_base64=request.image_base64,
+            mime_type=request.mime_type,
+            user_message=request.user_message,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Vision provider error: {exc}") from exc
+
+    return FoodImageAnalysisResponse(**result)
 
 
 if __name__ == "__main__":

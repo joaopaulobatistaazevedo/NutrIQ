@@ -53,3 +53,49 @@ INFO:     Started server process [11]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.18.0.2:56280 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.18.0.1:40404 - "OPTIONS /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:40404 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:52826 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:34164 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:53608 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:53608 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:59014 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:52504 - "OPTIONS /chat/analyze-food-image HTTP/1.1" 200 OK
+INFO:     172.18.0.1:52504 - "POST /chat/analyze-food-image HTTP/1.1" 200 OK
+INFO:     172.18.0.1:56260 - "POST /chat/analyze-food-image HTTP/1.1" 200 OK
+INFO:     172.18.0.1:33760 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.2:37500 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.18.0.2:39180 - "GET /health HTTP/1.1" 200 OK
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.18.0.1:34718 - "OPTIONS /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:34718 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:34718 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:34718 - "POST /chat/onboarding HTTP/1.1" 200 OK
+INFO:     172.18.0.1:39104 - "OPTIONS /chat/analyze-food-image HTTP/1.1" 200 OK
+INFO:     172.18.0.1:39104 - "POST /chat/analyze-food-image HTTP/1.1" 200 OK
+INFO:     172.18.0.1:57908 - "POST /chat/analyze-food-image HTTP/1.1" 200 OK
+INFO:     Started server process [11]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     172.18.0.1:34068 - "OPTIONS /chat/assistant HTTP/1.1" 200 OK
+Backend HTTPError 400 em GET /api/meal-plans/active payload=None detail={"error":"Nenhum plano ativo encontrado."}
+Plano gerado mas não persistido no backend (token=present)
+INFO:     172.18.0.1:34068 - "POST /chat/assistant HTTP/1.1" 200 OK
+Backend HTTPError 400 em GET /api/meal-plans/active payload=None detail={"error":"Nenhum plano ativo encontrado."}
+INFO:     172.18.0.1:48070 - "POST /chat/assistant HTTP/1.1" 200 OK
+Backend HTTPError 400 em GET /api/meal-plans/active payload=None detail={"error":"Nenhum plano ativo encontrado."}
+INFO:     172.18.0.1:41618 - "POST /chat/assistant HTTP/1.1" 200 OK
+Backend HTTPError 400 em GET /api/meal-plans/active payload=None detail={"error":"Nenhum plano ativo encontrado."}
+INFO:     172.18.0.1:41618 - "POST /chat/assistant HTTP/1.1" 200 OK
+Backend HTTPError 400 em GET /api/meal-plans/active payload=None detail={"error":"Nenhum plano ativo encontrado."}
+INFO:     172.18.0.1:47482 - "POST /chat/assistant HTTP/1.1" 200 OK
+INFO:     172.18.0.1:47554 - "POST /chat/analyze-food-image HTTP/1.1" 200 OK
