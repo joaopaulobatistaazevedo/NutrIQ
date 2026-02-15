@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronRight, LogOut } from 'lucide-react';
 import { getMainNavItems } from '../config/navigation';
@@ -25,6 +25,9 @@ export default function Sidebar() {
   const role = getUserRole();
   const navItems = useMemo(() => getMainNavItems(role), [role]);
   const { pendingFriendRequestCount } = useSocialNotifications();
+  const [showNutriSocialPopup, setShowNutriSocialPopup] = useState(false);
+  const [popupCount, setPopupCount] = useState(0);
+  const previousCountRef = useRef(0);
 
   const isActive = (path) => location.pathname === path;
 
@@ -32,6 +35,30 @@ export default function Sidebar() {
     clearNutribotSessionData();
     navigate('/login');
   };
+
+  useEffect(() => {
+    const previous = Number(previousCountRef.current || 0);
+    const current = Number(pendingFriendRequestCount || 0);
+    previousCountRef.current = current;
+
+    if (current > previous && current > 0) {
+      setPopupCount(current);
+      setShowNutriSocialPopup(true);
+
+      const timeout = setTimeout(() => {
+        setShowNutriSocialPopup(false);
+      }, 5000);
+
+      return () => clearTimeout(timeout);
+    }
+
+    if (current === 0) {
+      setShowNutriSocialPopup(false);
+      setPopupCount(0);
+    }
+
+    return undefined;
+  }, [pendingFriendRequestCount]);
 
   return (
     <div className="sidebar">
@@ -56,28 +83,20 @@ export default function Sidebar() {
               <span className="sidebar-item-label">
                 {item.label}
                 {count > 0 && (
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginLeft: '6px',
-                    minWidth: '18px',
-                    height: '18px',
-                    padding: '0 5px',
-                    borderRadius: '999px',
-                    backgroundColor: '#e53e3e',
-                    color: '#fff',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    verticalAlign: 'middle',
-                  }}>
+                  <span className="sidebar-nutrisocial-badge">
                     {count > 99 ? '99+' : count}
                   </span>
                 )}
               </span>
               <span className="sidebar-item-kbd" aria-hidden="true">{item.shortcut}</span>
               <ChevronRight className="sidebar-item-arrow" />
+              {isNutriSocial && showNutriSocialPopup && (
+                <span className="sidebar-nutrisocial-popup" role="status" aria-live="polite">
+                  {popupCount > 1
+                    ? `${popupCount} pedidos de amizade novos`
+                    : '1 pedido de amizade novo'}
+                </span>
+              )}
             </button>
           );
         })}
@@ -92,4 +111,3 @@ export default function Sidebar() {
     </div>
   );
 }
-

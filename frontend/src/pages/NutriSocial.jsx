@@ -1,28 +1,154 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Flame, MessageCircle, Send, ThumbsUp, UserPlus, Users, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Clock3, Flame, MessageCircle, Pencil, Send, ThumbsUp, Trash2, UserMinus, UserPlus } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
   acceptFriendRequest,
   addPostComment,
   declineFriendRequest,
+  deleteSocialPost,
   fetchFriends,
   fetchNutriSocialFeed,
+  fetchNutriSocialUserPosts,
+  fetchPostInteractionsMap,
   fetchPendingReceivedRequests,
   fetchPendingSentRequests,
-  getPostInteractions,
+  removeFriend,
+  resolveNutriSocialImageUrl,
   searchUsersForFriendRequest,
   sendFriendRequest,
   togglePostKudo,
+  updateSocialPost,
 } from '../services/nutriSocialService';
 import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/nutrisocial.css';
 
+const FALLBACK_POST_IMAGE = 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
+const QUICK_EMOJI_COMMENTS = ['🔥', '🤤', '😍', '👏', '💚', '🍽️'];
+const NUTRISOCIAL_COMMUNITIES_STORAGE_KEY = 'nutrisocial.communities.v1';
+
+function emojiToTwemojiUrl(emoji) {
+  const codePoints = Array.from(String(emoji || ''))
+    .map((char) => char.codePointAt(0)?.toString(16))
+    .filter(Boolean)
+    .join('-');
+
+  if (!codePoints) {
+    return '';
+  }
+
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${codePoints}.svg`;
+}
+
 function normalizePostImage(post) {
-  const image = String(post?.picturePath || '').trim();
-  if (image) return image;
-  return 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
+  const candidates = [
+    post?.picturePath,
+    post?.picture_path,
+  ];
+
+  for (const candidate of candidates) {
+    const resolved = resolveNutriSocialImageUrl(candidate);
+    if (resolved && !resolved.startsWith('blob:')) {
+      return resolved;
+    }
+  }
+
+  return FALLBACK_POST_IMAGE;
+}
+
+function isInvalidLegacyBlobPath(post) {
+  const value = String(post?.picturePath || post?.picture_path || '').trim().toLowerCase();
+  return value.startsWith('blob:');
+}
+
+function isTunnelHostImage(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    const host = String(parsed.host || '').toLowerCase();
+    return host.endsWith('.loca.lt') || host.includes('ngrok');
+  } catch {
+    return false;
+  }
+}
+
+function NutriSocialPostImage({ src, alt }) {
+  const [displaySrc, setDisplaySrc] = useState(src || FALLBACK_POST_IMAGE);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = '';
+
+    const imageSrc = String(src || '').trim();
+    if (!imageSrc) {
+      setDisplaySrc(FALLBACK_POST_IMAGE);
+      return () => {};
+    }
+
+    if (!isTunnelHostImage(imageSrc)) {
+      setDisplaySrc(imageSrc);
+      return () => {};
+    }
+
+    // ngrok/loca.lt may require a custom header; <img> cannot send it,
+    // so fetch as blob and render a local object URL.
+    const loadThroughFetch = async () => {
+      try {
+        const response = await fetch(imageSrc, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
+        });
+        if (!response.ok) {
+          throw new Error(`Image fetch failed: ${response.status}`);
+        }
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setDisplaySrc(objectUrl);
+        }
+      } catch {
+        if (!cancelled) {
+          setDisplaySrc(FALLBACK_POST_IMAGE);
+        }
+      }
+    };
+
+    void loadThroughFetch();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [src]);
+
+  return (
+    <img
+      src={displaySrc || FALLBACK_POST_IMAGE}
+      alt={alt}
+      className="nutri-social-feed-image"
+      loading="lazy"
+      onError={(event) => {
+        if (event.currentTarget.src !== FALLBACK_POST_IMAGE) {
+          event.currentTarget.src = FALLBACK_POST_IMAGE;
+        }
+      }}
+    />
+  );
+}
+
+function normalizeDateTimeValue(...values) {
+  for (const value of values) {
+    const candidate = String(value || '').trim();
+    if (!candidate) continue;
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return new Date().toISOString();
 }
 
 function prettyDate(value) {
@@ -60,7 +186,55 @@ function relationStatusLabel(status) {
   return 'Disponível';
 }
 
+function mealTypeLabel(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (normalized === 'BREAKFAST') return 'Pequeno-almoço';
+  if (normalized === 'LUNCH') return 'Almoço';
+  if (normalized === 'DINNER') return 'Jantar';
+  if (normalized === 'SNACK') return 'Snack';
+  return '';
+}
+
+function inferMealTypeFromDate(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'SNACK';
+  const hour = parsed.getHours();
+  if (hour < 11) return 'BREAKFAST';
+  if (hour < 15) return 'LUNCH';
+  if (hour < 19) return 'SNACK';
+  return 'DINNER';
+}
+
+function mealTypeFromPost(post) {
+  const candidates = [post?.mealType, post?.meal_type, post?.type, post?.meal];
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '').trim().toUpperCase();
+    if (['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'].includes(normalized)) {
+      return normalized;
+    }
+  }
+  return inferMealTypeFromDate(post?.createdAt);
+}
+
+function dayHourLabel(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'hora desconhecida';
+  }
+
+  const date = parsed.toLocaleDateString('pt-PT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const hour = parsed.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${hour}`;
+}
+
+function encodeFriendshipId(requesterId, addresseeId) {
+  const requester = BigInt(Number(requesterId) >>> 0);
+  const addressee = BigInt(Number(addresseeId) >>> 0);
+  return ((requester << 32n) | addressee).toString();
+}
+
 export default function NutriSocial() {
+  const location = useLocation();
   const authSession = getAuthSession();
   const token = String(authSession?.token || '').trim();
   const currentUserId = Number(authSession?.userId || 0);
@@ -70,6 +244,7 @@ export default function NutriSocial() {
   const [currentUserName, setCurrentUserName] = useState('');
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState('');
+  const [feedStatus, setFeedStatus] = useState('');
 
   const [friendsLoading, setFriendsLoading] = useState(true);
   const [friendActionLoadingId, setFriendActionLoadingId] = useState('');
@@ -79,17 +254,51 @@ export default function NutriSocial() {
   const [friendSuggestions, setFriendSuggestions] = useState([]);
   const [selectedFriendId, setSelectedFriendId] = useState('');
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
-  const [activePanel, setActivePanel] = useState('');
+  const [activeTab, setActiveTab] = useState('feed');
+  const [communities, setCommunities] = useState([]);
+  const [communityNameDraft, setCommunityNameDraft] = useState('');
+  const [communityInviteDraftById, setCommunityInviteDraftById] = useState({});
 
   const [feedPosts, setFeedPosts] = useState([]);
+  const [profileFeedPosts, setProfileFeedPosts] = useState([]);
   const [friendIds, setFriendIds] = useState([]);
   const [friendUsers, setFriendUsers] = useState([]);
   const [pendingReceived, setPendingReceived] = useState([]);
   const [pendingSent, setPendingSent] = useState([]);
   const [interactionsByPost, setInteractionsByPost] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
+  const [activePostMenuId, setActivePostMenuId] = useState('');
+  const [editingPostId, setEditingPostId] = useState('');
+  const [editingDraft, setEditingDraft] = useState({ description: '', rating: 5 });
 
-  const loadData = async () => {
+  const hydratePostInteractions = useCallback(async (posts) => {
+    if (!token) {
+      setInteractionsByPost({});
+      return;
+    }
+
+    const postIds = (Array.isArray(posts) ? posts : [])
+      .map((post) => post?.id)
+      .filter(Boolean);
+
+    if (postIds.length === 0) {
+      setInteractionsByPost({});
+      return;
+    }
+
+    try {
+      const interactionsMap = await fetchPostInteractionsMap(token, postIds);
+      setInteractionsByPost(interactionsMap);
+    } catch {
+      // keep previous interactions if fetch fails
+    }
+  }, [token]);
+
+  const announceFriendRequestRefresh = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('nutrisocial:force-refresh'));
+  }, []);
+
+  const loadData = useCallback(async ({ silent = false } = {}) => {
     if (!token) {
       setFeedLoading(false);
       setFriendsLoading(false);
@@ -97,20 +306,55 @@ export default function NutriSocial() {
       return;
     }
 
-    setFeedLoading(true);
-    setFriendsLoading(true);
-    setFeedError('');
+    if (!silent) {
+      setFeedLoading(true);
+      setFriendsLoading(true);
+      setFeedError('');
+    }
 
     try {
-      const [feed, profile, friends, receivedRequests, sentRequests] = await Promise.all([
+      const [feed, myPosts, profile, friends, receivedRequests, sentRequests] = await Promise.all([
         fetchNutriSocialFeed(token),
+        fetchNutriSocialUserPosts(token, currentUserId),
         fetchMyProfile(token),
         fetchFriends(token),
         fetchPendingReceivedRequests(token),
         fetchPendingSentRequests(token),
       ]);
 
-      setFeedPosts(Array.isArray(feed) ? feed : []);
+      const normalizedFeed = (Array.isArray(feed) ? feed : [])
+        .filter((post) => !isInvalidLegacyBlobPath(post))
+        .map((post) => ({
+          ...post,
+          userId: Number(post?.userId || post?.user_id || 0),
+          createdAt: normalizeDateTimeValue(post?.createdAt, post?.created_at, post?.currentTime, post?.current_time),
+          currentTime: normalizeDateTimeValue(post?.currentTime, post?.current_time, post?.createdAt, post?.created_at),
+        }));
+
+      const normalizedMyPosts = (Array.isArray(myPosts) ? myPosts : [])
+        .filter((post) => !isInvalidLegacyBlobPath(post))
+        .map((post) => ({
+          ...post,
+          userId: Number(post?.userId || post?.user_id || 0),
+          createdAt: normalizeDateTimeValue(post?.createdAt, post?.created_at, post?.currentTime, post?.current_time),
+          currentTime: normalizeDateTimeValue(post?.currentTime, post?.current_time, post?.createdAt, post?.created_at),
+        }));
+      setProfileFeedPosts(normalizedMyPosts);
+
+      setFeedPosts((previous) => {
+        if (silent) {
+          const previousIds = new Set(previous.map((post) => String(post?.id || '')));
+          const newPosts = normalizedFeed.filter((post) => !previousIds.has(String(post?.id || '')));
+          if (newPosts.length > 0) {
+            setFeedStatus(
+              newPosts.length === 1
+                ? 'Tens 1 nova publicação no feed.'
+                : `Tens ${newPosts.length} novas publicações no feed.`,
+            );
+          }
+        }
+        return normalizedFeed;
+      });
       setStreakCount(Math.max(0, Number(profile?.profile?.streakCount || 0)));
       setCurrentUserName(String(profile?.name || sessionName || '').trim());
       const friendIdsFromApi = Array.isArray(friends?.friendIds) ? friends.friendIds : [];
@@ -131,28 +375,72 @@ export default function NutriSocial() {
       );
       setPendingReceived(Array.isArray(receivedRequests) ? receivedRequests : []);
       setPendingSent(Array.isArray(sentRequests) ? sentRequests : []);
+      announceFriendRequestRefresh();
+      void hydratePostInteractions([...normalizedFeed, ...normalizedMyPosts]);
     } catch (error) {
-      setFeedError(error?.message || 'Não foi possível carregar o NutriSocial.');
+      if (!silent) {
+        setFeedError(error?.message || 'Não foi possível carregar o NutriSocial.');
+      }
     } finally {
-      setFeedLoading(false);
-      setFriendsLoading(false);
+      if (!silent) {
+        setFeedLoading(false);
+        setFriendsLoading(false);
+      }
     }
-  };
+  }, [announceFriendRequestRefresh, hydratePostInteractions, sessionName, token]);
 
   useEffect(() => {
     void loadData();
-  }, [token]);
+  }, [loadData]);
 
   useEffect(() => {
-    const postIds = feedPosts.map((post) => post?.id).filter(Boolean);
-    setInteractionsByPost(getPostInteractions(postIds));
-  }, [feedPosts]);
+    const params = new URLSearchParams(location.search);
+    const tab = String(params.get('tab') || '').trim().toLowerCase();
+    const allowedTabs = new Set(['feed', 'friends', 'meal', 'profile']);
+    if (allowedTabs.has(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      void loadData({ silent: true });
+    }, 15000);
+
+    const onFocus = () => {
+      void loadData({ silent: true });
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        void loadData({ silent: true });
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [loadData, token]);
+
+  useEffect(() => {
+    if (!feedStatus) return undefined;
+    const timeout = setTimeout(() => setFeedStatus(''), 5000);
+    return () => clearTimeout(timeout);
+  }, [feedStatus]);
 
   useEffect(() => {
     let cancelled = false;
     const cleanQuery = String(friendSearchQuery || '').trim();
 
-    if (activePanel !== 'friends' || !token) {
+    if (activeTab !== 'friends' || !token) {
       return () => {
         cancelled = true;
       };
@@ -197,7 +485,47 @@ export default function NutriSocial() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activePanel, friendSearchQuery, token]);
+  }, [activeTab, friendSearchQuery, token]);
+
+  useEffect(() => {
+    try {
+      const savedValue = localStorage.getItem(NUTRISOCIAL_COMMUNITIES_STORAGE_KEY);
+      if (!savedValue) {
+        setCommunities([]);
+        return;
+      }
+
+      const parsed = JSON.parse(savedValue);
+      if (!Array.isArray(parsed)) {
+        setCommunities([]);
+        return;
+      }
+
+      const normalized = parsed
+        .map((community) => ({
+          id: String(community?.id || ''),
+          name: String(community?.name || '').trim(),
+          memberIds: Array.isArray(community?.memberIds)
+            ? community.memberIds
+              .map((memberId) => Number(memberId))
+              .filter((memberId) => Number.isInteger(memberId) && memberId > 0)
+            : [],
+        }))
+        .filter((community) => community.id && community.name);
+
+      setCommunities(normalized);
+    } catch {
+      setCommunities([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NUTRISOCIAL_COMMUNITIES_STORAGE_KEY, JSON.stringify(communities));
+    } catch {
+      // ignore persistence errors
+    }
+  }, [communities]);
 
   const userDirectory = useMemo(() => {
     const map = new Map();
@@ -251,6 +579,21 @@ export default function NutriSocial() {
   const selectedFriendSuggestion = useMemo(
     () => friendSuggestions.find((item) => Number(item?.id) === Number(selectedFriendId)) || null,
     [friendSuggestions, selectedFriendId],
+  );
+
+  const visibleFeedPosts = useMemo(
+    () => feedPosts.filter((post) => friendIds.includes(Number(post?.userId)) && Number(post?.userId) !== Number(currentUserId)),
+    [feedPosts, friendIds, currentUserId],
+  );
+
+  const profilePosts = useMemo(
+    () => profileFeedPosts.filter((post) => Number(post?.userId) === Number(currentUserId)),
+    [profileFeedPosts, currentUserId],
+  );
+
+  const activePostList = useMemo(
+    () => (activeTab === 'profile' ? profilePosts : visibleFeedPosts),
+    [activeTab, profilePosts, visibleFeedPosts],
   );
 
   const getPostInteraction = (postId) => {
@@ -322,20 +665,33 @@ export default function NutriSocial() {
     }
   };
 
-  const handleToggleKudo = (postId) => {
+  const handleToggleKudo = async (postId) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
     try {
-      const updated = togglePostKudo(postId, currentUserId);
+      const updated = await togglePostKudo(token, postId);
       setInteractionsByPost((previous) => ({
         ...previous,
-        [String(postId)]: updated,
+        [String(postId)]: {
+          ...(previous[String(postId)] || { comments: [] }),
+          kudosByUser: updated.kudosByUser || {},
+        },
       }));
     } catch (error) {
       setFeedError(error?.message || 'Não foi possível atualizar o kudo.');
     }
   };
 
-  const handleCommentSubmit = (event, postId) => {
+  const handleCommentSubmit = async (event, postId) => {
     event.preventDefault();
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
     const key = String(postId);
     const draft = String(commentDrafts[key] || '').trim();
 
@@ -344,10 +700,13 @@ export default function NutriSocial() {
     }
 
     try {
-      const updated = addPostComment(postId, currentUserId, draft);
+      const newComment = await addPostComment(token, postId, draft);
       setInteractionsByPost((previous) => ({
         ...previous,
-        [key]: updated,
+        [key]: {
+          ...(previous[key] || { kudosByUser: {} }),
+          comments: [...(previous[key]?.comments || []), newComment].slice(-40),
+        },
       }));
       setCommentDrafts((previous) => ({
         ...previous,
@@ -358,8 +717,219 @@ export default function NutriSocial() {
     }
   };
 
-  const togglePanel = (panelName) => {
-    setActivePanel((previous) => (previous === panelName ? '' : panelName));
+  const handleRemoveFriend = async (friendId) => {
+    const numericFriendId = Number(friendId);
+    if (!Number.isInteger(numericFriendId) || numericFriendId <= 0) return;
+
+    const confirmation = window.confirm('Tem certeza que pretende remover amigo?');
+    if (!confirmation) return;
+
+    const candidateFriendshipIds = [
+      encodeFriendshipId(currentUserId, numericFriendId),
+      encodeFriendshipId(numericFriendId, currentUserId),
+    ];
+
+    setFriendActionLoadingId(`remove-${numericFriendId}`);
+    setFriendError('');
+    setFriendStatus('');
+
+    try {
+      let removed = false;
+      for (const friendshipId of candidateFriendshipIds) {
+        try {
+          await removeFriend(token, friendshipId);
+          removed = true;
+          break;
+        } catch {
+          // try inverse id encoding as fallback
+        }
+      }
+
+      if (!removed) {
+        throw new Error('Não foi possível remover esta amizade.');
+      }
+
+      await loadData();
+      setFriendStatus('Amigo removido com sucesso.');
+    } catch (error) {
+      setFriendError(error?.message || 'Não foi possível remover o amigo.');
+    } finally {
+      setFriendActionLoadingId('');
+    }
+  };
+
+  const handleStartEditPost = (post) => {
+    const postId = String(post?.id || '');
+    if (!postId) return;
+
+    setEditingPostId(postId);
+    setEditingDraft({
+      description: String(post?.description || ''),
+      rating: Math.min(5, Math.max(1, Number(post?.rating || 5))),
+    });
+    setActivePostMenuId('');
+    setFeedError('');
+  };
+
+  const handleCancelEditPost = () => {
+    setEditingPostId('');
+    setEditingDraft({ description: '', rating: 5 });
+  };
+
+  const handleSavePostEdit = async (postId) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const normalizedPostId = String(postId || '');
+    if (!normalizedPostId) return;
+
+    try {
+      const updated = await updateSocialPost(token, normalizedPostId, {
+        description: String(editingDraft.description || '').trim(),
+        rating: Number(editingDraft.rating || 0),
+      });
+
+      setFeedPosts((previous) => previous.map((post) => (
+        String(post?.id) === normalizedPostId
+          ? {
+            ...post,
+            description: updated?.description ?? String(editingDraft.description || '').trim(),
+            rating: Number(updated?.rating || editingDraft.rating || post?.rating || 5),
+          }
+          : post
+      )));
+
+      setProfileFeedPosts((previous) => previous.map((post) => (
+        String(post?.id) === normalizedPostId
+          ? {
+            ...post,
+            description: updated?.description ?? String(editingDraft.description || '').trim(),
+            rating: Number(updated?.rating || editingDraft.rating || post?.rating || 5),
+          }
+          : post
+      )));
+
+      setFeedStatus('Publicação atualizada com sucesso.');
+      handleCancelEditPost();
+    } catch (error) {
+      setFeedError(error?.message || 'Não foi possível editar a publicação.');
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const normalizedPostId = String(postId || '');
+    if (!normalizedPostId) return;
+
+    try {
+      await deleteSocialPost(token, normalizedPostId);
+      setFeedPosts((previous) => previous.filter((post) => String(post?.id) !== normalizedPostId));
+      setProfileFeedPosts((previous) => previous.filter((post) => String(post?.id) !== normalizedPostId));
+      setInteractionsByPost((previous) => {
+        const next = { ...previous };
+        delete next[normalizedPostId];
+        return next;
+      });
+      setActivePostMenuId('');
+      setFeedStatus('Publicação removida com sucesso.');
+      if (editingPostId === normalizedPostId) {
+        handleCancelEditPost();
+      }
+    } catch (error) {
+      setFeedError(error?.message || 'Não foi possível remover a publicação.');
+    }
+  };
+
+  const handleQuickEmojiComment = async (postId, emoji) => {
+    if (!token) {
+      setFeedError('Sessão inválida. Faz login novamente.');
+      return;
+    }
+
+    const cleanEmoji = String(emoji || '').trim();
+    if (!cleanEmoji) {
+      return;
+    }
+
+    try {
+      const newComment = await addPostComment(token, postId, cleanEmoji);
+      const key = String(postId);
+      setInteractionsByPost((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || { kudosByUser: {} }),
+          comments: [...(previous[key]?.comments || []), newComment].slice(-40),
+        },
+      }));
+    } catch (error) {
+      setFeedError(error?.message || 'Não foi possível comentar com emoji.');
+    }
+  };
+
+  const handleCreateCommunity = (event) => {
+    event.preventDefault();
+    const name = String(communityNameDraft || '').trim();
+
+    if (name.length < 2) {
+      setFriendError('O nome da comunidade deve ter pelo menos 2 caracteres.');
+      return;
+    }
+
+    setCommunities((previous) => [
+      {
+        id: `community-${Date.now()}`,
+        name,
+        memberIds: [],
+      },
+      ...previous,
+    ]);
+    setCommunityNameDraft('');
+    setFriendError('');
+    setFriendStatus('Comunidade criada com sucesso.');
+  };
+
+  const handleRenameCommunity = (communityId, nextName) => {
+    const name = String(nextName || '').trim();
+    if (name.length < 2) {
+      setFriendError('O nome da comunidade deve ter pelo menos 2 caracteres.');
+      return;
+    }
+
+    setCommunities((previous) => previous.map((community) => (
+      community.id === communityId ? { ...community, name } : community
+    )));
+    setFriendError('');
+    setFriendStatus('Nome da comunidade atualizado.');
+  };
+
+  const handleInviteFriendToCommunity = (communityId) => {
+    const selected = Number(communityInviteDraftById[communityId] || 0);
+    if (!Number.isInteger(selected) || selected <= 0) {
+      setFriendError('Seleciona um amigo para convidar.');
+      return;
+    }
+
+    setCommunities((previous) => previous.map((community) => {
+      if (community.id !== communityId) return community;
+      if (community.memberIds.includes(selected)) return community;
+      return {
+        ...community,
+        memberIds: [...community.memberIds, selected],
+      };
+    }));
+
+    setCommunityInviteDraftById((previous) => ({
+      ...previous,
+      [communityId]: '',
+    }));
+    setFriendError('');
+    setFriendStatus('Convite adicionado à comunidade.');
   };
 
   return (
@@ -376,32 +946,73 @@ export default function NutriSocial() {
                 <span className="badge bg-orange-lt text-orange d-inline-flex align-items-center gap-2 py-2 px-3">
                   <Flame size={14} /> Streak {streakCount} dias
                 </span>
-                <Link to="/progress" className="btn btn-primary btn-sm">Registar refeição</Link>
               </div>
             </div>
           </div>
 
-          <div className="card mb-3">
-            <div className="card-body py-3">
-              <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
-                {storyUsers.map((user, index) => (
-                  <button key={`story-${user.id}`} type="button" className="nutri-social-story-item">
-                    <span className="nutri-social-story-avatar">{String(user?.name || '').trim().slice(0, 2).toUpperCase() || String(user.id).slice(-2)}</span>
-                    <span className="nutri-social-story-label">{index === 0 ? 'Tu' : user.name}</span>
-                  </button>
-                ))}
-                {storyUsers.length === 0 ? <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p> : null}
+          <nav className="card mb-3" aria-label="Navegação NutriSocial">
+            <div className="card-body py-2">
+              <div className="nutri-social-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'feed'}
+                  className={`nutri-social-tab ${activeTab === 'feed' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('feed')}
+                >
+                  Feed
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'friends'}
+                  className={`nutri-social-tab ${activeTab === 'friends' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('friends')}
+                >
+                  Amigos
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'meal'}
+                  className={`nutri-social-tab ${activeTab === 'meal' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('meal')}
+                >
+                  Registar Refeição
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'profile'}
+                  className={`nutri-social-tab ${activeTab === 'profile' ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab('profile')}
+                >
+                  Perfil
+                </button>
               </div>
             </div>
-          </div>
+          </nav>
 
-          {activePanel === 'friends' ? (
+          {activeTab === 'feed' || activeTab === 'profile' ? (
+            <div className="card mb-3">
+              <div className="card-body py-3">
+                <div className="d-flex gap-3 flex-nowrap overflow-auto nutri-social-stories" aria-label="Rede ativa">
+                  {storyUsers.map((user, index) => (
+                    <button key={`story-${user.id}`} type="button" className="nutri-social-story-item">
+                      <span className="nutri-social-story-avatar">{String(user?.name || '').trim().slice(0, 2).toUpperCase() || String(user.id).slice(-2)}</span>
+                      <span className="nutri-social-story-label">{index === 0 ? 'Tu' : user.name}</span>
+                    </button>
+                  ))}
+                  {storyUsers.length === 0 ? <p className="text-secondary mb-0">Adiciona amigos para veres mais atividade social.</p> : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'friends' ? (
             <section className="card mb-3">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <h3 className="card-title m-0">Rede de amigos</h3>
-                <button type="button" className="btn btn-icon" onClick={() => setActivePanel('')}>
-                  <X size={16} />
-                </button>
               </div>
 
               <div className="card-body">
@@ -461,118 +1072,285 @@ export default function NutriSocial() {
                 {friendsLoading ? <p className="text-secondary mb-0">A carregar amizades...</p> : null}
 
                 {!friendsLoading ? (
-                  <div className="row g-3">
-                    <div className="col-12 col-lg-4">
-                      <div className="border rounded-3 p-3 h-100">
-                        <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
-                        {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
-                        {friendUsers.length > 0 ? (
-                          <div className="d-flex flex-column gap-2">
-                            {friendUsers.map((friend) => (
-                              <div className="small" key={`friend-id-${friend.id}`}>
-                                <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
-                                {friend.email ? <span className="text-secondary"> ({friend.email})</span> : null}
-                              </div>
-                            ))}
+                  <>
+                    <div className="nutri-social-friends-grid">
+                    <div className="nutri-social-friend-list">
+                      <h4 className="h6 mb-2">Amigos ({friendIds.length})</h4>
+                      {friendUsers.length === 0 ? <p className="text-secondary mb-0">Ainda sem amizades ativas.</p> : null}
+                      {friendUsers.map((friend) => (
+                        <div className="nutri-social-friend-item" key={`friend-id-${friend.id}`}>
+                          <div>
+                            <strong>{friend.name || `Utilizador #${friend.id}`}</strong>
+                            {friend.email ? <span>{friend.email}</span> : null}
                           </div>
-                        ) : null}
-                      </div>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1"
+                            onClick={() => handleRemoveFriend(friend.id)}
+                            disabled={friendActionLoadingId === `remove-${friend.id}`}
+                          >
+                            <UserMinus size={14} />
+                            {friendActionLoadingId === `remove-${friend.id}` ? 'A remover...' : 'Remover'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
 
-                    <div className="col-12 col-lg-4">
-                      <div className="border rounded-3 p-3 h-100">
-                        <h4 className="h6 mb-2">Pedidos recebidos ({pendingReceived.length})</h4>
-                        {pendingReceived.length === 0 ? <p className="text-secondary mb-0">Sem pedidos recebidos.</p> : null}
-                        {pendingReceived.map((request) => (
-                          <div className="d-flex justify-content-between align-items-center gap-2 mb-2" key={`request-received-${request.id}`}>
-                            <span className="small text-secondary">De #{request.requesterId}</span>
-                            <div className="d-flex gap-2">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-primary"
-                                onClick={() => handleAcceptRequest(request.id)}
-                                disabled={friendActionLoadingId === `accept-${request.id}`}
-                              >
-                                {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => handleDeclineRequest(request.id)}
-                                disabled={friendActionLoadingId === `decline-${request.id}`}
-                              >
-                                {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="col-12 col-lg-4">
-                      <div className="border rounded-3 p-3 h-100">
-                        <h4 className="h6 mb-2">Pedidos enviados ({pendingSent.length})</h4>
-                        {pendingSent.length === 0 ? <p className="text-secondary mb-0">Sem pedidos enviados pendentes.</p> : null}
-                        {pendingSent.map((request) => (
-                          <div className="d-flex justify-content-between align-items-center gap-2 mb-2" key={`request-sent-${request.id}`}>
-                            <span className="small text-secondary">Para #{request.addresseeId}</span>
+                    <div className="nutri-social-friend-list">
+                      <h4 className="h6 mb-2">Pedidos recebidos ({pendingReceived.length})</h4>
+                      {pendingReceived.length === 0 ? <p className="text-secondary mb-0">Sem pedidos recebidos.</p> : null}
+                      {pendingReceived.map((request) => (
+                        <div className="nutri-social-friend-item" key={`request-received-${request.id}`}>
+                          <span>De #{request.requesterId}</span>
+                          <div className="nutri-social-actions">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => handleAcceptRequest(request.id)}
+                              disabled={friendActionLoadingId === `accept-${request.id}`}
+                            >
+                              {friendActionLoadingId === `accept-${request.id}` ? 'A aceitar...' : 'Aceitar'}
+                            </button>
                             <button
                               type="button"
                               className="btn btn-sm btn-outline-danger"
                               onClick={() => handleDeclineRequest(request.id)}
                               disabled={friendActionLoadingId === `decline-${request.id}`}
                             >
-                              {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
+                              {friendActionLoadingId === `decline-${request.id}` ? 'Recusar...' : 'Recusar'}
                             </button>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="nutri-social-friend-list">
+                      <h4 className="h6 mb-2">Pedidos enviados ({pendingSent.length})</h4>
+                      {pendingSent.length === 0 ? <p className="text-secondary mb-0">Sem pedidos enviados pendentes.</p> : null}
+                      {pendingSent.map((request) => (
+                        <div className="nutri-social-friend-item" key={`request-sent-${request.id}`}>
+                          <span>Para #{request.addresseeId}</span>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDeclineRequest(request.id)}
+                            disabled={friendActionLoadingId === `decline-${request.id}`}
+                          >
+                            {friendActionLoadingId === `decline-${request.id}` ? 'A cancelar...' : 'Cancelar'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
+
+                  <section className="nutri-social-friend-community mt-3">
+                    <h4 className="h6 mb-2">Comunidades</h4>
+                    <form className="row g-2 mb-3" onSubmit={handleCreateCommunity}>
+                      <div className="col">
+                        <input
+                          className="form-control"
+                          type="text"
+                          value={communityNameDraft}
+                          onChange={(event) => setCommunityNameDraft(event.target.value)}
+                          placeholder="Nome da comunidade"
+                        />
+                      </div>
+                      <div className="col-auto">
+                        <button type="submit" className="btn btn-primary btn-sm">Criar comunidade</button>
+                      </div>
+                    </form>
+
+                    {communities.length === 0 ? <p className="text-secondary mb-0">Ainda não criaste comunidades.</p> : null}
+                    {communities.map((community) => (
+                      <article className="nutri-social-community-item" key={community.id}>
+                        <div className="row g-2 align-items-center">
+                          <div className="col-12 col-md-5">
+                            <label className="form-label mb-1">Nome</label>
+                            <input
+                              className="form-control form-control-sm"
+                              type="text"
+                              value={community.name}
+                              onChange={(event) => handleRenameCommunity(community.id, event.target.value)}
+                            />
+                          </div>
+                          <div className="col-12 col-md-5">
+                            <label className="form-label mb-1">Convidar amigo</label>
+                            <select
+                              className="form-select form-select-sm"
+                              value={communityInviteDraftById[community.id] || ''}
+                              onChange={(event) => setCommunityInviteDraftById((previous) => ({
+                                ...previous,
+                                [community.id]: event.target.value,
+                              }))}
+                              disabled={friendUsers.length === 0}
+                            >
+                              <option value="">Seleciona um amigo</option>
+                              {friendUsers.map((friend) => (
+                                <option key={`community-invite-${community.id}-${friend.id}`} value={friend.id}>
+                                  {friend.name || `Utilizador #${friend.id}`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-12 col-md-2 d-grid">
+                            <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => handleInviteFriendToCommunity(community.id)}>
+                              Convidar
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="nutri-social-community-members mt-2">
+                          <small className="text-secondary">Membros:</small>
+                          <div className="nutri-social-id-cloud">
+                            {community.memberIds.length === 0 ? (
+                              <span>Sem amigos convidados</span>
+                            ) : (
+                              community.memberIds.map((memberId) => {
+                                const member = friendUsers.find((friend) => Number(friend.id) === Number(memberId));
+                                return <span key={`community-${community.id}-member-${memberId}`}>{member?.name || `#${memberId}`}</span>;
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                  </>
                 ) : null}
               </div>
             </section>
           ) : null}
 
-          <section className="card">
+          {activeTab === 'feed' ? (
+            <section className="card">
             <div className="card-header d-flex justify-content-between align-items-center">
-              <h3 className="card-title m-0">Feed NutriSocial</h3>
+              <h3 className="card-title m-0">{activeTab === 'profile' ? 'Perfil · As tuas publicações' : 'Feed NutriSocial'}</h3>
               <div className="d-flex align-items-center gap-2">
                 <span className="badge">Utilizador #{currentUserId || '—'}</span>
-                <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => togglePanel('friends')}>
-                  <Users size={14} />
-                  Amigos
-                </button>
               </div>
             </div>
             <div className="card-body">
               {feedLoading ? <p className="text-secondary mb-2">A carregar feed...</p> : null}
               {!feedLoading && feedError ? <p className="text-danger mb-2">{feedError}</p> : null}
-              {!feedLoading && !feedError && feedPosts.length === 0 ? <p className="text-secondary mb-0">Ainda não existem partilhas no teu feed.</p> : null}
+              {!feedLoading && !feedError && feedStatus ? <p className="text-success mb-2">{feedStatus}</p> : null}
+              {!feedLoading && !feedError && activePostList.length === 0 ? (
+                <p className="text-secondary mb-0">
+                  {activeTab === 'profile'
+                    ? 'Ainda não tens publicações no teu perfil.'
+                    : 'Ainda não existem partilhas no teu feed.'}
+                </p>
+              ) : null}
 
               <div className="d-grid gap-3">
-                {feedPosts.map((post) => {
+                {activePostList.map((post) => {
                   const interaction = getPostInteraction(post.id);
                   const kudosCount = Object.keys(interaction.kudosByUser || {}).length;
                   const hasKudoFromMe = Boolean(interaction.kudosByUser?.[String(currentUserId)]);
                   const comments = Array.isArray(interaction.comments) ? interaction.comments : [];
+                  const imageSrc = normalizePostImage(post);
+                  const sortedComments = [...comments]
+                    .map((comment) => ({
+                      ...comment,
+                      createdAt: normalizeDateTimeValue(comment?.createdAt, comment?.created_at, comment?.currentTime, comment?.current_time),
+                    }))
+                    .sort((left, right) => new Date(right?.createdAt || 0).getTime() - new Date(left?.createdAt || 0).getTime());
                   const draftKey = String(post.id);
+                  const isOwnPost = Number(post?.userId) === Number(currentUserId);
+                  const mealType = mealTypeFromPost(post);
+                  const mealTypeDisplay = mealTypeLabel(mealType) || 'Refeição';
+                  const createdLabel = dayHourLabel(post?.currentTime || post?.createdAt);
+                  const isEditingPost = editingPostId === draftKey;
 
                   return (
-                    <article className="card" key={post.id}>
-                      <div className="card-header d-flex justify-content-between align-items-center">
+                    <article className="card nutri-social-feed-post" key={post.id}>
+                      <div className="card-header nutri-social-post-header">
                         <div className="d-flex align-items-center gap-2">
                           <span className="avatar avatar-sm">{String(post.userId || '').slice(-2)}</span>
-                          <span className="fw-semibold">{usernameFromId(post.userId, currentUserId, userDirectory)}</span>
+                          <div className="d-flex flex-column">
+                            <span className="fw-semibold">{usernameFromId(post.userId, currentUserId, userDirectory)}</span>
+                            <small className="text-secondary d-inline-flex align-items-center gap-1">
+                              <Clock3 size={12} /> {createdLabel}
+                            </small>
+                          </div>
                         </div>
-                        <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
+
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="badge bg-indigo-lt text-indigo">{mealTypeDisplay}</span>
+                          <span className="badge bg-azure-lt text-azure">⭐ {post.rating}/5</span>
+                          {isOwnPost ? (
+                            <div className="dropdown">
+                              <button
+                                type="button"
+                                className="btn btn-outline-secondary btn-sm"
+                                onClick={() => setActivePostMenuId((previous) => (previous === draftKey ? '' : draftKey))}
+                              >
+                                •••
+                              </button>
+                              {activePostMenuId === draftKey ? (
+                                <div className="nutri-social-post-menu">
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => handleStartEditPost(post)}
+                                  >
+                                    <Pencil size={13} /> Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => handleDeletePost(post.id)}
+                                  >
+                                    <Trash2 size={13} /> Remover
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
 
-                      <img src={normalizePostImage(post)} alt={post.description || post.recipeName || 'Refeição partilhada'} className="nutri-social-feed-image" />
+                      <NutriSocialPostImage
+                        src={imageSrc}
+                        alt={post.description || post.recipeName || 'Refeição partilhada'}
+                      />
 
                       <div className="card-body">
                         <h4 className="h5 mb-1">{post.recipeName || `Receita #${post.recipeId}`}</h4>
-                        <p className="text-secondary mb-2">{post.description || 'Sem descrição.'}</p>
+
+                        {isEditingPost ? (
+                          <div className="nutri-social-inline-edit mb-2">
+                            <textarea
+                              className="form-control"
+                              rows={2}
+                              value={editingDraft.description}
+                              onChange={(event) => setEditingDraft((previous) => ({ ...previous, description: event.target.value }))}
+                              placeholder="Descrição da publicação"
+                            />
+                            <div className="d-flex align-items-center gap-2">
+                              <label className="form-label mb-0">Classificação</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={5}
+                                className="form-control form-control-sm"
+                                value={editingDraft.rating}
+                                onChange={(event) => setEditingDraft((previous) => ({
+                                  ...previous,
+                                  rating: Math.max(1, Math.min(5, Number(event.target.value || 1))),
+                                }))}
+                                style={{ width: '84px' }}
+                              />
+                              <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSavePostEdit(post.id)}>
+                                Guardar
+                              </button>
+                              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCancelEditPost}>
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-secondary mb-2">{post.description || 'Sem descrição.'}</p>
+                        )}
 
                         <div className="nutri-social-post-actions mb-2">
                           <button
@@ -584,7 +1362,7 @@ export default function NutriSocial() {
                             Kudos {kudosCount}
                           </button>
                           <span className="badge bg-secondary-lt">
-                            <MessageCircle size={13} /> {comments.length} comentários
+                            <MessageCircle size={13} /> {sortedComments.length} comentários
                           </span>
                         </div>
 
@@ -625,6 +1403,30 @@ export default function NutriSocial() {
                           })()
                         ) : null}
 
+                        <div className="nutri-social-quick-emoji">
+                          {QUICK_EMOJI_COMMENTS.map((emoji) => (
+                            <button
+                              key={`quick-emoji-${post.id}-${emoji}`}
+                              type="button"
+                              className="nutri-social-emoji-chip"
+                              onClick={() => handleQuickEmojiComment(post.id, emoji)}
+                              aria-label={`Comentar ${emoji}`}
+                              title={`Comentar ${emoji}`}
+                            >
+                              <img
+                                className="nutri-social-emoji-icon"
+                                src={emojiToTwemojiUrl(emoji)}
+                                alt={emoji}
+                                loading="lazy"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                              <span className="nutri-social-emoji-fallback">{emoji}</span>
+                            </button>
+                          ))}
+                        </div>
+
                         <form className="nutri-social-comment-form" onSubmit={(event) => handleCommentSubmit(event, post.id)}>
                           <input
                             className="form-control"
@@ -643,9 +1445,9 @@ export default function NutriSocial() {
                           </button>
                         </form>
 
-                        {comments.length > 0 ? (
+                        {sortedComments.length > 0 ? (
                           <div className="nutri-social-comment-list mt-2">
-                            {comments.slice(0, 4).map((comment) => (
+                            {sortedComments.slice(0, 4).map((comment) => (
                               <div className="nutri-social-comment-item" key={comment.id}>
                                 <strong>{usernameFromId(comment.userId, currentUserId, userDirectory)}</strong>
                                 <span>{comment.text}</span>
@@ -654,17 +1456,26 @@ export default function NutriSocial() {
                             ))}
                           </div>
                         ) : null}
-
-                        <div className="d-flex flex-wrap gap-2 mt-2">
-                          <span className="badge bg-secondary-lt">🕒 {prettyDate(post.createdAt)}</span>
-                        </div>
                       </div>
                     </article>
                   );
                 })}
               </div>
             </div>
-          </section>
+            </section>
+          ) : null}
+
+          {activeTab === 'meal' ? (
+            <section className="card">
+              <div className="card-header">
+                <h3 className="card-title m-0">Registar Refeição</h3>
+              </div>
+              <div className="card-body">
+                <p className="text-secondary mb-3">Usa esta aba para abrir o registo de refeição.</p>
+                <Link to="/progress" className="btn btn-primary">Ir para Registar Refeição</Link>
+              </div>
+            </section>
+          ) : null}
         </div>
       </div>
     </Layout>

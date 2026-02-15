@@ -1,15 +1,28 @@
-import axios from 'axios';
+import { createJsonClient } from './httpClient';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071';
-const INTERACTIONS_STORAGE_KEY = 'nutri_social_interactions_v1';
+function normalizeBaseUrl(value) {
+  return String(value || '').trim().replace(/\/+$/, '');
+}
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 20000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071');
+const API_BASE_HOST = (() => {
+  try {
+    return new URL(API_BASE_URL).host.toLowerCase();
+  } catch {
+    return '';
+  }
+})();
+
+const client = createJsonClient(API_BASE_URL, 20000);
+
+function isEphemeralTunnelHost(host) {
+  const normalized = String(host || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') return true;
+  if (normalized.endsWith('.loca.lt')) return true;
+  if (normalized.includes('ngrok')) return true;
+  return false;
+}
 
 function normalizeError(error) {
   const payload = error?.response?.data;
@@ -46,7 +59,134 @@ export async function fetchNutriSocialFeed(token) {
       headers: buildAuthHeaders(token),
     });
 
-    return Array.isArray(data?.posts) ? data.posts : [];
+    if (Array.isArray(data?.posts)) {
+      return data.posts;
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+
+export async function fetchNutriSocialUserPosts(token, userId) {
+  const numericUserId = Number(userId || 0);
+  if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
+    return [];
+  }
+
+  try {
+    const { data } = await client.get(`/api/social/users/${numericUserId}/posts`, {
+      headers: buildAuthHeaders(token),
+    });
+
+    if (Array.isArray(data?.posts)) {
+      return data.posts;
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+export async function updateSocialPost(token, postId, payload) {
+  const key = normalizePostKey(postId);
+  if (!key) {
+    throw new Error('Publicação inválida.');
+  }
+
+  const description = String(payload?.description || '').trim();
+  const rating = Number(payload?.rating || 0);
+
+  if (rating < 1 || rating > 5) {
+    throw new Error('A classificação deve estar entre 1 e 5.');
+  }
+
+  try {
+    const { data } = await client.put(
+      `/api/social/posts/${encodeURIComponent(key)}`,
+      { description, rating },
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function deleteSocialPost(token, postId) {
+  const key = normalizePostKey(postId);
+  if (!key) {
+    throw new Error('Publicação inválida.');
+  }
+
+  try {
+    await client.delete(`/api/social/posts/${encodeURIComponent(key)}`, {
+      headers: buildAuthHeaders(token),
+    });
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export function resolveNutriSocialImageUrl(rawPath) {
+  const value = String(rawPath || '').trim();
+  if (!value) {
+    return '';
+  }
+
+  if (value.startsWith('data:')) {
+    return value;
+  }
+
+  if (/^(https?:)?\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      const host = String(parsed.host || '').toLowerCase();
+      const uploadsIndex = parsed.pathname.indexOf('/uploads/');
+      if (uploadsIndex >= 0 && host !== API_BASE_HOST && isEphemeralTunnelHost(host)) {
+        const portablePath = parsed.pathname.slice(uploadsIndex);
+        return `${API_BASE_URL}${portablePath}${parsed.search || ''}`;
+      }
+    } catch {
+      // keep original value
+    }
+    return value;
+  }
+
+  if (value.startsWith('/')) {
+    return `${API_BASE_URL}${value}`;
+  }
+
+  return `${API_BASE_URL}/${value}`;
+}
+
+export async function uploadSocialPostImage(token, file) {
+  if (!(file instanceof File)) {
+    throw new Error('Ficheiro de imagem inválido.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const { data } = await client.post('/api/social/posts/upload', formData, {
+      headers: {
+        ...buildAuthHeaders(token),
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    const picturePath = String(data?.picturePath || '').trim();
+    if (!picturePath) {
+      throw new Error('Resposta inválida ao carregar imagem.');
+    }
+    return picturePath;
   } catch (error) {
     throw new Error(normalizeError(error));
   }
@@ -169,45 +309,36 @@ export async function removeFriend(token, friendshipId) {
   }
 }
 
-
-function canUseStorage() {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-}
-
-function readInteractionsStore() {
-  if (!canUseStorage()) {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(INTERACTIONS_STORAGE_KEY);
-    if (!raw) {
-      return {};
-    }
-
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeInteractionsStore(store) {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(INTERACTIONS_STORAGE_KEY, JSON.stringify(store));
-}
-
 function normalizePostKey(postId) {
   return String(postId || '').trim();
 }
 
-function buildPostState(source) {
+function normalizeTimestamp(...values) {
+  for (const value of values) {
+    const candidate = String(value || '').trim();
+    if (!candidate) continue;
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
+function buildPostState(source = {}) {
   const entry = source && typeof source === 'object' ? source : {};
   const kudosByUser = entry.kudosByUser && typeof entry.kudosByUser === 'object' ? entry.kudosByUser : {};
-  const comments = Array.isArray(entry.comments) ? entry.comments : [];
+  const comments = Array.isArray(entry.comments)
+    ? entry.comments
+      .map((comment) => ({
+        id: String(comment?.id || `${Date.now()}-${Math.random()}`),
+        userId: Number(comment?.userId || 0),
+        text: String(comment?.text || '').trim(),
+        createdAt: normalizeTimestamp(comment?.createdAt, comment?.created_at, comment?.currentTime, comment?.current_time),
+        currentTime: normalizeTimestamp(comment?.currentTime, comment?.current_time, comment?.createdAt, comment?.created_at),
+      }))
+      .filter((comment) => comment.userId > 0 && comment.text)
+    : [];
 
   return {
     kudosByUser,
@@ -215,69 +346,96 @@ function buildPostState(source) {
   };
 }
 
-export function getPostInteractions(postIds = []) {
-  const store = readInteractionsStore();
-  const map = {};
+export async function fetchPostInteractions(token, postId) {
+  const key = normalizePostKey(postId);
+  if (!key) {
+    return buildPostState();
+  }
 
-  postIds.forEach((postId) => {
-    const key = normalizePostKey(postId);
-    if (!key) return;
-    map[key] = buildPostState(store[key]);
+  try {
+    const { data } = await client.get(`/api/social/posts/${encodeURIComponent(key)}/interactions`, {
+      headers: buildAuthHeaders(token),
+    });
+    return buildPostState(data);
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function fetchPostInteractionsMap(token, postIds = []) {
+  const normalizedIds = [...new Set(
+    postIds
+      .map((postId) => normalizePostKey(postId))
+      .filter(Boolean),
+  )];
+
+  const map = {};
+  if (normalizedIds.length === 0) {
+    return map;
+  }
+
+  const pairs = await Promise.all(
+    normalizedIds.map(async (postId) => {
+      try {
+        const state = await fetchPostInteractions(token, postId);
+        return [postId, state];
+      } catch {
+        return [postId, buildPostState()];
+      }
+    }),
+  );
+
+  pairs.forEach(([postId, state]) => {
+    map[postId] = state;
   });
 
   return map;
 }
 
-export function togglePostKudo(postId, userId) {
+export async function togglePostKudo(token, postId) {
   const key = normalizePostKey(postId);
-  const actor = Number(userId);
-
-  if (!key || !Number.isFinite(actor) || actor <= 0) {
+  if (!key) {
     throw new Error('Não foi possível atualizar o kudo.');
   }
 
-  const store = readInteractionsStore();
-  const current = buildPostState(store[key]);
-  const nextKudos = { ...current.kudosByUser };
+  try {
+    const { data } = await client.post(
+      `/api/social/posts/${encodeURIComponent(key)}/kudos`,
+      {},
+      { headers: buildAuthHeaders(token) },
+    );
 
-  if (nextKudos[String(actor)]) {
-    delete nextKudos[String(actor)];
-  } else {
-    nextKudos[String(actor)] = new Date().toISOString();
+    return buildPostState({
+      kudosByUser: data?.kudosByUser || {},
+      comments: [],
+    });
+  } catch (error) {
+    throw new Error(normalizeError(error));
   }
-
-  store[key] = {
-    ...current,
-    kudosByUser: nextKudos,
-  };
-
-  writeInteractionsStore(store);
-  return buildPostState(store[key]);
 }
 
-export function addPostComment(postId, userId, text) {
+export async function addPostComment(token, postId, text) {
   const key = normalizePostKey(postId);
-  const actor = Number(userId);
   const cleanText = String(text || '').trim();
 
-  if (!key || !Number.isFinite(actor) || actor <= 0 || !cleanText) {
+  if (!key || !cleanText) {
     throw new Error('Comentário inválido.');
   }
 
-  const store = readInteractionsStore();
-  const current = buildPostState(store[key]);
-  const nextComment = {
-    id: `${Date.now()}-${Math.round(Math.random() * 10_000)}`,
-    userId: actor,
-    text: cleanText,
-    createdAt: new Date().toISOString(),
-  };
-
-  store[key] = {
-    ...current,
-    comments: [nextComment, ...current.comments].slice(0, 30),
-  };
-
-  writeInteractionsStore(store);
-  return buildPostState(store[key]);
+  try {
+    const { data } = await client.post(
+      `/api/social/posts/${encodeURIComponent(key)}/comments`,
+      { text: cleanText },
+      { headers: buildAuthHeaders(token) },
+    );
+    return {
+      id: String(data?.id || `${Date.now()}-${Math.round(Math.random() * 10000)}`),
+      userId: Number(data?.userId || 0),
+      text: String(data?.text || cleanText),
+      createdAt: normalizeTimestamp(data?.createdAt, data?.created_at, data?.currentTime, data?.current_time),
+      currentTime: normalizeTimestamp(data?.currentTime, data?.current_time, data?.createdAt, data?.created_at),
+    };
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
 }

@@ -391,3 +391,22 @@
   justify-content: center;
   gap: 8px;
 }
+
+.progress-visibility {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-visibility-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+@media (max-width: 768px) {
+  .progress-visibility-options {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

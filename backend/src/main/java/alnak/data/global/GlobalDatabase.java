@@ -1,5 +1,7 @@
 package alnak.data.global;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
@@ -8,8 +10,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import io.github.cdimascio.dotenv.Dotenv;
 
 public class GlobalDatabase
 {
@@ -182,10 +182,10 @@ public class GlobalDatabase
                 )
             """);
 
-            // ── Recipes (global — system + user-created) ───────────
+            // ── Recipes (mirrored from local SQLite) ──────────────
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS recipes (
-                    id            INT PRIMARY KEY AUTO_INCREMENT,
+                    id            INT PRIMARY KEY,
                     name          VARCHAR(255) NOT NULL,
                     description   TEXT,
                     meal_type     VARCHAR(50)  NOT NULL,
@@ -196,51 +196,7 @@ public class GlobalDatabase
                     protein_g     DOUBLE       DEFAULT 0,
                     carbs_g       DOUBLE       DEFAULT 0,
                     fat_g         DOUBLE       DEFAULT 0,
-                    image_url     VARCHAR(500),
-                    owner_id      INT,
-                    visibility    VARCHAR(20)  DEFAULT 'PUBLIC',
-                    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
-                )
-            """);
-
-            ensureColumnExists(s, "recipes", "owner_id", "INT");
-            ensureColumnExists(s, "recipes", "visibility", "VARCHAR(20) DEFAULT 'PUBLIC'");
-
-            // ── User recipe favorites (star/bookmark) ─────────────
-            s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS user_recipe_favorites (
-                    user_id    INT NOT NULL,
-                    recipe_id  INT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (user_id, recipe_id),
-                    FOREIGN KEY (user_id)   REFERENCES users(id)   ON DELETE CASCADE,
-                    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
-                )
-            """);
-
-            // ── Recipe ingredients (global) ───────────────────────
-            s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS recipe_ingredients (
-                    id              INT PRIMARY KEY AUTO_INCREMENT,
-                    recipe_id       INT          NOT NULL,
-                    ingredient_name VARCHAR(255) NOT NULL,
-                    quantity        DOUBLE       DEFAULT 0,
-                    unit            VARCHAR(50),
-                    notes           VARCHAR(255),
-                    order_index     INT          DEFAULT 0,
-                    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
-                )
-            """);
-
-            // ── Recipe steps (global) ─────────────────────────────
-            s.executeUpdate("""
-                CREATE TABLE IF NOT EXISTS recipe_steps (
-                    id               INT PRIMARY KEY AUTO_INCREMENT,
-                    recipe_id        INT  NOT NULL,
-                    step_order       INT  NOT NULL DEFAULT 1,
-                    description      TEXT NOT NULL,
-                    duration_minutes INT  DEFAULT 0,
-                    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+                    image_url     VARCHAR(500)
                 )
             """);
 
@@ -301,16 +257,39 @@ public class GlobalDatabase
                 )
             """);
 
+            // ── Post interactions (kudos + comments) ─────────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS post_kudos (
+                    post_id    INT       NOT NULL,
+                    user_id    INT       NOT NULL,
+                    created_at DATETIME  DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (post_id, user_id),
+                    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS post_comments (
+                    id         INT PRIMARY KEY AUTO_INCREMENT,
+                    post_id    INT         NOT NULL,
+                    user_id    INT         NOT NULL,
+                    text       TEXT        NOT NULL,
+                    created_at DATETIME    DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
             // ── Indexes ───────────────────────────────────────────
             createIndexIfMissing(s, "CREATE INDEX idx_users_email      ON users(email)");
             createIndexIfMissing(s, "CREATE INDEX idx_friendships_addr ON friendships(addressee_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_user       ON posts(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_recipe     ON posts(recipe_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_kudos_user  ON post_kudos(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_comments_post ON post_comments(post_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_comments_user ON post_comments(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_ratings_recipe   ON user_recipe_ratings(recipe_id)");
-            createIndexIfMissing(s, "CREATE INDEX idx_recipes_owner    ON recipes(owner_id)");
-            createIndexIfMissing(s, "CREATE INDEX idx_recipes_vis      ON recipes(visibility)");
-            createIndexIfMissing(s, "CREATE INDEX idx_fav_user         ON user_recipe_favorites(user_id)");
-            createIndexIfMissing(s, "CREATE INDEX idx_fav_recipe       ON user_recipe_favorites(recipe_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_user  ON meal_plans(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_week  ON meal_plans(week_start)");
             createIndexIfMissing(s, "CREATE INDEX idx_mp_meals_plan    ON meal_plan_meals(meal_plan_id)");

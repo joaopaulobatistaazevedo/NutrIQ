@@ -1,15 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers, Star, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock3, Euro, Flame, Layers, X } from 'lucide-react';
 import Layout from '../components/Layout';
-import {
-  fetchRecipes,
-  fetchMyRecipes,
-  createMyRecipe,
-  updateMyRecipe,
-  deleteMyRecipe,
-  fetchFavoriteRecipes,
-  toggleFavorite,
-} from '../services/recipeService';
+import { fetchRecipes } from '../services/recipeService';
 import '../styles/recipes.css';
 
 const CATEGORY_META = {
@@ -181,7 +173,7 @@ function recipeStepsText(recipe) {
   return String(recipe?.instructions || recipe?.stepsText || '').trim();
 }
 
-function CategoryCarousel({ category, onOpenNutritionistRecipe, onToggleFavorite, favoriteIds }) {
+function CategoryCarousel({ category, onOpenNutritionistRecipe }) {
   const trackRef = useRef(null);
 
   const scrollByAmount = (direction) => {
@@ -229,30 +221,19 @@ function CategoryCarousel({ category, onOpenNutritionistRecipe, onToggleFavorite
             const sourceUrl = extractSourceUrl(recipe);
             const hasSourceUrl = Boolean(sourceUrl);
             const calories = recipeCalories(recipe);
-            const isFav = favoriteIds?.has(recipe?.id);
 
             return (
               <article key={recipe?.id || recipe?.name} className="recipe-card">
-                <div className="recipe-card-img-wrap">
-                  <img
-                    src={recipeImageFor(recipe)}
-                    alt={recipe?.name || 'Receita'}
-                    loading="lazy"
-                    className="recipe-thumb"
-                    onError={(event) => {
-                      event.currentTarget.onerror = null;
-                      event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className={`recipe-fav-btn ${isFav ? 'is-fav' : ''}`}
-                    title={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                    onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(recipe.id); }}
-                  >
-                    <Star size={16} fill={isFav ? '#f59e0b' : 'none'} color={isFav ? '#f59e0b' : '#94a3b8'} />
-                  </button>
-                </div>
+                <img
+                  src={recipeImageFor(recipe)}
+                  alt={recipe?.name || 'Receita'}
+                  loading="lazy"
+                  className="recipe-thumb"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
+                  }}
+                />
                 <p className="recipe-badge">
                   <Layers size={13} />
                   {category.title}
@@ -300,25 +281,15 @@ export default function Recipes() {
   const [activeInnerTab, setActiveInnerTab] = useState('made');
   const [createNotice, setCreateNotice] = useState('');
   const [myRecipes, setMyRecipes] = useState([]);
-  const [myRecipesLoading, setMyRecipesLoading] = useState(false);
-  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
-  const [favoritesLoading, setFavoritesLoading] = useState(false);
-  const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [recipeDraft, setRecipeDraft] = useState({
     name: '',
-    description: '',
-    mealType: 'DINNER',
     ingredients: '',
     steps: '',
-    prepTimeMin: '',
-    cookTimeMin: '',
-    servings: '2',
-    calories: '',
-    proteinG: '',
-    carbsG: '',
-    fatG: '',
+    utensils: '',
+    allergens: '',
     visibility: 'private',
-    imageUrl: '',
+    photoFile: null,
+    photoPreview: '',
   });
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -333,24 +304,17 @@ export default function Recipes() {
     open: false,
     id: '',
     name: '',
-    description: '',
-    mealType: 'DINNER',
     ingredients: '',
     steps: '',
-    prepTimeMin: '',
-    cookTimeMin: '',
-    servings: '2',
-    calories: '',
-    proteinG: '',
-    carbsG: '',
-    fatG: '',
+    utensils: '',
+    allergens: '',
     visibility: 'private',
     image: '',
+    sourceUrl: '',
   });
   const [editNotice, setEditNotice] = useState('');
   const [showDeleteConfirmInEdit, setShowDeleteConfirmInEdit] = useState(false);
 
-  // ── Load all recipes (carousel) ──────────────────────────────
   useEffect(() => {
     let isMounted = true;
 
@@ -363,10 +327,24 @@ export default function Recipes() {
         const safeData = Array.isArray(data) ? data : [];
         setRecipes(safeData);
 
-        // Build favorite IDs set from the isFavorite field returned by backend
-        const favIds = new Set();
-        safeData.forEach((r) => { if (r.isFavorite) favIds.add(r.id); });
-        setFavoriteIds(favIds);
+        setMyRecipes((previous) => {
+          if (previous.length > 0) {
+            return previous;
+          }
+
+          return safeData.slice(0, 3).map((recipe, index) => ({
+            id: `seed-${recipe?.id || index}`,
+            name: String(recipe?.name || `Receita ${index + 1}`),
+            description: String(recipe?.description || '').trim() || 'Sem descrição detalhada.',
+            image: recipeImageFor(recipe),
+            visibility: index === 0 ? 'private' : 'public',
+            sourceUrl: extractSourceUrl(recipe),
+            ingredients: recipeIngredientsText(recipe),
+            steps: recipeStepsText(recipe),
+            utensils: stringListFromValue(recipe?.utensils),
+            allergens: stringListFromValue(recipe?.allergens),
+          }));
+        });
       } catch (loadError) {
         if (!isMounted) return;
         setError(loadError?.message || 'Não foi possível carregar as receitas.');
@@ -376,63 +354,30 @@ export default function Recipes() {
     };
 
     void run();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // ── Load user's own recipes when "mine" tab opens ────────────
-  const loadMyRecipes = useCallback(async () => {
-    setMyRecipesLoading(true);
-    try {
-      const data = await fetchMyRecipes();
-      setMyRecipes(Array.isArray(data) ? data : []);
-    } catch {
-      setMyRecipes([]);
-    } finally {
-      setMyRecipesLoading(false);
+  useEffect(() => () => {
+    if (String(recipeDraft.photoPreview || '').startsWith('blob:')) {
+      URL.revokeObjectURL(recipeDraft.photoPreview);
     }
-  }, []);
-
-  // ── Load favorites when "favorites" tab opens ────────────────
-  const loadFavorites = useCallback(async () => {
-    setFavoritesLoading(true);
-    try {
-      const data = await fetchFavoriteRecipes();
-      setFavoriteRecipes(Array.isArray(data) ? data : []);
-    } catch {
-      setFavoriteRecipes([]);
-    } finally {
-      setFavoritesLoading(false);
-    }
-  }, []);
+  }, [recipeDraft.photoPreview]);
 
   useEffect(() => {
-    if (activeInnerTab === 'mine') void loadMyRecipes();
-    if (activeInnerTab === 'favorites') void loadFavorites();
-  }, [activeInnerTab, loadMyRecipes, loadFavorites]);
+    const hasOverlayOpen = confirmDialog.open || editRecipeDialog.open || Boolean(selectedNutritionistRecipe);
 
-  // ── Toggle favorite handler ──────────────────────────────────
-  const handleToggleFavorite = useCallback(async (recipeId) => {
-    try {
-      const result = await toggleFavorite(recipeId);
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        if (result.favorited) {
-          next.add(recipeId);
-        } else {
-          next.delete(recipeId);
-        }
-        return next;
-      });
-      // Update recipes list to reflect new fav status
-      setRecipes((prev) =>
-        prev.map((r) =>
-          r.id === recipeId ? { ...r, isFavorite: result.favorited } : r
-        )
-      );
-    } catch {
-      // silently fail
+    if (hasOverlayOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
     }
-  }, []);
+
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [confirmDialog.open, editRecipeDialog.open, selectedNutritionistRecipe]);
 
   const groupedCategories = useMemo(() => {
     const grouped = {
@@ -486,6 +431,45 @@ export default function Recipes() {
     }));
   };
 
+  const handlePhotoChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setCreateNotice('');
+
+    setRecipeDraft((previous) => {
+      if (String(previous.photoPreview || '').startsWith('blob:')) {
+        URL.revokeObjectURL(previous.photoPreview);
+      }
+
+      if (!file) {
+        return {
+          ...previous,
+          photoFile: null,
+          photoPreview: '',
+        };
+      }
+
+      return {
+        ...previous,
+        photoFile: file,
+        photoPreview: URL.createObjectURL(file),
+      };
+    });
+  };
+
+  const removeDraftPhoto = () => {
+    setCreateNotice('');
+    setRecipeDraft((previous) => {
+      if (String(previous.photoPreview || '').startsWith('blob:')) {
+        URL.revokeObjectURL(previous.photoPreview);
+      }
+      return {
+        ...previous,
+        photoFile: null,
+        photoPreview: '',
+      };
+    });
+  };
+
   const openConfirmDialog = ({ type, recipeId, title, message, confirmLabel, tone = 'primary' }) => {
     setConfirmDialog({
       open: true,
@@ -514,21 +498,13 @@ export default function Recipes() {
       open: true,
       id: recipe.id,
       name: String(recipe.name || '').trim(),
-      description: String(recipe.description || '').trim(),
-      mealType: String(recipe.mealType || 'DINNER').trim().toUpperCase(),
-      ingredients: recipeIngredientsText(recipe),
-      steps: recipeStepsText(recipe),
-      prepTimeMin: String(recipe.prepTimeMin || ''),
-      cookTimeMin: String(recipe.cookTimeMin || ''),
-      servings: String(recipe.servings || '2'),
-      calories: String(recipe.nutritionalInfo?.calories || recipe.calories || ''),
-      proteinG: String(recipe.nutritionalInfo?.proteinG || ''),
-      carbsG: String(recipe.nutritionalInfo?.carbsG || ''),
-      fatG: String(recipe.nutritionalInfo?.fatG || ''),
-      visibility: recipe.visibility === 'PUBLIC' ? 'public' : 'private',
-      image: String(recipe.imageUrl || recipe.image || '').trim(),
-      utensils: '',
-      allergens: '',
+      ingredients: String(recipe.ingredients || '').trim(),
+      steps: String(recipe.steps || recipe.description || '').trim(),
+      utensils: String(recipe.utensils || '').trim(),
+      allergens: String(recipe.allergens || '').trim(),
+      visibility: recipe.visibility === 'public' ? 'public' : 'private',
+      image: String(recipe.image || '').trim(),
+      sourceUrl: String(recipe.sourceUrl || '').trim(),
     });
   };
 
@@ -551,13 +527,13 @@ export default function Recipes() {
     }));
   };
 
-  const toggleMyRecipeVisibility = async (recipeId) => {
+  const toggleMyRecipeVisibility = (recipeId) => {
     const targetRecipe = myRecipes.find((recipe) => recipe.id === recipeId);
-    if (!targetRecipe) return;
+    if (!targetRecipe) {
+      return;
+    }
 
-    const newVisibility = targetRecipe.visibility === 'PRIVATE' ? 'PUBLIC' : 'PRIVATE';
-
-    if (newVisibility === 'PUBLIC') {
+    if (targetRecipe.visibility === 'private') {
       openConfirmDialog({
         type: 'publish',
         recipeId,
@@ -569,44 +545,39 @@ export default function Recipes() {
       return;
     }
 
-    try {
-      await updateMyRecipe(recipeId, { ...buildRecipePayload(targetRecipe), visibility: newVisibility });
-      setMyRecipes((prev) =>
-        prev.map((r) => (r.id === recipeId ? { ...r, visibility: newVisibility } : r))
-      );
-    } catch {
-      // silently fail
-    }
+    setMyRecipes((previous) => previous.map((recipe) => (
+      recipe.id === recipeId
+        ? { ...recipe, visibility: 'private' }
+        : recipe
+    )));
   };
 
-  const handleConfirmDialog = async () => {
+  const handleConfirmDialog = () => {
     if (!confirmDialog.recipeId) {
       closeConfirmDialog();
       return;
     }
 
     if (confirmDialog.type === 'publish') {
-      const targetRecipe = myRecipes.find((r) => r.id === confirmDialog.recipeId);
-      if (targetRecipe) {
-        try {
-          await updateMyRecipe(confirmDialog.recipeId, { ...buildRecipePayload(targetRecipe), visibility: 'PUBLIC' });
-          setMyRecipes((prev) =>
-            prev.map((r) => (r.id === confirmDialog.recipeId ? { ...r, visibility: 'PUBLIC' } : r))
-          );
-        } catch {
-          // silently fail
-        }
-      }
+      setMyRecipes((previous) => previous.map((recipe) => (
+        recipe.id === confirmDialog.recipeId
+          ? { ...recipe, visibility: 'public' }
+          : recipe
+      )));
     }
 
     closeConfirmDialog();
   };
 
-  const saveEditedRecipe = async (event) => {
+  const saveEditedRecipe = (event) => {
     event.preventDefault();
 
     const requiredFields = [
       { key: 'name', label: 'nome da receita' },
+      { key: 'ingredients', label: 'ingredientes' },
+      { key: 'steps', label: 'passos' },
+      { key: 'allergens', label: 'alergénios' },
+      { key: 'utensils', label: 'utensílios' },
     ];
 
     const missing = requiredFields
@@ -623,47 +594,24 @@ export default function Recipes() {
       return;
     }
 
-    // Parse ingredients/steps text into structured lists
-    const ingredientLines = String(editRecipeDialog.ingredients || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const ingredients = ingredientLines.map((line, idx) => ({
-      ingredientName: line,
-      quantity: 0,
-      unit: '',
-      orderIndex: idx + 1,
-    }));
+    setMyRecipes((previous) => previous.map((recipe) => (
+      recipe.id === editRecipeDialog.id
+        ? {
+          ...recipe,
+          name: String(editRecipeDialog.name || '').trim(),
+          ingredients: String(editRecipeDialog.ingredients || '').trim(),
+          steps: String(editRecipeDialog.steps || '').trim(),
+          utensils: String(editRecipeDialog.utensils || '').trim(),
+          allergens: String(editRecipeDialog.allergens || '').trim(),
+          visibility: editRecipeDialog.visibility === 'public' ? 'public' : 'private',
+          image: String(editRecipeDialog.image || '').trim() || recipe.image,
+          sourceUrl: String(editRecipeDialog.sourceUrl || '').trim(),
+          description: String(editRecipeDialog.steps || '').trim() || recipe.description,
+        }
+        : recipe
+    )));
 
-    const stepLines = String(editRecipeDialog.steps || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const steps = stepLines.map((line, idx) => ({
-      description: line,
-      stepOrder: idx + 1,
-    }));
-
-    const payload = {
-      name: String(editRecipeDialog.name || '').trim(),
-      description: String(editRecipeDialog.description || '').trim(),
-      mealType: String(editRecipeDialog.mealType || 'DINNER').trim().toUpperCase(),
-      prepTimeMin: Number(editRecipeDialog.prepTimeMin) || 0,
-      cookTimeMin: Number(editRecipeDialog.cookTimeMin) || 0,
-      servings: Number(editRecipeDialog.servings) || 2,
-      visibility: editRecipeDialog.visibility === 'public' ? 'PUBLIC' : 'PRIVATE',
-      imageUrl: String(editRecipeDialog.image || '').trim(),
-      ingredients,
-      steps,
-      nutritionalInfo: {
-        calories: Number(editRecipeDialog.calories) || 0,
-        proteinG: Number(editRecipeDialog.proteinG) || 0,
-        carbsG: Number(editRecipeDialog.carbsG) || 0,
-        fatG: Number(editRecipeDialog.fatG) || 0,
-      },
-    };
-
-    try {
-      await updateMyRecipe(editRecipeDialog.id, payload);
-      void loadMyRecipes();
-      closeEditRecipeDialog();
-    } catch (err) {
-      setEditNotice(err?.message || 'Erro ao guardar a receita.');
-    }
+    closeEditRecipeDialog();
   };
 
   const requestDeleteFromEditDialog = () => {
@@ -674,27 +622,25 @@ export default function Recipes() {
     setShowDeleteConfirmInEdit(false);
   };
 
-  const confirmDeleteFromEditDialog = async () => {
+  const confirmDeleteFromEditDialog = () => {
     if (!editRecipeDialog.id) {
       closeEditRecipeDialog();
       return;
     }
 
-    try {
-      await deleteMyRecipe(editRecipeDialog.id);
-      setMyRecipes((previous) => previous.filter((recipe) => recipe.id !== editRecipeDialog.id));
-    } catch {
-      // silently fail
-    }
+    setMyRecipes((previous) => previous.filter((recipe) => recipe.id !== editRecipeDialog.id));
     closeEditRecipeDialog();
   };
 
-  const handleCreateSubmit = async (event) => {
+  const handleCreateSubmit = (event) => {
     event.preventDefault();
 
     const requiredFields = [
       { key: 'name', label: 'nome da receita' },
-      { key: 'mealType', label: 'tipo de refeição' },
+      { key: 'ingredients', label: 'ingredientes' },
+      { key: 'steps', label: 'passos' },
+      { key: 'allergens', label: 'alergénios' },
+      { key: 'utensils', label: 'utensílios' },
     ];
 
     const missing = requiredFields
@@ -708,103 +654,37 @@ export default function Recipes() {
 
     const recipeName = String(recipeDraft.name || '').trim();
 
-    // Parse ingredients text into structured list
-    const ingredientLines = String(recipeDraft.ingredients || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const ingredients = ingredientLines.map((line, idx) => ({
-      ingredientName: line,
-      quantity: 0,
-      unit: '',
-      orderIndex: idx + 1,
-    }));
+    const cardImage = recipeDraft.photoFile
+      ? URL.createObjectURL(recipeDraft.photoFile)
+      : '';
 
-    // Parse steps text into structured list
-    const stepLines = String(recipeDraft.steps || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const steps = stepLines.map((line, idx) => ({
-      description: line,
-      stepOrder: idx + 1,
-    }));
-
-    const payload = {
+    const createdRecipe = {
+      id: `mine-${Date.now()}`,
       name: recipeName,
-      description: String(recipeDraft.description || '').trim() || 'Receita criada manualmente.',
-      mealType: String(recipeDraft.mealType || 'DINNER').trim().toUpperCase(),
-      prepTimeMin: Number(recipeDraft.prepTimeMin) || 0,
-      cookTimeMin: Number(recipeDraft.cookTimeMin) || 0,
-      servings: Number(recipeDraft.servings) || 2,
-      visibility: recipeDraft.visibility === 'public' ? 'PUBLIC' : 'PRIVATE',
-      imageUrl: String(recipeDraft.imageUrl || '').trim(),
-      ingredients,
-      steps,
-      nutritionalInfo: {
-        calories: Number(recipeDraft.calories) || 0,
-        proteinG: Number(recipeDraft.proteinG) || 0,
-        carbsG: Number(recipeDraft.carbsG) || 0,
-        fatG: Number(recipeDraft.fatG) || 0,
-      },
+      description: String(recipeDraft.steps || '').trim() || 'Receita criada manualmente.',
+      image: cardImage || 'https://placehold.co/900x560/e2e8f0/475569?text=Receita+Criada',
+      visibility: recipeDraft.visibility === 'public' ? 'public' : 'private',
+      sourceUrl: '',
+      ingredients: String(recipeDraft.ingredients || '').trim(),
+      steps: String(recipeDraft.steps || '').trim(),
+      utensils: String(recipeDraft.utensils || '').trim(),
+      allergens: String(recipeDraft.allergens || '').trim(),
     };
 
-    try {
-      await createMyRecipe(payload);
-      setRecipeDraft({
-        name: '',
-        description: '',
-        mealType: 'DINNER',
-        ingredients: '',
-        steps: '',
-        prepTimeMin: '',
-        cookTimeMin: '',
-        servings: '2',
-        calories: '',
-        proteinG: '',
-        carbsG: '',
-        fatG: '',
-        visibility: 'private',
-        imageUrl: '',
-      });
-      setCreateNotice('Receita criada com sucesso!');
-      setActiveInnerTab('mine');
-    } catch (err) {
-      setCreateNotice(err?.message || 'Erro ao criar a receita.');
-    }
-  };
+    setMyRecipes((previous) => [createdRecipe, ...previous]);
+    setRecipeDraft({
+      name: '',
+      ingredients: '',
+      steps: '',
+      utensils: '',
+      allergens: '',
+      visibility: 'private',
+      photoFile: null,
+      photoPreview: '',
+    });
 
-  /** Build a recipe payload from a backend-shaped recipe for updates. */
-  const buildRecipePayload = (recipe) => {
-    // Preserve existing ingredients/steps from the backend-shaped recipe
-    const ingredients = Array.isArray(recipe.ingredients)
-      ? recipe.ingredients.map((ing, idx) => ({
-          ingredientName: ing.ingredientName || (typeof ing === 'string' ? ing : ''),
-          quantity: ing.quantity || 0,
-          unit: ing.unit || '',
-          orderIndex: ing.orderIndex || idx + 1,
-        }))
-      : [];
-
-    const steps = Array.isArray(recipe.steps)
-      ? recipe.steps.map((step, idx) => ({
-          description: step.description || (typeof step === 'string' ? step : ''),
-          stepOrder: step.stepOrder || idx + 1,
-        }))
-      : [];
-
-    return {
-      name: recipe.name || '',
-      description: recipe.description || '',
-      mealType: String(recipe.mealType || 'DINNER').toUpperCase(),
-      prepTimeMin: Number(recipe.prepTimeMin) || 0,
-      cookTimeMin: Number(recipe.cookTimeMin) || 0,
-      servings: Number(recipe.servings) || 2,
-      visibility: recipe.visibility || 'PRIVATE',
-      imageUrl: recipe.imageUrl || recipe.image || '',
-      ingredients,
-      steps,
-      nutritionalInfo: {
-        calories: Number(recipe.nutritionalInfo?.calories || recipe.calories || 0),
-        proteinG: Number(recipe.nutritionalInfo?.proteinG || 0),
-        carbsG: Number(recipe.nutritionalInfo?.carbsG || 0),
-        fatG: Number(recipe.nutritionalInfo?.fatG || 0),
-      },
-    };
+    setCreateNotice('Receita adicionada em "Suas receitas".');
+    setActiveInnerTab('mine');
   };
 
   return (
@@ -813,9 +693,10 @@ export default function Recipes() {
         <div className="container-xl">
           <header className="page-header d-print-none mb-3">
             <div>
-              <h2 className="page-title">Receitas</h2>
+              <h2 className="page-title">Receitas por Base</h2>
               <p className="text-secondary mb-0">
-                Explora receitas, cria as tuas, marca favoritas e guarda-as para o teu plano alimentar.
+                Organização por categoria para veres receitas parecidas juntas
+                como pediste (ex: carbonara e bolonhesa na base massa).
               </p>
             </div>
           </header>
@@ -828,7 +709,7 @@ export default function Recipes() {
               aria-selected={activeInnerTab === 'made'}
               onClick={() => setActiveInnerTab('made')}
             >
-              Todas as Receitas
+              Receitas feitas
             </button>
             <button
               type="button"
@@ -848,15 +729,6 @@ export default function Recipes() {
             >
               Suas receitas
             </button>
-            <button
-              type="button"
-              role="tab"
-              className={`recipes-inner-tab ${activeInnerTab === 'favorites' ? 'active' : ''}`}
-              aria-selected={activeInnerTab === 'favorites'}
-              onClick={() => setActiveInnerTab('favorites')}
-            >
-              <Star size={14} style={{ marginRight: 4 }} /> Favoritas
-            </button>
           </div>
 
           {activeInnerTab === 'made' ? (
@@ -873,8 +745,6 @@ export default function Recipes() {
                     key={category.id}
                     category={category}
                     onOpenNutritionistRecipe={setSelectedNutritionistRecipe}
-                    onToggleFavorite={handleToggleFavorite}
-                    favoriteIds={favoriteIds}
                   />
                 ))}
               </div>
@@ -885,7 +755,7 @@ export default function Recipes() {
             <section className="recipes-create card" aria-label="Criar receita">
               <header className="recipes-create-head">
                 <h3>Criar receita</h3>
-                <p>Cria uma nova receita que será guardada na tua base de dados. Pode ser pública ou privada.</p>
+                <p>Preenche a base da receita com nome, ingredientes, passos, utensílios, alergénios e foto.</p>
               </header>
 
               <form className="recipes-create-form" onSubmit={handleCreateSubmit}>
@@ -904,145 +774,54 @@ export default function Recipes() {
                   </div>
 
                   <div className="recipes-create-field">
-                    <label htmlFor="recipe-meal-type">Tipo de refeição</label>
-                    <select
-                      id="recipe-meal-type"
-                      className="form-control"
-                      value={recipeDraft.mealType}
-                      onChange={updateDraftField('mealType')}
-                      required
-                    >
-                      <option value="BREAKFAST">Pequeno-almoço</option>
-                      <option value="LUNCH">Almoço</option>
-                      <option value="DINNER">Jantar</option>
-                      <option value="SNACK">Snack</option>
-                    </select>
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-servings">Porções</label>
-                    <input
-                      id="recipe-servings"
-                      type="number"
-                      min="1"
-                      className="form-control"
-                      placeholder="2"
-                      value={recipeDraft.servings}
-                      onChange={updateDraftField('servings')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field recipes-create-field-full">
-                    <label htmlFor="recipe-description">Descrição</label>
-                    <textarea
-                      id="recipe-description"
-                      className="form-control"
-                      rows={3}
-                      placeholder="Uma breve descrição da receita..."
-                      value={recipeDraft.description}
-                      onChange={updateDraftField('description')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-prep-time">Tempo de preparação (min)</label>
-                    <input
-                      id="recipe-prep-time"
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      placeholder="15"
-                      value={recipeDraft.prepTimeMin}
-                      onChange={updateDraftField('prepTimeMin')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-cook-time">Tempo de cozinha (min)</label>
-                    <input
-                      id="recipe-cook-time"
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      placeholder="30"
-                      value={recipeDraft.cookTimeMin}
-                      onChange={updateDraftField('cookTimeMin')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-calories">Calorias (kcal)</label>
-                    <input
-                      id="recipe-calories"
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      placeholder="450"
-                      value={recipeDraft.calories}
-                      onChange={updateDraftField('calories')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-protein">Proteína (g)</label>
-                    <input
-                      id="recipe-protein"
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      placeholder="30"
-                      value={recipeDraft.proteinG}
-                      onChange={updateDraftField('proteinG')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-carbs">Hidratos (g)</label>
-                    <input
-                      id="recipe-carbs"
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      placeholder="55"
-                      value={recipeDraft.carbsG}
-                      onChange={updateDraftField('carbsG')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field">
-                    <label htmlFor="recipe-fat">Gordura (g)</label>
-                    <input
-                      id="recipe-fat"
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      placeholder="12"
-                      value={recipeDraft.fatG}
-                      onChange={updateDraftField('fatG')}
-                    />
-                  </div>
-
-                  <div className="recipes-create-field recipes-create-field-full">
                     <label htmlFor="recipe-ingredients">Ingredientes</label>
                     <textarea
                       id="recipe-ingredients"
                       className="form-control"
-                      rows={4}
-                      placeholder="Um ingrediente por linha, ex:&#10;200g de massa&#10;1 lata de atum&#10;Espinafres a gosto"
+                      rows={6}
+                      placeholder={'Ex: 200g massa\n150g atum\n1 chávena espinafres'}
                       value={recipeDraft.ingredients}
                       onChange={updateDraftField('ingredients')}
+                      required
                     />
                   </div>
 
-                  <div className="recipes-create-field recipes-create-field-full">
-                    <label htmlFor="recipe-steps">Passos de preparação</label>
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-steps">Passos</label>
                     <textarea
                       id="recipe-steps"
                       className="form-control"
-                      rows={4}
-                      placeholder="Um passo por linha, ex:&#10;Cozer a massa em água com sal&#10;Escorrer e reservar&#10;Misturar o atum e os espinafres"
+                      rows={6}
+                      placeholder={'Ex: 1) Cozer a massa\n2) Saltear espinafres\n3) Misturar com atum'}
                       value={recipeDraft.steps}
                       onChange={updateDraftField('steps')}
+                      required
+                    />
+                  </div>
+
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-utensils">Utensílios recomendados</label>
+                    <textarea
+                      id="recipe-utensils"
+                      className="form-control"
+                      rows={4}
+                      placeholder={'Ex: Panela\nFrigideira\nEscorredor'}
+                      value={recipeDraft.utensils}
+                      onChange={updateDraftField('utensils')}
+                      required
+                    />
+                  </div>
+
+                  <div className="recipes-create-field">
+                    <label htmlFor="recipe-allergens">Alergénios</label>
+                    <textarea
+                      id="recipe-allergens"
+                      className="form-control"
+                      rows={4}
+                      placeholder={'Ex: Glúten\nPeixe\nLactose'}
+                      value={recipeDraft.allergens}
+                      onChange={updateDraftField('allergens')}
+                      required
                     />
                   </div>
 
@@ -1057,7 +836,7 @@ export default function Recipes() {
                           checked={recipeDraft.visibility === 'public'}
                           onChange={updateDraftField('visibility')}
                         />
-                        Pública — visível para todos
+                        Pública
                       </label>
                       <label className={`recipes-visibility-pill ${recipeDraft.visibility === 'private' ? 'active' : ''}`}>
                         <input
@@ -1067,25 +846,32 @@ export default function Recipes() {
                           checked={recipeDraft.visibility === 'private'}
                           onChange={updateDraftField('visibility')}
                         />
-                        Privada — só tu vês
+                        Privada
                       </label>
                     </div>
                   </div>
 
                   <div className="recipes-create-field recipes-create-field-full">
-                    <label htmlFor="recipe-image-url">Imagem (URL)</label>
-                    <input
-                      id="recipe-image-url"
-                      type="url"
-                      className="form-control"
-                      placeholder="https://exemplo.com/imagem-da-receita.jpg"
-                      value={recipeDraft.imageUrl || ''}
-                      onChange={updateDraftField('imageUrl')}
-                    />
-                    {recipeDraft.imageUrl ? (
-                      <img src={recipeDraft.imageUrl} alt="Pré-visualização da receita" className="recipes-photo-preview" />
+                    <label htmlFor="recipe-photo">Foto da receita</label>
+                    <div className="recipes-photo-upload-row">
+                      <input
+                        id="recipe-photo"
+                        type="file"
+                        accept="image/*"
+                        className="form-control"
+                        onChange={handlePhotoChange}
+                      />
+                      {recipeDraft.photoPreview ? (
+                        <button type="button" className="btn btn-outline-secondary" onClick={removeDraftPhoto}>
+                          Remover foto
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {recipeDraft.photoPreview ? (
+                      <img src={recipeDraft.photoPreview} alt="Pré-visualização da receita" className="recipes-photo-preview" />
                     ) : (
-                      <div className="recipes-photo-placeholder">Cole uma URL de imagem acima para pré-visualizar</div>
+                      <div className="recipes-photo-placeholder">Sem foto selecionada</div>
                     )}
                   </div>
                 </div>
@@ -1095,7 +881,7 @@ export default function Recipes() {
                 ) : null}
 
                 <div className="recipes-create-actions">
-                  <button type="submit" className="btn btn-primary">Criar receita</button>
+                  <button type="submit" className="btn btn-primary">Guardar base da receita</button>
                 </div>
               </form>
             </section>
@@ -1108,24 +894,18 @@ export default function Recipes() {
                 <p>Lista das tuas receitas. As privadas aparecem mais escuras e podes alterar a qualquer momento.</p>
               </header>
 
-              {myRecipesLoading ? (
-                <div className="text-center py-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">A carregar...</span>
-                  </div>
-                </div>
-              ) : myRecipes.length === 0 ? (
+              {myRecipes.length === 0 ? (
                 <div className="alert alert-secondary" role="status">
                   Ainda não tens receitas criadas. Vai à aba "Criar receita" para adicionar a primeira.
                 </div>
               ) : (
                 <div className="recipes-mine-grid">
                   {myRecipes.map((recipe) => {
-                    const isPrivate = recipe.visibility === 'PRIVATE';
+                    const isPrivate = recipe.visibility === 'private';
                     return (
                       <article key={recipe.id} className={`my-recipe-card ${isPrivate ? 'is-private' : 'is-public'}`}>
                         <img
-                          src={recipe.imageUrl || recipe.image}
+                          src={recipe.image}
                           alt={recipe.name}
                           loading="lazy"
                           className="my-recipe-thumb"
@@ -1162,69 +942,6 @@ export default function Recipes() {
                       </article>
                     );
                   })}
-                </div>
-              )}
-            </section>
-          ) : null}
-
-          {activeInnerTab === 'favorites' ? (
-            <section className="recipes-favorites card" aria-label="Receitas favoritas">
-              <header className="recipes-mine-head">
-                <h3>⭐ Receitas favoritas</h3>
-                <p>Receitas de outros utilizadores que marcaste como favoritas. Também ficam disponíveis para o chatbot.</p>
-              </header>
-
-              {favoritesLoading ? (
-                <div className="text-center py-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">A carregar...</span>
-                  </div>
-                </div>
-              ) : favoriteRecipes.length === 0 ? (
-                <div className="alert alert-secondary" role="status">
-                  Ainda não tens receitas favoritas. Vai à aba "Todas as Receitas" e clica na ⭐ para marcar.
-                </div>
-              ) : (
-                <div className="recipes-mine-grid">
-                  {favoriteRecipes.map((recipe) => (
-                    <article key={recipe.id} className="my-recipe-card is-public">
-                      <img
-                        src={recipe.imageUrl || recipe.image}
-                        alt={recipe.name}
-                        loading="lazy"
-                        className="my-recipe-thumb"
-                        onError={(event) => {
-                          event.currentTarget.onerror = null;
-                          event.currentTarget.src = 'https://placehold.co/900x560/e2e8f0/475569?text=Receita';
-                        }}
-                      />
-                      <div className="my-recipe-body">
-                        <div className="my-recipe-top">
-                          <h4>{recipe.name}</h4>
-                          <button
-                            type="button"
-                            className="recipe-fav-btn is-fav"
-                            title="Remover dos favoritos"
-                            onClick={() => handleToggleFavorite(recipe.id)}
-                          >
-                            <Star size={18} fill="currentColor" />
-                          </button>
-                        </div>
-                        <p>{recipe.description || `${recipe.prepTimeMin || '?'} min prep · ${recipe.cookTimeMin || '?'} min cook`}</p>
-                        <div className="my-recipe-actions">
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => {
-                              setSelectedNutritionistRecipe(recipe);
-                            }}
-                          >
-                            Ver detalhes
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
                 </div>
               )}
             </section>
@@ -1452,4 +1169,3 @@ export default function Recipes() {
     </Layout>
   );
 }
-

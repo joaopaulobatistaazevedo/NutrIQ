@@ -1,19 +1,8 @@
-import axios from 'axios';
+import { createJsonClient } from './httpClient';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071';
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-function getAuthHeaders() {
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+const client = createJsonClient(API_BASE_URL, 15000);
 
 function normalizeError(error) {
   const payload = error?.response?.data;
@@ -33,6 +22,31 @@ function normalizeError(error) {
   return 'Não foi possível carregar as receitas.';
 }
 
+function normalizeRecipesPayload(data) {
+  if (Array.isArray(data)) return data;
+
+  const nestedCandidates = [
+    data?.recipes,
+    data?.items,
+    data?.content,
+    data?.data,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  if (typeof data === 'string' && /<html|ngrok/i.test(data)) {
+    throw new Error(
+      'O túnel público está a devolver uma página intermédia (ngrok), não JSON da API. Verifica o URL/túnel do backend.',
+    );
+  }
+
+  throw new Error('Formato de resposta inesperado ao carregar receitas.');
+}
+
 export async function fetchRecipes({ limit = 200, mealType = '' } = {}) {
   const params = {};
   if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
@@ -43,8 +57,8 @@ export async function fetchRecipes({ limit = 200, mealType = '' } = {}) {
   }
 
   try {
-    const { data } = await client.get('/api/recipes', { params, headers: getAuthHeaders() });
-    return Array.isArray(data) ? data : [];
+    const { data } = await client.get('/api/recipes', { params });
+    return normalizeRecipesPayload(data);
   } catch (error) {
     throw new Error(normalizeError(error));
   }
@@ -57,7 +71,7 @@ export async function fetchRecipeById(recipeId) {
   }
 
   try {
-    const { data } = await client.get(`/api/recipes/${id}`, { headers: getAuthHeaders() });
+    const { data } = await client.get(`/api/recipes/${id}`);
     return data || null;
   } catch (error) {
     throw new Error(normalizeError(error));
@@ -66,89 +80,7 @@ export async function fetchRecipeById(recipeId) {
 
 export async function createRecipe(payload) {
   try {
-    const { data } = await client.post('/api/recipes', payload, { headers: getAuthHeaders() });
-    return data;
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-// ── User recipe CRUD (auth required) ──────────────────────────
-
-export async function fetchMyRecipes() {
-  try {
-    const { data } = await client.get('/api/recipes/mine', { headers: getAuthHeaders() });
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-export async function createMyRecipe(payload) {
-  try {
-    const { data } = await client.post('/api/recipes/mine', payload, { headers: getAuthHeaders() });
-    return data;
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-export async function updateMyRecipe(recipeId, payload) {
-  const id = Number(recipeId);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error('ID de receita inválido.');
-  }
-  try {
-    const { data } = await client.put(`/api/recipes/mine/${id}`, payload, { headers: getAuthHeaders() });
-    return data;
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-export async function deleteMyRecipe(recipeId) {
-  const id = Number(recipeId);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error('ID de receita inválido.');
-  }
-  try {
-    await client.delete(`/api/recipes/mine/${id}`, { headers: getAuthHeaders() });
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-// ── Favorites (star/bookmark) ─────────────────────────────────
-
-export async function fetchFavoriteRecipes() {
-  try {
-    const { data } = await client.get('/api/recipes/favorites', { headers: getAuthHeaders() });
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-export async function toggleFavorite(recipeId) {
-  const id = Number(recipeId);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error('ID de receita inválido.');
-  }
-  try {
-    const { data } = await client.post(`/api/recipes/${id}/favorite`, {}, { headers: getAuthHeaders() });
-    return data;
-  } catch (error) {
-    throw new Error(normalizeError(error));
-  }
-}
-
-export async function checkFavorite(recipeId) {
-  const id = Number(recipeId);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error('ID de receita inválido.');
-  }
-  try {
-    const { data } = await client.get(`/api/recipes/${id}/favorite`, { headers: getAuthHeaders() });
+    const { data } = await client.post('/api/recipes', payload);
     return data;
   } catch (error) {
     throw new Error(normalizeError(error));

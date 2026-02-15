@@ -305,12 +305,15 @@ export default function Profile() {
               <button className="prof-avatar-btn" type="button" aria-label="Alterar foto">
                 <Camera size={14} />
               </button>
+              <span className="prof-streak-pill" aria-label={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`} title={`Streak ${Math.max(0, Number(formState.streakCount || 0))} dias`}>
+                <Flame size={14} />
+                <span className="prof-streak-value">{Math.max(0, Number(formState.streakCount || 0))}</span>
+              </span>
             </div>
 
             <div className="prof-id">
               <div className="prof-name-row">
                 <h1>{formState.name || 'Utilizador'}</h1>
-                <span className="prof-streak-pill"><Flame size={16} /> Streak {Math.max(0, Number(formState.streakCount || 0))} dias</span>
               </div>
               <p className="prof-location">
                 <MapPin size={14} />
@@ -318,20 +321,22 @@ export default function Profile() {
                 {formState.location || 'Localização não definida'}
               </p>
               <p className="prof-bio">{profileBio}</p>
-              <div className="prof-user-id-row">
-                <span className="prof-user-id-pill">ID #{userId || '—'}</span>
-                <button type="button" className="prof-id-copy-btn" onClick={handleCopyUserId}>
-                  {copyStatus === 'ID copiado!' ? <Check size={14} /> : <Copy size={14} />}
-                  {copyStatus || 'Copiar ID'}
-                </button>
-              </div>
-              <div className="prof-mini-metrics">
-                <span>{dailyCalories ? `${dailyCalories} kcal alvo` : 'Sem calorias definidas'}</span>
-                <span>
-                  {weeklyBudget !== null
-                    ? `${weeklyBudget.toFixed(2)} EUR / semana`
-                    : 'Sem orçamento semanal'}
-                </span>
+              <div className="prof-meta-side">
+                <div className="prof-user-id-row">
+                  <span className="prof-user-id-pill">ID #{userId || '—'}</span>
+                  <button type="button" className="prof-id-copy-btn" onClick={handleCopyUserId}>
+                    {copyStatus === 'ID copiado!' ? <Check size={14} /> : <Copy size={14} />}
+                    {copyStatus || 'Copiar ID'}
+                  </button>
+                </div>
+                <div className="prof-mini-metrics">
+                  <span>{dailyCalories ? `${dailyCalories} kcal alvo` : 'Sem calorias definidas'}</span>
+                  <span>
+                    {weeklyBudget !== null
+                      ? `${weeklyBudget.toFixed(2)} EUR / semana`
+                      : 'Sem orçamento semanal'}
+                  </span>
+                </div>
               </div>
             </div>
 

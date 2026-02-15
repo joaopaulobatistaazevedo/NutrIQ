@@ -31,6 +31,7 @@ public class SocialDTOs {
             long userId,
             int recipeId,
             String recipeName,
+            String recipeImageUrl,
             String picturePath,
             String description,
             int rating,
@@ -38,11 +39,13 @@ public class SocialDTOs {
     ) {
         public static PostResponse from(Post post) {
             String recipeName = post.getRecipe() != null ? post.getRecipe().getName() : null;
+            String recipeImageUrl = post.getRecipe() != null ? post.getRecipe().getImageUrl() : null;
             return new PostResponse(
                     post.getId(),
                     post.getUserId(),
                     post.getRecipeId(),
                     recipeName,
+                    recipeImageUrl,
                     post.getPicturePath(),
                     post.getDescription(),
                     post.getRating(),

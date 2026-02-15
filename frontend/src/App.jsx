@@ -14,6 +14,7 @@ import Progress from './pages/Progress';
 import Profile from './pages/Profile';
 import NutriSocial from './pages/NutriSocial';
 import Nutritionist from './pages/Nutritionist';
+import { SocialNotificationProvider } from './context/SocialNotificationContext';
 import './styles/global.css';
 
 function AppRoutes() {
@@ -57,10 +58,12 @@ function AppRoutes() {
 function App() {
 
   return (
-    <BrowserRouter>
-      <AppRoutes />
-      <ChatWidget />
-    </BrowserRouter>
+    <SocialNotificationProvider>
+      <BrowserRouter>
+        <AppRoutes />
+        <ChatWidget />
+      </BrowserRouter>
+    </SocialNotificationProvider>
   );
 }
 

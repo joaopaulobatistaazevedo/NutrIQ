@@ -1,10 +1,10 @@
 package alnak.data.local;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -213,14 +213,9 @@ public class LocalDatabase {
                     protein_g     REAL    DEFAULT 0,
                     carbs_g       REAL    DEFAULT 0,
                     fat_g         REAL    DEFAULT 0,
-                    image_url     TEXT,
-                    owner_id      INTEGER,
-                    visibility    TEXT    DEFAULT 'PUBLIC'
+                    image_url     TEXT
                 )
             """);
-
-            ensureColumnExists("recipes", "owner_id", "INTEGER");
-            ensureColumnExists("recipes", "visibility", "TEXT DEFAULT 'PUBLIC'");
 
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS recipe_ingredients (

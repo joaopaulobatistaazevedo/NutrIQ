@@ -1,19 +1,16 @@
 package alnak;
 
-import java.sql.SQLException;
-import java.util.Map;
-
 import alnak.controllers.AuthController;
 import alnak.controllers.MealPlanController;
 import alnak.controllers.PriceController;
 import alnak.controllers.RecipeController;
-import alnak.controllers.ShoppingCartController;
 import alnak.controllers.SocialController;
+import alnak.controllers.ShoppingCartController;
 import alnak.controllers.UserController;
 import alnak.data.global.FriendshipDAO;
 import alnak.data.global.GlobalDatabase;
-import alnak.data.global.GlobalMealPlanDAO;
 import alnak.data.global.GlobalRecipeDAO;
+import alnak.data.global.GlobalMealPlanDAO;
 import alnak.data.global.PostDAO;
 import alnak.data.global.UserDAO;
 import alnak.data.local.IngredientMarketPriceDAO;
@@ -26,11 +23,14 @@ import alnak.services.AuthService;
 import alnak.services.MealPlanService;
 import alnak.services.PriceImportService;
 import alnak.services.RecipeService;
-import alnak.services.ShoppingCartService;
 import alnak.services.SocialService;
+import alnak.services.ShoppingCartService;
 import alnak.services.UserService;
 import alnak.utils.JWTUtil;
 import io.javalin.Javalin;
+
+import java.sql.SQLException;
+import java.util.Map;
 
 public class Main {
 
@@ -84,8 +84,6 @@ public class Main {
                 (e, ctx) -> ctx.status(400).json(Map.of("error", e.getMessage())));
         app.exception(SecurityException.class,
                 (e, ctx) -> ctx.status(403).json(Map.of("error", e.getMessage())));
-        app.exception(com.fasterxml.jackson.core.JsonProcessingException.class,
-                (e, ctx) -> ctx.status(400).json(Map.of("error", "Payload inválido: " + e.getOriginalMessage())));
 
         app.after(ctx -> {
             try {
@@ -197,73 +195,12 @@ public class Main {
             ctx.json(recipeController.listByMealType(type));
         });
 
-        // ── User recipe routes (auth required) ───────────────────
-        app.get("/api/recipes/mine", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            ctx.json(recipeController.listMyRecipes(userId));
-        });
-
-        app.get("/api/recipes/favorites", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            ctx.json(recipeController.listFavorites(userId));
-        });
-
-        app.get("/api/recipes/accessible", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            ctx.json(recipeController.listUserAccessible(userId));
-        });
-
-        app.post("/api/recipes/mine", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            ctx.status(201).json(recipeController.createForUser(userId, ctx.body()));
-        });
-
-        app.put("/api/recipes/mine/{id}", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            int id = Integer.parseInt(ctx.pathParam("id"));
-            ctx.json(recipeController.updateForUser(userId, id, ctx.body()));
-        });
-
-        app.delete("/api/recipes/mine/{id}", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            int id = Integer.parseInt(ctx.pathParam("id"));
-            recipeController.deleteForUser(userId, id);
-            ctx.status(204);
-        });
-
-        app.post("/api/recipes/{id}/favorite", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            int id = Integer.parseInt(ctx.pathParam("id"));
-            ctx.json(recipeController.toggleFavorite(userId, id));
-        });
-
-        app.get("/api/recipes/{id}/favorite", ctx -> {
-            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
-            int id = Integer.parseInt(ctx.pathParam("id"));
-            ctx.json(recipeController.checkFavorite(userId, id));
-        });
-
-        app.get("/api/recipes", ctx -> {
-            Long userId = null;
-            try { userId = extractUserId(ctx.header("Authorization"), jwtUtil); }
-            catch (Exception ignored) {}
-            if (userId != null) {
-                ctx.json(recipeController.listAll(userId));
-            } else {
-                ctx.json(recipeController.listAll());
-            }
-        });
+        app.get("/api/recipes", ctx ->
+                ctx.json(recipeController.listAll()));
 
         app.get("/api/recipes/{id}", ctx -> {
             int id = Integer.parseInt(ctx.pathParam("id"));
-            Long userId = null;
-            try { userId = extractUserId(ctx.header("Authorization"), jwtUtil); }
-            catch (Exception ignored) {}
-            if (userId != null) {
-                ctx.json(recipeController.getById(id, userId));
-            } else {
-                ctx.json(recipeController.getById(id));
-            }
+            ctx.json(recipeController.getById(id));
         });
 
         app.post("/api/recipes", ctx ->

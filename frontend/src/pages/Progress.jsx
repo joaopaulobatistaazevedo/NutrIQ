@@ -6,7 +6,7 @@ import Layout from '../components/Layout';
 import { listLatestPrices } from '../services/priceService';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { fetchRecipeById, fetchRecipes } from '../services/recipeService';
-import { registerMealPhoto } from '../services/nutriSocialService';
+import { registerMealPhoto, uploadSocialPostImage } from '../services/nutriSocialService';
 import { fetchMyProfile } from '../services/userService';
 import { getAuthSession } from '../utils/authSession';
 import '../styles/progress.css';
@@ -136,8 +136,9 @@ export default function Progress() {
   const [submitStatus, setSubmitStatus] = useState('');
   const [photoPath, setPhotoPath] = useState('');
   const [photoPreview, setPhotoPreview] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
   const [description, setDescription] = useState('');
-  const [shareOnNutriSocial, setShareOnNutriSocial] = useState(true);
+  const [postVisibility, setPostVisibility] = useState('public');
   const [selectedRecipeId, setSelectedRecipeId] = useState('');
   const [rating, setRating] = useState(5);
 
@@ -302,6 +303,7 @@ export default function Progress() {
     const preview = buildPreviewFromFile(file);
     setPhotoPreview(preview);
     setPhotoPath(preview);
+    setPhotoFile(file);
     setSubmitStatus('');
   };
 
@@ -315,6 +317,7 @@ export default function Progress() {
     }
 
     const cleanPhotoPath = String(photoPath || '').trim();
+    const shareOnNutriSocial = postVisibility === 'public';
     if (!cleanPhotoPath) {
       setSubmitStatus('Para aumentar o streak tens de tirar uma foto da refeição.');
       return;
@@ -329,8 +332,15 @@ export default function Progress() {
     setSubmitStatus('');
 
     try {
+      let finalPicturePath = cleanPhotoPath;
+      if (photoFile instanceof File) {
+        finalPicturePath = await uploadSocialPostImage(token, photoFile);
+      } else if (cleanPhotoPath.startsWith('blob:')) {
+        throw new Error('A foto selecionada expirou. Escolhe novamente a imagem antes de submeter.');
+      }
+
       const payload = {
-        picturePath: cleanPhotoPath,
+        picturePath: finalPicturePath,
         description: String(description || '').trim() || null,
         shareOnNutriSocial,
         recipeId: shareOnNutriSocial ? Number(selectedRecipeId) : null,
@@ -343,13 +353,24 @@ export default function Progress() {
 
       setSubmitStatus(
         shareOnNutriSocial
-          ? 'Foto registada, streak atualizado e publicação enviada para o NutriSocial.'
-          : 'Foto registada e streak atualizado com sucesso.',
+          ? 'Refeição registada e publicada com sucesso. A redirecionar para o NutriSocial...'
+          : 'Refeição registada como privada com sucesso. A redirecionar para o NutriSocial...',
       );
 
       setDescription('');
       setSelectedRecipeId('');
       setRating(5);
+      setPostVisibility('public');
+      setPhotoFile(null);
+      setPhotoPath('');
+      if (photoPreview && photoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(photoPreview);
+      }
+      setPhotoPreview('');
+
+      setTimeout(() => {
+        navigate('/nutrisocial?tab=profile');
+      }, 1200);
     } catch (error) {
       setSubmitStatus(error?.message || 'Não foi possível registar a foto.');
     } finally {
@@ -418,17 +439,36 @@ export default function Progress() {
                   placeholder="Ex: almoço com frango grelhado e legumes."
                 />
 
-                <label className="form-check d-inline-flex align-items-center gap-2 mt-1">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    checked={shareOnNutriSocial}
-                    onChange={(event) => setShareOnNutriSocial(event.target.checked)}
-                  />
-                  <span className="form-check-label">Partilhar automaticamente no NutriSocial</span>
-                </label>
+                <div className="progress-visibility">
+                  <label className="form-label mb-1">Visibilidade da refeição</label>
+                  <div className="progress-visibility-options">
+                    <label className="form-check d-inline-flex align-items-center gap-2">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="postVisibility"
+                        value="public"
+                        checked={postVisibility === 'public'}
+                        onChange={(event) => setPostVisibility(event.target.value)}
+                      />
+                      <span className="form-check-label">Pública (aparece no NutriSocial)</span>
+                    </label>
+                    <label className="form-check d-inline-flex align-items-center gap-2">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="postVisibility"
+                        value="private"
+                        checked={postVisibility === 'private'}
+                        onChange={(event) => setPostVisibility(event.target.value)}
+                      />
+                      <span className="form-check-label">Privada (só conta para streak)</span>
+                    </label>
+                  </div>
+                  <small className="text-secondary">Tanto pública como privada contam para o teu streak.</small>
+                </div>
 
-                {shareOnNutriSocial ? (
+                {postVisibility === 'public' ? (
                   <div className="progress-photo-grid">
                     <div>
                       <label className="form-label">Receita associada</label>
