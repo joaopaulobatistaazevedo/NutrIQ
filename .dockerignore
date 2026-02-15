@@ -13,4 +13,6 @@ frontend/dist
 *.db-shm
 *.db-wal
 
+*.log
+
 report.json

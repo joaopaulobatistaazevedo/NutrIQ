@@ -71,6 +71,46 @@ export async function fetchNutriSocialFeed(token) {
   }
 }
 
+export async function updateSocialPost(token, postId, payload) {
+  const key = normalizePostKey(postId);
+  if (!key) {
+    throw new Error('Publicação inválida.');
+  }
+
+  const description = String(payload?.description || '').trim();
+  const rating = Number(payload?.rating || 0);
+
+  if (rating < 1 || rating > 5) {
+    throw new Error('A classificação deve estar entre 1 e 5.');
+  }
+
+  try {
+    const { data } = await client.put(
+      `/api/social/posts/${encodeURIComponent(key)}`,
+      { description, rating },
+      { headers: buildAuthHeaders(token) },
+    );
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function deleteSocialPost(token, postId) {
+  const key = normalizePostKey(postId);
+  if (!key) {
+    throw new Error('Publicação inválida.');
+  }
+
+  try {
+    await client.delete(`/api/social/posts/${encodeURIComponent(key)}`, {
+      headers: buildAuthHeaders(token),
+    });
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
 export function resolveNutriSocialImageUrl(rawPath) {
   const value = String(rawPath || '').trim();
   if (!value) {
