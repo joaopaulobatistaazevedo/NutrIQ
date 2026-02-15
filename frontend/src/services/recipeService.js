@@ -10,6 +10,11 @@ const client = axios.create({
   },
 });
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 function normalizeError(error) {
   const payload = error?.response?.data;
 
@@ -38,7 +43,7 @@ export async function fetchRecipes({ limit = 200, mealType = '' } = {}) {
   }
 
   try {
-    const { data } = await client.get('/api/recipes', { params });
+    const { data } = await client.get('/api/recipes', { params, headers: getAuthHeaders() });
     return Array.isArray(data) ? data : [];
   } catch (error) {
     throw new Error(normalizeError(error));
@@ -52,7 +57,7 @@ export async function fetchRecipeById(recipeId) {
   }
 
   try {
-    const { data } = await client.get(`/api/recipes/${id}`);
+    const { data } = await client.get(`/api/recipes/${id}`, { headers: getAuthHeaders() });
     return data || null;
   } catch (error) {
     throw new Error(normalizeError(error));
@@ -61,7 +66,89 @@ export async function fetchRecipeById(recipeId) {
 
 export async function createRecipe(payload) {
   try {
-    const { data } = await client.post('/api/recipes', payload);
+    const { data } = await client.post('/api/recipes', payload, { headers: getAuthHeaders() });
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+// ── User recipe CRUD (auth required) ──────────────────────────
+
+export async function fetchMyRecipes() {
+  try {
+    const { data } = await client.get('/api/recipes/mine', { headers: getAuthHeaders() });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function createMyRecipe(payload) {
+  try {
+    const { data } = await client.post('/api/recipes/mine', payload, { headers: getAuthHeaders() });
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function updateMyRecipe(recipeId, payload) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+  try {
+    const { data } = await client.put(`/api/recipes/mine/${id}`, payload, { headers: getAuthHeaders() });
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function deleteMyRecipe(recipeId) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+  try {
+    await client.delete(`/api/recipes/mine/${id}`, { headers: getAuthHeaders() });
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+// ── Favorites (star/bookmark) ─────────────────────────────────
+
+export async function fetchFavoriteRecipes() {
+  try {
+    const { data } = await client.get('/api/recipes/favorites', { headers: getAuthHeaders() });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function toggleFavorite(recipeId) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+  try {
+    const { data } = await client.post(`/api/recipes/${id}/favorite`, {}, { headers: getAuthHeaders() });
+    return data;
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function checkFavorite(recipeId) {
+  const id = Number(recipeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('ID de receita inválido.');
+  }
+  try {
+    const { data } = await client.get(`/api/recipes/${id}/favorite`, { headers: getAuthHeaders() });
     return data;
   } catch (error) {
     throw new Error(normalizeError(error));

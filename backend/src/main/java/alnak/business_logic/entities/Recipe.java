@@ -21,6 +21,11 @@ public class Recipe {
     private int servings = 2;
     private String imageUrl;
 
+    /** User who created this recipe (null = system / scraped recipe). */
+    private Integer ownerId;
+    /** PUBLIC or PRIVATE. */
+    private String visibility = "PUBLIC";
+
     public Recipe() {}
 
     public int totalTimeMin() {
@@ -85,6 +90,12 @@ public class Recipe {
     public void setImageUrl(String imageUrl)                { this.imageUrl = imageUrl; }
     public Set<String> getTags()                            { return tags; }
     public void setTags(Set<String> tags)                   { this.tags = tags; }
+    public Integer getOwnerId()                             { return ownerId; }
+    public void setOwnerId(Integer ownerId)                 { this.ownerId = ownerId; }
+    public String getVisibility()                           { return visibility; }
+    public void setVisibility(String visibility)            { this.visibility = visibility != null ? visibility : "PUBLIC"; }
+    public boolean isPublic()                               { return "PUBLIC".equalsIgnoreCase(visibility); }
+    public boolean isPrivate()                              { return "PRIVATE".equalsIgnoreCase(visibility); }
 
     // ── Embedded types (moved from separate files) ───────────────────
 
@@ -95,6 +106,8 @@ public class Recipe {
         private double quantity;
         private Unit unit;
         private String notes; // optional: "finely chopped", "room temperature"
+        private String ingredientName; // convenience field for simple recipe creation
+        private int orderIndex;
 
         public RecipeIngredient() {}
 
@@ -126,8 +139,17 @@ public class Recipe {
         public Unit getUnit()                     { return unit; }
         public void setUnit(Unit unit)            { this.unit = unit; }
         public String getNotes()                  { return notes; }
-        public void setNotes(String notes)        { this.notes = notes; }
-    }
+        public void setNotes(String notes)        { this.notes = notes; }        public String getIngredientName()            { return ingredientName; }
+        public void setIngredientName(String name)   {
+            this.ingredientName = name;
+            // Auto-populate the Ingredient object for convenience
+            if (name != null && !name.isBlank() && this.ingredient == null) {
+                this.ingredient = new Ingredient();
+                this.ingredient.setName(name);
+            }
+        }
+        public int getOrderIndex()                   { return orderIndex; }
+        public void setOrderIndex(int orderIndex)    { this.orderIndex = orderIndex; }    }
 
     public static class RecipeStep {
 

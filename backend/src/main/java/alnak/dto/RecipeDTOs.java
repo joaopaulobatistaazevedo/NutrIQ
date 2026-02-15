@@ -1,11 +1,10 @@
 package alnak.dto;
 
-import alnak.business_logic.entities.MealType;
-import alnak.business_logic.entities.NutritionalInfo;
-import alnak.business_logic.entities.Recipe;
-
 import java.util.List;
 import java.util.Set;
+
+import alnak.business_logic.entities.NutritionalInfo;
+import alnak.business_logic.entities.Recipe;
 
 public class RecipeDTOs {
 
@@ -71,9 +70,16 @@ public class RecipeDTOs {
             List<RecipeIngredientResponse> ingredients,
             List<RecipeStepResponse> steps,
             Set<String> tags,
-            String imageUrl
+            String imageUrl,
+            Integer ownerId,
+            String visibility,
+            Boolean isFavorite
     ) {
         public static RecipeResponse from(Recipe r) {
+            return from(r, null);
+        }
+
+        public static RecipeResponse from(Recipe r, Boolean isFavorite) {
             return new RecipeResponse(
                     r.getId(),
                     r.getName(),
@@ -89,12 +95,21 @@ public class RecipeDTOs {
                     r.getIngredients().stream().map(RecipeIngredientResponse::from).toList(),
                     r.getSteps().stream().map(RecipeStepResponse::from).toList(),
                     r.getTags(),
-                    r.getImageUrl()
+                    r.getImageUrl(),
+                    r.getOwnerId(),
+                    r.getVisibility(),
+                    isFavorite
             );
         }
 
         public static List<RecipeResponse> fromList(List<Recipe> recipes) {
             return recipes.stream().map(RecipeResponse::from).toList();
+        }
+
+        public static List<RecipeResponse> fromList(List<Recipe> recipes, java.util.Set<Integer> favoriteIds) {
+            return recipes.stream()
+                    .map(r -> from(r, favoriteIds != null && favoriteIds.contains(r.getId())))
+                    .toList();
         }
     }
 }

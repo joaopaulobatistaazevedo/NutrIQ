@@ -1,14 +1,22 @@
 package alnak.data.local;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
 import alnak.business_logic.entities.Allergen;
 import alnak.business_logic.entities.Ingredient;
 import alnak.business_logic.entities.MealType;
 import alnak.business_logic.entities.NutritionalInfo;
 import alnak.business_logic.entities.Recipe;
 import alnak.business_logic.entities.Unit;
-
-import java.sql.*;
-import java.util.*;
 
 /**
  * Map<Integer, Recipe> backed by SQLite.
@@ -236,8 +244,8 @@ public class RecipeDAO extends AbstractMap<Integer, Recipe> {
         String sql = """
             INSERT INTO recipes
               (name, description, meal_type, prep_time_min, cook_time_min, servings,
-               calories, protein_g, carbs_g, fat_g, image_url)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+               calories, protein_g, carbs_g, fat_g, image_url, owner_id, visibility)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """;
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bindCore(ps, r);
@@ -255,10 +263,10 @@ public class RecipeDAO extends AbstractMap<Integer, Recipe> {
         try (PreparedStatement ps = conn.prepareStatement("""
             UPDATE recipes SET name=?, description=?, meal_type=?, prep_time_min=?,
               cook_time_min=?, servings=?, calories=?, protein_g=?, carbs_g=?, fat_g=?,
-              image_url=? WHERE id=?
+              image_url=?, owner_id=?, visibility=? WHERE id=?
         """)) {
             bindCore(ps, r);
-            ps.setInt(12, r.getId());
+            ps.setInt(14, r.getId());
             ps.executeUpdate();
         }
         // CASCADE DELETE clears child rows; re-insert
@@ -281,6 +289,12 @@ public class RecipeDAO extends AbstractMap<Integer, Recipe> {
         ps.setDouble(9, n != null ? n.getCarbsG()    : 0);
         ps.setDouble(10, n != null ? n.getFatG()     : 0);
         ps.setString(11, r.getImageUrl());
+        if (r.getOwnerId() != null) {
+            ps.setInt(12, r.getOwnerId());
+        } else {
+            ps.setNull(12, java.sql.Types.INTEGER);
+        }
+        ps.setString(13, r.getVisibility() != null ? r.getVisibility() : "PUBLIC");
     }
 
     private void saveIngredients(Recipe r) throws SQLException {
@@ -355,6 +369,9 @@ public class RecipeDAO extends AbstractMap<Integer, Recipe> {
             rs.getDouble("fat_g")
         ));
         r.setImageUrl(rs.getString("image_url"));
+        int ownerId = rs.getInt("owner_id");
+        r.setOwnerId(rs.wasNull() ? null : ownerId);
+        r.setVisibility(rs.getString("visibility"));
         return r;
     }
 }

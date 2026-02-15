@@ -861,3 +861,64 @@
   }
 }
 
+/* ── Star / Favorite button on recipe cards ── */
+.recipe-card-img-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px 10px 0 0;
+}
+
+.recipe-fav-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.85);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.recipe-fav-btn:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 1);
+  color: #f59e0b;
+}
+
+.recipe-fav-btn.is-fav {
+  color: #f59e0b;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* ── Favorites section ── */
+.recipes-favorites {
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.recipes-favorites .recipes-mine-head h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.recipes-favorites .my-recipe-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recipes-favorites .recipe-fav-btn {
+  position: static;
+  flex-shrink: 0;
+}
+
+
