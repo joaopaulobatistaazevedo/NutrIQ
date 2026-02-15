@@ -117,6 +117,30 @@ public class SocialDTOs {
             String relationStatus
     ) {}
 
+    // ── Community DTOs ───────────────────────────────────────────
+
+    public record CommunityCreateRequest(String name) {}
+
+    public record CommunityRenameRequest(String name) {}
+
+    public record CommunityInviteRequest(long friendUserId) {}
+
+    public record CommunityResponse(
+            long id,
+            long ownerUserId,
+            String name,
+            List<Long> memberIds,
+            List<Long> pendingInviteUserIds
+    ) {}
+
+    public record CommunityInviteResponse(
+            long communityId,
+            String communityName,
+            long inviterId,
+            String inviterName,
+            LocalDateTime createdAt
+    ) {}
+
     // ── Kudo & Comment DTOs ───────────────────────────────────────
 
     /** Body for POST /api/social/posts/{id}/comments */
