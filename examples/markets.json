@@ -2,12 +2,13 @@
   "supermarkets": [
     {
       "name": "Continente",
-      "search_url": "https://www.continente.pt/on/demandware.store/Sites-continente-Site/default/Search-ShowAjax?cgid=col-produtos&q={query_compact}&pmin=0.01&srule=Continente",
+      "search_url": "https://www.continente.pt/on/demandware.store/Sites-continente-Site/default/Search-ShowAjax?cgid=col-produtos&q={query}&pmin=0.01&srule=Continente",
       "base_url": "https://www.continente.pt",
       "result_selector": "li.product-grid-item, div.product, article.product",
       "title_selector": "h3, .pwc-tile--description, .name a, .product-name a, h2 a",
       "price_selector": "[data-testid='price-value'], .price .sales .value, .sales .value, .price .value, [itemprop='price']",
       "link_selector": "a",
+      "image_selector": ".ct-image-container img.ct-tile-image, picture[class*='product-image'] img, .ct-image-container img",
       "product_url_patterns": ["/produto/"],
       "currency": "EUR",
       "min_delay_seconds": 0.2,

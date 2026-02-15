@@ -41,6 +41,27 @@ ABSOLUTE_PRODUCT_URL_RE = re.compile(r"https?:\\/\\/[^\"'\\s>]+|https?://[^\"'\\
 RELATIVE_PRODUCT_URL_RE = re.compile(r"\\/[^\"'\\s>]+|/[^\"'\\s>]+")
 PRODUCT_HTML_ID_RE = re.compile(r"/\d{4,}\.html?$")
 CSS_URL_RE = re.compile(r"url\((['\"]?)(.*?)\1\)", re.IGNORECASE)
+BADGE_IMAGE_HINTS = (
+    "/images/badges/",
+    "/badges/",
+    "badge-",
+    "-badge",
+    "desconto",
+    "discount",
+    "promoc",
+    "promo",
+    "pvpr",
+    "sdr",
+)
+BADGE_NODE_HINTS = (
+    "badge",
+    "promotional",
+    "promotion",
+    "promo",
+    "tooltip",
+    "advertise",
+    "dual-badge",
+)
 
 
 def parse_price_value(text: str) -> float | None:
@@ -209,23 +230,26 @@ def extract_products_from_selectors(
         if not isinstance(result, Tag):
             continue
 
-        name = _extract_text(result, config.title_selector) or _safe_text(result)
+        structured_name, structured_price = _extract_tile_impression_data(result)
+        name = structured_name or _extract_text(result, config.title_selector) or _safe_text(result)
         if not name:
             continue
 
-        price_text = _extract_text(result, config.price_selector)
-        used_fallback = False
-        if not price_text:
-            price_text = _find_price_text_fallback(result)
-            used_fallback = True
+        price: float | None = structured_price
+        if price is None:
+            price_text = _extract_text(result, config.price_selector)
+            used_fallback = False
+            if not price_text:
+                price_text = _find_price_text_fallback(result)
+                used_fallback = True
 
-        if used_fallback:
-            parsed = _parse_price_with_confidence(price_text or "")
-            if parsed is None or parsed[1] < 2.0:
-                continue
-            price = parsed[0]
-        else:
-            price = parse_price_value(price_text or "")
+            if used_fallback:
+                parsed = _parse_price_with_confidence(price_text or "")
+                if parsed is None or parsed[1] < 2.0:
+                    continue
+                price = parsed[0]
+            else:
+                price = parse_price_value(price_text or "")
         if price is None:
             continue
 
@@ -472,11 +496,15 @@ def _extract_image_from_selector_node(
     selector: str | None,
     base_url: str | None,
 ) -> str | None:
+    from_confirmation = _extract_image_from_confirmation_data(node, base_url=base_url)
+    if from_confirmation is not None:
+        return from_confirmation
+
     candidates: list[Tag] = []
     if selector:
-        selected = node.select_one(selector)
-        if isinstance(selected, Tag):
-            candidates.append(selected)
+        for selected in node.select(selector):
+            if isinstance(selected, Tag):
+                candidates.append(selected)
     candidates.append(node)
 
     visited: set[int] = set()
@@ -491,8 +519,9 @@ def _extract_image_from_selector_node(
             return direct_image
 
         if candidate.name != "img":
-            nested = candidate.select_one("img")
-            if isinstance(nested, Tag):
+            for nested in candidate.select("img"):
+                if not isinstance(nested, Tag):
+                    continue
                 nested_image = _extract_image_from_tag(nested, base_url=base_url)
                 if nested_image is not None:
                     return nested_image
@@ -500,6 +529,9 @@ def _extract_image_from_selector_node(
 
 
 def _extract_image_from_tag(node: Tag, base_url: str | None) -> str | None:
+    if _looks_like_badge_node(node):
+        return None
+
     attrs = (
         "src",
         "data-src",
@@ -570,6 +602,75 @@ def _extract_image_from_node(node: Any, base_url: str | None) -> str | None:
     return None
 
 
+def _extract_image_from_confirmation_data(node: Tag, base_url: str | None) -> str | None:
+    candidates: list[Tag] = [node]
+    candidates.extend(
+        item for item in node.select("[data-confirmation-image]") if isinstance(item, Tag)
+    )
+    seen: set[int] = set()
+    for candidate in candidates:
+        token = id(candidate)
+        if token in seen:
+            continue
+        seen.add(token)
+        raw = _safe_str(candidate.attrs.get("data-confirmation-image"))
+        if not raw:
+            continue
+        parsed_payload = _parse_json_blob(raw)
+        if parsed_payload is not None:
+            parsed_image = _extract_image_from_node(parsed_payload, base_url=base_url)
+            if parsed_image is not None:
+                return parsed_image
+        direct_image = _normalize_media_url(raw, base_url=base_url)
+        if direct_image is not None:
+            return direct_image
+    return None
+
+
+def _extract_tile_impression_data(node: Tag) -> tuple[str | None, float | None]:
+    candidates: list[Tag] = [node]
+    candidates.extend(
+        item for item in node.select("[data-product-tile-impression]") if isinstance(item, Tag)
+    )
+    seen: set[int] = set()
+    for candidate in candidates:
+        token = id(candidate)
+        if token in seen:
+            continue
+        seen.add(token)
+        raw = _safe_str(candidate.attrs.get("data-product-tile-impression"))
+        if not raw:
+            continue
+
+        payload = _parse_json_blob(raw)
+        if not isinstance(payload, dict):
+            continue
+
+        name = _safe_str(payload.get("name"))
+        price = parse_price_value(str(payload.get("price")))
+        if price is not None and price > 0:
+            return name, price
+        if name:
+            return name, None
+    return None, None
+
+
+def _parse_json_blob(raw: str) -> dict[str, Any] | None:
+    candidates = [raw]
+    unescaped = html.unescape(raw)
+    if unescaped != raw:
+        candidates.append(unescaped)
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def _extract_image_from_meta(soup: BeautifulSoup, base_url: str | None) -> str | None:
     selectors: list[tuple[str, str]] = [
         ("meta[property='og:image']", "content"),
@@ -606,6 +707,8 @@ def _normalize_media_url(raw_url: str | None, base_url: str | None) -> str | Non
         return None
     if _looks_like_placeholder_url(candidate):
         return None
+    if _looks_like_badge_image_url(candidate):
+        return None
 
     if candidate.startswith("//"):
         candidate = f"https:{candidate}"
@@ -615,6 +718,8 @@ def _normalize_media_url(raw_url: str | None, base_url: str | None) -> str | Non
     if parsed.scheme and parsed.scheme not in {"http", "https"}:
         return None
     if not parsed.scheme and not base_url:
+        return None
+    if _looks_like_badge_image_url(parsed.path):
         return None
     return final_url
 
@@ -784,6 +889,39 @@ def _looks_like_placeholder_url(value: str) -> bool:
     if lowered in {"{}", "/{}", "javascript:void(0)", "javascript:;", "#"}:
         return True
     return "{" in lowered or "}" in lowered
+
+
+def _looks_like_badge_image_url(value: str) -> bool:
+    lowered = value.strip().lower()
+    if not lowered:
+        return False
+    return any(token in lowered for token in BADGE_IMAGE_HINTS)
+
+
+def _looks_like_badge_node(node: Tag) -> bool:
+    chain: list[Tag] = [node]
+    parent = node.parent
+    depth = 0
+    while isinstance(parent, Tag) and depth < 3:
+        chain.append(parent)
+        parent = parent.parent
+        depth += 1
+
+    for item in chain:
+        class_attr = " ".join(item.attrs.get("class", [])) if item.attrs.get("class") else ""
+        lowered_class = class_attr.lower()
+        if lowered_class and any(token in lowered_class for token in BADGE_NODE_HINTS):
+            return True
+
+        for attr_name in ("title", "alt", "aria-label", "data-testid"):
+            raw = _safe_str(item.attrs.get(attr_name))
+            if not raw:
+                continue
+            lowered_raw = raw.lower()
+            if any(token in lowered_raw for token in ("desconto", "discount", "promo", "pvpr", "sdr", "badge")):
+                return True
+
+    return False
 
 
 def _is_product_url_candidate(url: str, patterns: list[str]) -> bool:
