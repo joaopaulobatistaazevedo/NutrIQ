@@ -1,14 +1,8 @@
-import axios from 'axios';
+import { createJsonClient } from './httpClient';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071';
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+const client = createJsonClient(API_BASE_URL, 15000);
 
 function normalizeError(error) {
   const payload = error?.response?.data;

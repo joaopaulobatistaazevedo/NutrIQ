@@ -2,7 +2,7 @@
  * SocialNotificationContext
  *
  * Provides `pendingFriendRequestCount` (number) to any component in the tree.
- * Polls the API every 30 s so the sidebar badge stays up-to-date without a
+ * Polls the API every 15 s so the sidebar badge stays up-to-date without a
  * full page reload.
  *
  * Usage:
@@ -42,10 +42,34 @@ export function SocialNotificationProvider({ children }) {
     void refresh();
   }, [refresh]);
 
-  // Poll every 30 s
+  // Poll every 15 s
   useEffect(() => {
-    const interval = setInterval(refresh, 1_000);
+    const interval = setInterval(refresh, 15_000);
     return () => clearInterval(interval);
+  }, [refresh]);
+
+  // Refresh on focus/visibility so badge catches up immediately when user returns.
+  useEffect(() => {
+    const onFocus = () => {
+      void refresh();
+    };
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        void refresh();
+      }
+    };
+    const onForceRefresh = () => {
+      void refresh();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('nutrisocial:force-refresh', onForceRefresh);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('nutrisocial:force-refresh', onForceRefresh);
+    };
   }, [refresh]);
 
   return (

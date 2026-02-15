@@ -29,6 +29,7 @@ services:
     restart: unless-stopped
     environment:
       PORT: 7071
+      UPLOADS_DIR: /app/uploads
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DB: ${MYSQL_DB:-bugsbyte}
@@ -42,6 +43,7 @@ services:
       - "${BACKEND_HOST_PORT:-7071}:7071"
     volumes:
       - backend_sqlite_data:/app/database
+      - backend_uploads_data:/app/uploads
 
   chatbot:
     build:
@@ -163,5 +165,6 @@ services:
 volumes:
   mysql_data:
   backend_sqlite_data:
+  backend_uploads_data:
   frontend_node_modules:
   chatbot_data:

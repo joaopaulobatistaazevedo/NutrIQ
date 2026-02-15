@@ -253,18 +253,6 @@ async def assistant_chat(request: ChatRequest, http_request: Request):
 
     return response
 
-        # Primeiro tenta sempre o plano ativo persistido (BD), como fonte de verdade.
-        cart_plan_input = persisted_plan if isinstance(persisted_plan, dict) else None
-        if not isinstance(cart_plan_input, dict):
-            cart_plan_input = backend_service.fetch_active_meal_plan(backend_token)
-        if not isinstance(cart_plan_input, dict):
-            cart_plan_input = dict(generated_plan)
-
-        # Garante constraints do plano gerado para cálculo de orçamento/objetivo.
-        for key in ("max_weekly_budget", "goal_daily_calories", "planning_days", "goal"):
-            if key not in cart_plan_input and key in generated_plan:
-                cart_plan_input[key] = generated_plan[key]
-
 @app.post("/chat/analyze-food-image", response_model=FoodImageAnalysisResponse)
 async def analyze_food_image(request: FoodImageAnalysisRequest):
     try:
