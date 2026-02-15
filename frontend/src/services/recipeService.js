@@ -1,14 +1,8 @@
-import axios from 'axios';
+import { createJsonClient } from './httpClient';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071';
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+const client = createJsonClient(API_BASE_URL, 15000);
 
 function normalizeError(error) {
   const payload = error?.response?.data;
@@ -28,6 +22,31 @@ function normalizeError(error) {
   return 'Não foi possível carregar as receitas.';
 }
 
+function normalizeRecipesPayload(data) {
+  if (Array.isArray(data)) return data;
+
+  const nestedCandidates = [
+    data?.recipes,
+    data?.items,
+    data?.content,
+    data?.data,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  if (typeof data === 'string' && /<html|ngrok/i.test(data)) {
+    throw new Error(
+      'O túnel público está a devolver uma página intermédia (ngrok), não JSON da API. Verifica o URL/túnel do backend.',
+    );
+  }
+
+  throw new Error('Formato de resposta inesperado ao carregar receitas.');
+}
+
 export async function fetchRecipes({ limit = 200, mealType = '' } = {}) {
   const params = {};
   if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
@@ -39,7 +58,7 @@ export async function fetchRecipes({ limit = 200, mealType = '' } = {}) {
 
   try {
     const { data } = await client.get('/api/recipes', { params });
-    return Array.isArray(data) ? data : [];
+    return normalizeRecipesPayload(data);
   } catch (error) {
     throw new Error(normalizeError(error));
   }

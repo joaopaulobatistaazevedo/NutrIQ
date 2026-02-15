@@ -27,7 +27,9 @@ import { fetchMyProfile } from '../services/userService';
 import { listLatestPrices } from '../services/priceService';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { fetchRecipeById } from '../services/recipeService';
+import { PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
 import { getAuthSession } from '../utils/authSession';
+import { resolveAccountId, scopedKey } from '../utils/accountScope';
 import '../styles/dashboard.css';
 
 const fade = {
@@ -131,6 +133,542 @@ function estimateWeeklySpend(prices) {
   return Array.from(cheapestByIngredient.values()).reduce((total, value) => total + value, 0);
 }
 
+function parseStorage(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeIngredient(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  return text
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseDecimal(value) {
+  const token = String(value || '').trim().replace(',', '.');
+  const parsed = Number(token);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function parseFractionOrDecimal(token) {
+  const value = String(token || '').trim();
+  if (!value) {
+    return NaN;
+  }
+  const fraction = value.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (fraction) {
+    const numerator = Number(fraction[1]);
+    const denominator = Number(fraction[2]);
+    if (denominator > 0) {
+      return numerator / denominator;
+    }
+  }
+  return parseDecimal(value);
+}
+
+const UNIT_TO_BASE = {
+  g: { baseUnit: 'g', factor: 1 },
+  gr: { baseUnit: 'g', factor: 1 },
+  grama: { baseUnit: 'g', factor: 1 },
+  gramas: { baseUnit: 'g', factor: 1 },
+  kg: { baseUnit: 'g', factor: 1000 },
+  ml: { baseUnit: 'ml', factor: 1 },
+  l: { baseUnit: 'ml', factor: 1000 },
+  lt: { baseUnit: 'ml', factor: 1000 },
+  cl: { baseUnit: 'ml', factor: 10 },
+  dl: { baseUnit: 'ml', factor: 100 },
+  unit: { baseUnit: 'un', factor: 1 },
+  un: { baseUnit: 'un', factor: 1 },
+  unid: { baseUnit: 'un', factor: 1 },
+  unidade: { baseUnit: 'un', factor: 1 },
+  unidades: { baseUnit: 'un', factor: 1 },
+  ovo: { baseUnit: 'un', factor: 1 },
+  ovos: { baseUnit: 'un', factor: 1 },
+  dente: { baseUnit: 'un', factor: 1 },
+  dentes: { baseUnit: 'un', factor: 1 },
+};
+
+function normalizeUnitToken(rawUnit) {
+  return String(rawUnit || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.\-_]/g, '')
+    .replace(/\s+/g, '');
+}
+
+function toBaseQuantity(quantity, rawUnit) {
+  const numeric = Number(quantity);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+
+  const mapping = UNIT_TO_BASE[normalizeUnitToken(rawUnit)];
+  if (!mapping) {
+    return null;
+  }
+
+  return {
+    baseUnit: mapping.baseUnit,
+    quantity: numeric * mapping.factor,
+  };
+}
+
+function parseSelectionNote(note) {
+  const raw = String(note || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const match = raw.match(
+    /selecionado por quantidade:\s*([0-9.,]+)\s*x\s*de\s*([0-9.,]+)\s*([a-zA-Z]+)\s*para\s*([0-9.,]+)\s*([a-zA-Z]+)/i,
+  );
+  if (!match) {
+    return null;
+  }
+
+  const packs = parseDecimal(match[1]);
+  const packQty = parseDecimal(match[2]);
+  const requiredQty = parseDecimal(match[4]);
+  if (!Number.isFinite(packs) || !Number.isFinite(packQty) || !Number.isFinite(requiredQty)) {
+    return null;
+  }
+
+  const convertedPack = toBaseQuantity(packQty, match[3]);
+  const convertedRequired = toBaseQuantity(requiredQty, match[5]);
+  if (!convertedPack || !convertedRequired || convertedPack.baseUnit !== convertedRequired.baseUnit) {
+    return null;
+  }
+
+  return {
+    baseUnit: convertedPack.baseUnit,
+    purchasedBaseQty: packs * convertedPack.quantity,
+    requiredBaseQty: convertedRequired.quantity,
+  };
+}
+
+function parseUnitPriceHint(productName) {
+  const text = String(productName || '');
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(
+    /(\d+(?:[.,]\d+)?)\s*€\s*\/\s*(kg|g|gr|grama|gramas|l|lt|ml|cl|dl|un|unid|unidade|unidades)\b/i,
+  );
+  if (!match) {
+    return null;
+  }
+
+  const unitPrice = parseDecimal(match[1]);
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+    return null;
+  }
+
+  const converted = toBaseQuantity(1, match[2]);
+  if (!converted) {
+    return null;
+  }
+
+  return {
+    baseUnit: converted.baseUnit,
+    rawUnitPrice: unitPrice,
+    eurPerBaseUnit: unitPrice / converted.quantity,
+  };
+}
+
+function parsePackQuantity(productName) {
+  const text = String(productName || '');
+  if (!text) {
+    return null;
+  }
+
+  const multi = text.match(
+    /(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grama|gramas|l|lt|ml|cl|dl|un|unid|unidade|unidades|ovo|ovos|dente|dentes)\b/i,
+  );
+  if (multi) {
+    const packs = parseDecimal(multi[1]);
+    const qty = parseDecimal(multi[2]);
+    const converted = toBaseQuantity(qty, multi[3]);
+    if (Number.isFinite(packs) && converted) {
+      return {
+        baseUnit: converted.baseUnit,
+        quantity: packs * converted.quantity,
+      };
+    }
+  }
+
+  const single = text.match(
+    /(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grama|gramas|l|lt|ml|cl|dl|un|unid|unidade|unidades|ovo|ovos|dente|dentes)\b/i,
+  );
+  if (!single) {
+    return null;
+  }
+
+  const qty = parseDecimal(single[1]);
+  const converted = toBaseQuantity(qty, single[2]);
+  if (!converted) {
+    return null;
+  }
+
+  return {
+    baseUnit: converted.baseUnit,
+    quantity: converted.quantity,
+  };
+}
+
+function derivePricingBasis(entry) {
+  const price = Number(entry?.price);
+  if (!Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  const unitHint = parseUnitPriceHint(entry?.productName);
+  if (unitHint && Math.abs(unitHint.rawUnitPrice - price) <= Math.max(0.05, unitHint.rawUnitPrice * 0.2)) {
+    return {
+      baseUnit: unitHint.baseUnit,
+      eurPerBaseUnit: unitHint.eurPerBaseUnit,
+    };
+  }
+
+  const noteInfo = parseSelectionNote(entry?.note);
+  if (noteInfo && Number.isFinite(noteInfo.purchasedBaseQty) && noteInfo.purchasedBaseQty > 0) {
+    return {
+      baseUnit: noteInfo.baseUnit,
+      eurPerBaseUnit: price / noteInfo.purchasedBaseQty,
+    };
+  }
+
+  const packInfo = parsePackQuantity(entry?.productName);
+  if (packInfo && Number.isFinite(packInfo.quantity) && packInfo.quantity > 0) {
+    return {
+      baseUnit: packInfo.baseUnit,
+      eurPerBaseUnit: price / packInfo.quantity,
+    };
+  }
+
+  return null;
+}
+
+function deriveCaloriesPerBase(entry, basis) {
+  const calories = Number(entry?.calories);
+  if (!Number.isFinite(calories) || calories <= 0 || !basis?.baseUnit) {
+    return null;
+  }
+
+  if (basis.baseUnit === 'g' || basis.baseUnit === 'ml') {
+    return calories / 100;
+  }
+
+  return null;
+}
+
+function buildPriceIndex(prices) {
+  const index = new Map();
+
+  prices.forEach((entry) => {
+    const normalized = normalizeIngredient(entry?.ingredientNormalized || entry?.ingredientName);
+    const basis = derivePricingBasis(entry);
+    if (!normalized || !basis) {
+      return;
+    }
+
+    const previous = index.get(normalized);
+    if (!previous || basis.eurPerBaseUnit < previous.basis.eurPerBaseUnit) {
+      index.set(normalized, {
+        basis: {
+          ...basis,
+          caloriesPerBaseUnit: deriveCaloriesPerBase(entry, basis),
+        },
+      });
+    }
+  });
+
+  return index;
+}
+
+function cleanIngredientName(rawValue) {
+  const cleaned = String(rawValue || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\bq\.?b\.?\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[,;:\-]+/, '')
+    .replace(/[,;:\-]+$/, '')
+    .trim();
+  return cleaned;
+}
+
+function parseIngredientToken(rawToken) {
+  const token = cleanIngredientName(rawToken);
+  if (!token) {
+    return null;
+  }
+
+  const start = token.match(/^(\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*(.*)$/);
+  if (!start) {
+    return {
+      name: token,
+      quantity: null,
+      unit: null,
+    };
+  }
+
+  const quantity = parseFractionOrDecimal(start[1]);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return {
+      name: token,
+      quantity: null,
+      unit: null,
+    };
+  }
+
+  let remainder = String(start[2] || '').trim();
+  let unit = null;
+
+  const unitMatch = remainder.match(
+    /^(kg|g|gr|grama|gramas|ml|l|lt|cl|dl|un|unid|unidade|unidades|ovo|ovos|dente|dentes)\b\s*/i,
+  );
+  if (unitMatch) {
+    unit = unitMatch[1];
+    remainder = remainder.slice(unitMatch[0].length).trim();
+  }
+
+  remainder = remainder.replace(/^(de|da|do)\s+/i, '').trim();
+  const name = cleanIngredientName(remainder);
+  if (!name) {
+    return null;
+  }
+
+  return {
+    name,
+    quantity,
+    unit,
+  };
+}
+
+function extractIngredientsFromDescription(recipe) {
+  const description = String(recipe?.description || '');
+  const match = description.match(/\bingredientes?\s*:\s*(.+)$/i);
+  if (!match?.[1]) {
+    return [];
+  }
+
+  const chunk = match[1].split('|', 1)[0] || '';
+  const tokens = chunk.split(/[;,]/);
+  return tokens
+    .map((token) => parseIngredientToken(token))
+    .filter((entry) => entry && entry.name);
+}
+
+function extractIngredientLines(meal, recipe) {
+  const mealIngredients = Array.isArray(meal?.ingredients) ? meal.ingredients : [];
+  if (mealIngredients.length > 0) {
+    return mealIngredients
+      .map((entry) => {
+        if (entry && typeof entry === 'object') {
+          const name = cleanIngredientName(entry.name || entry.ingredientName);
+          if (!name) {
+            return null;
+          }
+          const quantity = Number(entry.quantity);
+          return {
+            name,
+            quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+            unit: entry.unit || null,
+          };
+        }
+        return parseIngredientToken(entry);
+      })
+      .filter((entry) => entry && entry.name);
+  }
+
+  const recipeIngredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+  if (recipeIngredients.length > 0) {
+    return recipeIngredients
+      .map((entry) => {
+        const name = cleanIngredientName(entry?.ingredientName || entry?.name);
+        if (!name) {
+          return null;
+        }
+        const quantity = Number(entry?.quantity);
+        return {
+          name,
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
+          unit: entry?.unit || null,
+        };
+      })
+      .filter((entry) => entry && entry.name);
+  }
+
+  return extractIngredientsFromDescription(recipe);
+}
+
+function resolveFallbackCost(meal, recipe) {
+  const candidates = [
+    meal?.cost_per_serving_eur,
+    meal?.costPerServing,
+    meal?.cost,
+    recipe?.costPerServing,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
+function resolveFallbackCalories(meal, recipe) {
+  const candidates = [
+    meal?.calories_per_serving,
+    meal?.caloriesPerServing,
+    meal?.kcal,
+    recipe?.nutritionalInfo?.calories,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
+function estimateMealMetrics(meal, recipe, priceIndex) {
+  const fallbackCost = resolveFallbackCost(meal, recipe);
+  const fallbackCalories = resolveFallbackCalories(meal, recipe);
+  const ingredientLines = extractIngredientLines(meal, recipe);
+  const servings = Math.max(1, Number(recipe?.servings) || 1);
+
+  let quantifiedLines = 0;
+  let matchedCostLines = 0;
+  let matchedCaloriesLines = 0;
+  let proportionalCost = 0;
+  let proportionalCalories = 0;
+
+  ingredientLines.forEach((line) => {
+    if (!Number.isFinite(Number(line?.quantity)) || Number(line.quantity) <= 0) {
+      return;
+    }
+
+    const perServing = Number(line.quantity) / servings;
+    const converted = toBaseQuantity(perServing, line.unit);
+    if (!converted) {
+      return;
+    }
+
+    quantifiedLines += 1;
+    const priceData = priceIndex.get(normalizeIngredient(line.name));
+    if (!priceData?.basis || priceData.basis.baseUnit !== converted.baseUnit) {
+      return;
+    }
+
+    matchedCostLines += 1;
+    proportionalCost += converted.quantity * priceData.basis.eurPerBaseUnit;
+
+    if (Number.isFinite(priceData.basis.caloriesPerBaseUnit)) {
+      matchedCaloriesLines += 1;
+      proportionalCalories += converted.quantity * priceData.basis.caloriesPerBaseUnit;
+    }
+  });
+
+  let cost = fallbackCost;
+  if (matchedCostLines > 0) {
+    const coverage = matchedCostLines / Math.max(1, quantifiedLines);
+    if (fallbackCost <= 0 || coverage >= 0.6) {
+      cost = proportionalCost;
+    }
+  }
+
+  let kcal = fallbackCalories;
+  if (matchedCaloriesLines > 0) {
+    const coverage = matchedCaloriesLines / Math.max(1, quantifiedLines);
+    if (fallbackCalories <= 0 || coverage >= 0.8) {
+      kcal = proportionalCalories;
+    }
+  }
+
+  return {
+    cost: Math.max(0, Number.isFinite(cost) ? cost : 0),
+    kcal: Math.max(0, Number.isFinite(kcal) ? kcal : 0),
+  };
+}
+
+function mealLookupKeys(date, meal) {
+  const safeDate = String(date || '').trim();
+  const slot = normalizeIngredient(meal?.slot || meal?.period);
+  const title = normalizeIngredient(meal?.title || meal?.name);
+  const recipeId = Number(meal?.recipe_id ?? meal?.recipeId ?? 0);
+  const keys = [];
+
+  if (!safeDate || !slot) {
+    return keys;
+  }
+
+  if (Number.isInteger(recipeId) && recipeId > 0) {
+    keys.push(`${safeDate}|${slot}|id:${recipeId}`);
+  }
+  if (title) {
+    keys.push(`${safeDate}|${slot}|title:${title}`);
+  }
+  return keys;
+}
+
+function buildStoredMealLookup(weeklyPlan) {
+  const lookup = new Map();
+  const days = Array.isArray(weeklyPlan?.days) ? weeklyPlan.days : [];
+
+  days.forEach((day) => {
+    const date = String(day?.date || '').trim();
+    const meals = Array.isArray(day?.meals) ? day.meals : [];
+    meals.forEach((meal) => {
+      mealLookupKeys(date, meal).forEach((key) => {
+        lookup.set(key, meal);
+      });
+    });
+  });
+
+  return lookup;
+}
+
+function mergeStoredMeal(meal, storedLookup) {
+  const keys = mealLookupKeys(meal?.date, meal);
+  for (const key of keys) {
+    if (storedLookup.has(key)) {
+      return { ...storedLookup.get(key), ...meal };
+    }
+  }
+  return meal;
+}
+
+function loadStoredWeeklyPlan() {
+  const profile = parseStorage(PROFILE_KEY, null);
+  const accountId = resolveAccountId(profile);
+  return parseStorage(scopedKey(WEEKLY_PLAN_KEY, accountId), null);
+}
+
 const CalorieRing = ({ consumed, goal }) => {
   const safeGoal = Math.max(1, goal);
   const pct = Math.min((consumed / safeGoal) * 100, 100);
@@ -205,10 +743,16 @@ export default function Dashboard() {
         const profile = apiUser?.profile || {};
         const dailyGoal = Math.max(1200, Math.round(toNumberOr(2150, profile?.dailyCalories)));
         const estimatedSpendByPrices = estimateWeeklySpend(prices);
+        const storedWeeklyPlan = loadStoredWeeklyPlan();
+        const storedMealLookup = buildStoredMealLookup(storedWeeklyPlan);
+        const priceIndex = buildPriceIndex(prices);
 
         const planDays = Array.isArray(activePlan?.days) ? activePlan.days : [];
         const flatMeals = planDays.flatMap((day) => (Array.isArray(day?.meals)
-          ? day.meals.map((meal) => ({ ...meal, date: day.date, dayLabel: day.day_label }))
+          ? day.meals.map((meal) => mergeStoredMeal(
+            { ...meal, date: day.date, dayLabel: day.day_label },
+            storedMealLookup,
+          ))
           : []));
 
         const uniqueRecipeIds = Array.from(
@@ -235,7 +779,8 @@ export default function Dashboard() {
           const dayMeals = flatMeals.filter((meal) => meal?.dayLabel === dayLabel);
           const real = Math.round(dayMeals.reduce((sum, meal) => {
             const recipe = recipeById.get(Number(meal?.recipe_id));
-            return sum + toNumberOr(0, recipe?.nutritionalInfo?.calories);
+            const metrics = estimateMealMetrics(meal, recipe, priceIndex);
+            return sum + toNumberOr(0, metrics.kcal);
           }, 0));
           return { day: dayLabel, real, meta: dailyGoal };
         });
@@ -248,8 +793,9 @@ export default function Dashboard() {
             const recipe = recipeById.get(Number(meal?.recipe_id));
             const slot = String(meal?.slot || '').trim() || 'Refeição';
             const meta = SLOT_META[slot] || SLOT_META.Snack;
-            const kcal = Math.round(toNumberOr(0, recipe?.nutritionalInfo?.calories));
-            const cost = toNumberOr(0, recipe?.costPerServing);
+            const metrics = estimateMealMetrics(meal, recipe, priceIndex);
+            const kcal = Math.round(toNumberOr(0, metrics.kcal));
+            const cost = toNumberOr(0, metrics.cost);
             const totalTime = toNumberOr(meta.fallbackMinutes, recipe?.totalTimeMin);
 
             return {
@@ -271,8 +817,15 @@ export default function Dashboard() {
           ? Math.round((weeklyCompletedMeals / weeklyTotalMeals) * 100)
           : 0;
 
+        const computedPlanCost = flatMeals.reduce((sum, meal) => {
+          const recipe = recipeById.get(Number(meal?.recipe_id));
+          const metrics = estimateMealMetrics(meal, recipe, priceIndex);
+          return sum + toNumberOr(0, metrics.cost);
+        }, 0);
         const weeklyPlanCost = toNumberOr(0, activePlan?.total_cost);
-        const estimatedWeeklySpend = weeklyPlanCost > 0 ? weeklyPlanCost : estimatedSpendByPrices;
+        const estimatedWeeklySpend = computedPlanCost > 0
+          ? computedPlanCost
+          : (weeklyPlanCost > 0 ? weeklyPlanCost : estimatedSpendByPrices);
 
         if (!isMounted) {
           return;
