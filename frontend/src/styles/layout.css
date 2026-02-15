@@ -32,8 +32,13 @@
   overflow-y: auto;
   min-width: 0;
   position: relative;
+  z-index: 1;
   isolation: isolate;
   background: transparent !important;
+}
+
+body.modal-open .layout-content {
+  z-index: 2600;
 }
 
 .layout-content::before {
@@ -63,11 +68,18 @@ html[data-theme='dark'] .layout-content::before {
   }
 }
 
-/* Mobile */
-@media (max-width: 768px) {
+/* Mobile + narrow tablets */
+@media (max-width: 1024px) {
+  .layout {
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
   .layout-content {
+    width: 100%;
     margin-left: 0;
     padding: 16px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
   }
 }
 

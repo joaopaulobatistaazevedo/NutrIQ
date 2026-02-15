@@ -365,6 +365,20 @@ export default function Recipes() {
     }
   }, [recipeDraft.photoPreview]);
 
+  useEffect(() => {
+    const hasOverlayOpen = confirmDialog.open || editRecipeDialog.open || Boolean(selectedNutritionistRecipe);
+
+    if (hasOverlayOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [confirmDialog.open, editRecipeDialog.open, selectedNutritionistRecipe]);
+
   const groupedCategories = useMemo(() => {
     const grouped = {
       BREAKFAST: [],
@@ -1155,4 +1169,3 @@ export default function Recipes() {
     </Layout>
   );
 }
-

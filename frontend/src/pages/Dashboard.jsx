@@ -698,10 +698,7 @@ const CalorieRing = ({ consumed, goal }) => {
           </linearGradient>
         </defs>
       </svg>
-      <div className="cal-ring-inner">
-        <strong>{consumed}</strong>
-        <span>/ {goal} kcal</span>
-      </div>
+      <div className="cal-ring-inner"><strong>{consumed}</strong><span>/ {goal} kcal</span></div>
     </div>
   );
 };
@@ -964,27 +961,27 @@ export default function Dashboard() {
     <Layout>
       <div className="page dash">
         <div className="container-xl">
-        <motion.section className="dash-hero card" {...fade}>
-          <div className="dash-hero-noise" />
-          <div className="dash-hero-blob blob-1" />
-          <div className="dash-hero-blob blob-2" />
+          <motion.section className="dash-hero card" {...fade}>
+            <div className="dash-hero-noise" />
+            <div className="dash-hero-blob blob-1" />
+            <div className="dash-hero-blob blob-2" />
 
-          <div className="dash-hero-content">
-            <div className="dash-hero-left">
-              <span className="dash-streak-pill"><Flame size={17} /> Streak {dashboardData.streakCount} dias</span>
-              <h1>Boa tarde, {dashboardData.userName}</h1>
-              <p>Estás no caminho certo. Planea as tuas refeições de forma simples, com os carrinhos de compras automáticos.</p>
+            <div className="dash-hero-content">
+              <div className="dash-hero-left">
+                <span className="dash-streak-pill"><Flame size={17} /> Streak {dashboardData.streakCount} dias</span>
+                <h1>Boa tarde, {dashboardData.userName}</h1>
+                <p>Estás no caminho certo. Planea as tuas refeições de forma simples, com os carrinhos de compras automáticos.</p>
               <motion.button
                 className="dash-hero-cta"
                 whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(52,211,153,0.4)' }}
                 whileTap={{ scale: 0.97 }}
                 onClick={openChatbotForPlan}
               >
-                Gerar Novo Plano <ArrowRight size={16} />
-              </motion.button>
-            </div>
+                  Gerar Novo Plano <ArrowRight size={16} />
+                </motion.button>
+              </div>
 
-            <div className="dash-hero-right">
+              <div className="dash-hero-right">
               <div className="dash-hero-meters">
                 <CalorieRing consumed={dashboardData.consumedCalories} goal={dashboardData.dailyGoal} />
                 <motion.div
@@ -1017,13 +1014,13 @@ export default function Dashboard() {
                   </div>
                 </motion.div>
               </div>
-              <div className="dash-hero-macros">
-                {macros.map((m) => (
-                  <div className="macro-bar" key={m.label}>
+                <div className="dash-hero-macros">
+                  {macros.map((m) => (
+                    <div className="macro-bar" key={m.label}>
                     <div className="macro-bar-head">
                       <span>{m.label}</span>
                       <span>{m.value}g</span>
-                    </div>
+                      </div>
                     <div className="macro-bar-track">
                       <motion.div
                         className="macro-bar-fill"
@@ -1035,22 +1032,22 @@ export default function Dashboard() {
                       />
                     </div>
                   </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </motion.section>
+          </motion.section>
 
-        <motion.section className="dash-meals" {...fade}>
+          <motion.section className="dash-meals" {...fade}>
           <div className="dash-meals-head">
             <h2>Refeições de hoje</h2>
             <span className="dash-meals-total">{consumedKcal} kcal total</span>
           </div>
 
-          <div className="dash-meal-tabs">
-            {meals.map((meal, i) => {
-              const Icon = meal.icon;
-              return (
+            <div className="dash-meal-tabs">
+              {meals.map((meal, i) => {
+                const Icon = meal.icon;
+                return (
                 <button
                   key={`${meal.period}-${i}`}
                   className={`dash-meal-tab ${activeMeal === i ? 'active' : ''}`}
@@ -1058,22 +1055,22 @@ export default function Dashboard() {
                 >
                   <Icon size={16} />
                   <span>{meal.period}</span>
-                </button>
-              );
-            })}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
 
-          {!activeMealData ? (
-            <div className="dash-meal-card">
-              <h3>Sem refeições planeadas para hoje</h3>
-              <div className="dash-meal-actions">
+            {!activeMealData ? (
+              <div className="dash-meal-card">
+                <h3>Sem refeições planeadas para hoje</h3>
+                <div className="dash-meal-actions">
                 <button type="button" className="dash-meal-view" onClick={openChatbotForPlan}>
                   Gerar plano no chatbot <ChevronRight size={15} />
                 </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <AnimatePresence mode="wait">
+            ) : (
+              <AnimatePresence mode="wait">
               <motion.div
                 className="dash-meal-card"
                 key={activeMeal}
@@ -1082,16 +1079,16 @@ export default function Dashboard() {
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.25 }}
               >
-                <img src={activeMealData.image} alt={activeMealData.name} loading="lazy" className="dash-meal-image" />
-                <div className="dash-meal-icon"><MealIcon size={24} /></div>
-                <h3>{activeMealData.name}</h3>
-                <div className="dash-meal-meta">
-                  <span><Clock3 size={13} /> {activeMealData.time}</span>
-                  <span><Flame size={13} /> {activeMealData.kcal} kcal</span>
-                  <span>{activeMealData.cost}</span>
-                </div>
-                <div className="dash-meal-actions">
-                  <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>Ver receita completa <ChevronRight size={15} /></button>
+                  <img src={activeMealData.image} alt={activeMealData.name} loading="lazy" className="dash-meal-image" />
+                  <div className="dash-meal-icon"><MealIcon size={24} /></div>
+                  <h3>{activeMealData.name}</h3>
+                  <div className="dash-meal-meta">
+                    <span><Clock3 size={13} /> {activeMealData.time}</span>
+                    <span><Flame size={13} /> {activeMealData.kcal} kcal</span>
+                    <span>{activeMealData.cost}</span>
+                  </div>
+                  <div className="dash-meal-actions">
+                    <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>Ver receita completa <ChevronRight size={15} /></button>
                   <button
                     type="button"
                     className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`}
@@ -1099,40 +1096,40 @@ export default function Dashboard() {
                   >
                     <CheckCircle2 size={14} />
                     <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Por concluir'}</span>
-                  </button>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          )}
+                    </button>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            )}
 
-          <div className="dash-meal-progress">
-            <div className="dash-meal-progress-track">
+            <div className="dash-meal-progress">
+              <div className="dash-meal-progress-track">
               <motion.div
                 className="dash-meal-progress-fill"
                 initial={false}
                 animate={{ width: `${completedPct}%` }}
                 transition={{ duration: 0.35, ease: 'easeOut' }}
               />
-            </div>
-            <span>{completedCount} de {meals.length} concluídas</span>
-          </div>
-        </motion.section>
-
-        <div className="dash-summary-stack">
-          <motion.section className="dash-insight" {...fade}>
-            <div className="dash-insight-head">
-              <div className="dash-insight-content">
-                <span className="dash-insight-badge">Resumo semanal</span>
-                <h2>{weeklySummaryTitle}</h2>
-                <p>{weeklySummaryText}</p>
               </div>
+              <span>{completedCount} de {meals.length} concluídas</span>
+            </div>
+          </motion.section>
+
+          <div className="dash-summary-stack">
+            <motion.section className="dash-insight" {...fade}>
+              <div className="dash-insight-head">
+                <div className="dash-insight-content">
+                  <span className="dash-insight-badge">Resumo semanal</span>
+                  <h2>{weeklySummaryTitle}</h2>
+                  <p>{weeklySummaryText}</p>
+                </div>
               <div className="dash-insight-art">
                 <img src="https://picsum.photos/seed/summary-nutriq/520/360" alt="Prato saudável" loading="lazy" className="dash-insight-image" />
               </div>
-            </div>
+              </div>
 
-            <div className="dash-insight-bento">
-              <motion.div className="bento-cell bento-budget" {...fade}>
+              <div className="dash-insight-bento">
+                <motion.div className="bento-cell bento-budget" {...fade}>
                 <Wallet size={20} />
                 <strong>{formatEuro(dashboardData.estimatedWeeklySpend)}</strong>
                 <span>gasto esta semana</span>
@@ -1147,25 +1144,25 @@ export default function Dashboard() {
                 <span className="bento-budget-label">
                   {dashboardData.weeklyBudget > 0 ? `${budgetPercent}% do orçamento` : 'Orçamento não definido'}
                 </span>
-              </motion.div>
+                </motion.div>
 
-              <motion.div className="bento-cell bento-score" {...fade}>
+                <motion.div className="bento-cell bento-score" {...fade}>
                 <Target size={20} />
                 <strong>{dashboardData.weeklyAdherencePct}<span className="score-pct">%</span></strong>
                 <span>adesão semanal</span>
-              </motion.div>
+                </motion.div>
 
-              <motion.div className="bento-cell bento-meals-done" {...fade}>
+                <motion.div className="bento-cell bento-meals-done" {...fade}>
                 <CheckCircle2 size={20} />
                 <strong>{dashboardData.weeklyCompletedMeals}<span className="score-sep">/</span>{dashboardData.weeklyTotalMeals}</strong>
                 <span>refeições concluídas</span>
-              </motion.div>
-            </div>
-          </motion.section>
+                </motion.div>
+              </div>
+            </motion.section>
 
-          <motion.section className="dash-chart-section" {...fade}>
-            <div className="dash-chart-noise" />
-            <div className="dash-chart-head">
+            <motion.section className="dash-chart-section" {...fade}>
+              <div className="dash-chart-noise" />
+              <div className="dash-chart-head">
               <div>
                 <h2>Calorias vs objetivo</h2>
                 <span>Últimos 7 dias</span>
@@ -1174,31 +1171,31 @@ export default function Dashboard() {
                 <span className="legend-real" />Real
                 <span className="legend-meta" />Meta
               </div>
-            </div>
-            <div className="dash-chart-canvas">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dashboardData.weeklyCalories}>
+              </div>
+              <div className="dash-chart-canvas">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dashboardData.weeklyCalories}>
                   <defs>
                     <linearGradient id="calGradDark" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
                       <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(148,163,184,0.25)" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fill: '#cbd5e1', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={34} domain={['dataMin - 100', 'dataMax + 100']} />
+                    <CartesianGrid stroke="rgba(148,163,184,0.25)" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fill: '#cbd5e1', fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={34} domain={['dataMin - 100', 'dataMax + 100']} />
                   <Tooltip
                     cursor={{ stroke: '#34d399', strokeWidth: 1 }}
                     contentStyle={{ background: '#f8fafc', border: '1px solid #d9e2ec', borderRadius: '12px', color: '#0f172a' }}
                     labelStyle={{ color: '#475569' }}
                   />
-                  <Area type="monotone" dataKey="meta" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="6 4" fill="transparent" name="Meta" />
-                  <Area type="monotone" dataKey="real" stroke="#34d399" strokeWidth={2.5} fill="url(#calGradDark)" name="Real" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.section>
-        </div>
+                    <Area type="monotone" dataKey="meta" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="6 4" fill="transparent" name="Meta" />
+                    <Area type="monotone" dataKey="real" stroke="#34d399" strokeWidth={2.5} fill="url(#calGradDark)" name="Real" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.section>
+          </div>
 
         </div>
       </div>
