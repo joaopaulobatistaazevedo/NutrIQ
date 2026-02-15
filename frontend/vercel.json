@@ -1,12 +1,15 @@
 {
-  "rewrites": [
+  "routes": [
     {
-      "source": "/favicon.ico",
-      "destination": "/NutriBot.svg"
+      "src": "/favicon.ico",
+      "dest": "/NutriBot.svg"
     },
     {
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
