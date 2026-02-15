@@ -81,6 +81,28 @@ SLOT_CALORIE_SPLIT: dict[str, float] = {
 
 SLOTS = list(SLOT_CALORIE_SPLIT.keys())
 
+BREAKFAST_KEYWORDS = {
+    "aveia", "iogurte", "panqueca", "panquecas", "muesli", "granola", "torrada",
+    "omelete", "papas", "batido", "fruta", "cereais", "crepe", "crepes",
+    "overnight oats", "smoothie", "tosta", "waffle", "waffles", "croissant",
+    "bagel", "tosta mista", "toast", "pão com", "pao com",
+}
+
+MAIN_ONLY_KEYWORDS = {
+    "bacalhau", "bife", "costela", "feijoada", "cozido", "arroz de",
+    "frango assado", "frango no forno", "massa com", "esparguete",
+    "risotto", "lasanha", "moussaka", "stew", "estufado",
+    "carne de porco", "lombo", "entrecosto", "churrasco",
+    "caril", "curry", "guisado", "salmão no forno", "salmao no forno",
+}
+
+DESSERT_KEYWORDS = {
+    "bolo", "tarte", "torta", "pudim", "mousse", "brownie",
+    "cookie", "cupcake", "cheesecake", "gelado", "sobremesa",
+    "doce", "brigadeiro", "tiramisu", "pavlova", "muffin", "donut",
+    "chocolate quente", "leite creme", "arroz doce", "panna cotta",
+}
+
 
 @dataclass
 class MealSlot:
@@ -225,52 +247,33 @@ class MealPlanGA:
         # AND doesn't contain dinner/lunch-only signals.
         # A recipe is "main-meal-appropriate" if it's not a light breakfast item.
 
-        _breakfast_kw = {
-            "aveia", "iogurte", "panqueca", "muesli", "granola", "torrada",
-            "omelete", "papas", "batido", "fruta", "cereais", "crepe",
-            "overnight oats", "smoothie", "tosta",
-        }
-        _main_only_kw = {
-            "bacalhau", "bife", "costela", "feijoada", "cozido", "arroz de",
-            "frango assado", "frango no forno", "massa com", "esparguete",
-            "risotto", "lasanha", "moussaka", "stew", "estufado",
-            "carne de porco", "lombo", "entrecosto", "churrasco",
-        }
-        _dessert_kw = {
-            "bolo", "tarte", "torta", "pudim", "mousse", "brownie",
-            "cookie", "cupcake", "cheesecake", "gelado", "sobremesa",
-        }
-
         breakfast_cal_lo = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Pequeno-almoço"] * 0.60
         breakfast_cal_hi = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Pequeno-almoço"] * 1.80
 
         def _is_breakfast(r: PricedRecipe) -> bool:
-            title = (r.title or "").lower()
+            text = self._recipe_text(r)
             # Hard reject: clearly a dinner dish or dessert
-            if any(kw in title for kw in _main_only_kw):
+            if any(kw in text for kw in MAIN_ONLY_KEYWORDS):
                 return False
-            if any(kw in title for kw in _dessert_kw):
+            if any(kw in text for kw in DESSERT_KEYWORDS):
                 return False
             # Positive signal: has breakfast keyword
-            if any(kw in title for kw in _breakfast_kw):
+            if any(kw in text for kw in BREAKFAST_KEYWORDS):
                 return True
-            # Calorie window: if no nutrition data, assume it could be breakfast
+            # Fallback: only lighter/high-protein recipes can pass as breakfast
             cal = _safe_float(r.calories_per_serving)
             if cal > 0:
-                return breakfast_cal_lo <= cal <= breakfast_cal_hi
+                return breakfast_cal_lo <= cal <= breakfast_cal_hi and _safe_float(r.protein_g) >= 6.0
             return False
 
         def _is_main_meal(r: PricedRecipe) -> bool:
-            title = (r.title or "").lower()
+            text = self._recipe_text(r)
             # Hard reject desserts from main meal slots
-            if any(kw in title for kw in _dessert_kw):
+            if any(kw in text for kw in DESSERT_KEYWORDS):
                 return False
             # Explicit breakfast items should not appear as main meals
-            if any(kw in title for kw in _breakfast_kw):
-                cal = _safe_float(r.calories_per_serving)
-                # Allow breakfast items as mains only if they're calorie-dense enough
-                main_cal_lo = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Almoço"] * 0.55
-                return cal >= main_cal_lo
+            if any(kw in text for kw in BREAKFAST_KEYWORDS):
+                return False
             return True
 
         self._breakfast_pool: list[PricedRecipe] = [r for r in self.recipes if _is_breakfast(r)]
@@ -281,15 +284,23 @@ class MealPlanGA:
             # Fallback: any recipe with calories in breakfast range
             self._breakfast_pool = [
                 r for r in self.recipes
-                if not any(kw in (r.title or "").lower() for kw in _dessert_kw)
+                if not any(kw in self._recipe_text(r) for kw in DESSERT_KEYWORDS)
+                and not any(kw in self._recipe_text(r) for kw in MAIN_ONLY_KEYWORDS)
                 and (_safe_float(r.calories_per_serving) <= breakfast_cal_hi or _safe_float(r.calories_per_serving) == 0)
             ] or list(self.recipes)
 
         if len(self._main_pool) < 5:
             self._main_pool = [
                 r for r in self.recipes
-                if not any(kw in (r.title or "").lower() for kw in _dessert_kw)
-            ] or list(self.recipes)
+                if not any(kw in self._recipe_text(r) for kw in DESSERT_KEYWORDS)
+                and not any(kw in self._recipe_text(r) for kw in BREAKFAST_KEYWORDS)
+            ]
+            if not self._main_pool:
+                # Last resort to keep GA runnable in sparse datasets
+                self._main_pool = [
+                    r for r in self.recipes
+                    if not any(kw in self._recipe_text(r) for kw in DESSERT_KEYWORDS)
+                ] or list(self.recipes)
 
     def run(self) -> list[MealSlot]:
         population = self._seed_population()
@@ -331,7 +342,63 @@ class MealPlanGA:
             self._evaluate_all(population)
 
         population.sort(key=lambda x: x.fitness, reverse=True)
-        return population[0].slots
+        feasible = self._pick_feasible_individual(population)
+        if feasible is not None:
+            return feasible.slots
+
+        # Last-resort safety: enforce slot compatibility even when no candidate
+        # can satisfy all hard constraints (e.g. sparse/low-quality datasets).
+        fallback = self._enforce_slot_compatibility(deepcopy(population[0]))
+        return fallback.slots
+
+    def _pick_feasible_individual(self, population: list[Individual]) -> Individual | None:
+        for candidate in population:
+            repaired = self._repair(deepcopy(candidate))
+            if not self._violates_hard_constraints(repaired):
+                return repaired
+        return None
+
+    def _enforce_slot_compatibility(self, ind: Individual) -> Individual:
+        grouped = self._group_by_day(ind.slots)
+        repaired_slots: list[MealSlot] = []
+        usage: dict[str, int] = {}
+
+        for day in range(self.planning_days):
+            day_slots = grouped.get(day, [])
+            by_slot = {ms.slot: ms for ms in day_slots if ms.slot in SLOTS}
+            day_used: set[str] = set()
+
+            for slot in SLOTS:
+                existing = by_slot.get(slot)
+                if existing and self._slot_recipe_is_compatible(slot, existing.recipe):
+                    recipe = existing.recipe
+                else:
+                    slot_pool = self._breakfast_pool if slot == "Pequeno-almoço" else self._main_pool
+                    compatible = [r for r in slot_pool if self._slot_recipe_is_compatible(slot, r)]
+                    recipe = self._pick_low_repetition_recipe(day_used, usage, compatible or slot_pool)
+
+                rid = str(recipe.id or recipe.url or "")
+                if rid in day_used:
+                    slot_pool = self._breakfast_pool if slot == "Pequeno-almoço" else self._main_pool
+                    compatible = [r for r in slot_pool if self._slot_recipe_is_compatible(slot, r)]
+                    recipe = self._pick_low_repetition_recipe(day_used, usage, compatible or slot_pool)
+                    rid = str(recipe.id or recipe.url or "")
+
+                repaired_slots.append(MealSlot(day=day, slot=slot, recipe=recipe))
+                day_used.add(rid)
+                usage[rid] = usage.get(rid, 0) + 1
+
+        ind.slots = repaired_slots
+        return ind
+
+    def _slot_recipe_is_compatible(self, slot: str, recipe: PricedRecipe) -> bool:
+        calories = _safe_float(recipe.calories_per_serving)
+        protein = _safe_float(recipe.protein_g)
+
+        if slot == "Pequeno-almoço":
+            return self._is_breakfast_appropriate(recipe) and (calories == 0 or calories >= 180.0) and protein >= 8.0
+
+        return self._is_main_appropriate(recipe) and calories >= 350.0 and protein >= 12.0
 
     def _seed_population(self) -> list[Individual]:
         heuristic_count = max(1, int(self.pop_size * 0.30))
@@ -450,8 +517,16 @@ class MealPlanGA:
             for ms in day_slots:
                 calories = _safe_float(ms.recipe.calories_per_serving)
                 protein = _safe_float(ms.recipe.protein_g)
-                if calories < 400.0 or protein < 12.0:
-                    return True
+                if ms.slot == "Pequeno-almoço":
+                    if not self._is_breakfast_appropriate(ms.recipe):
+                        return True
+                    if (calories > 0 and calories < 180.0) or protein < 8.0:
+                        return True
+                else:
+                    if not self._is_main_appropriate(ms.recipe):
+                        return True
+                    if calories < 350.0 or protein < 12.0:
+                        return True
 
         return False
 
@@ -647,6 +722,29 @@ class MealPlanGA:
 
         return max(0.0, min(100.0, macro_component + distribution_component))
 
+    def _recipe_text(self, recipe: PricedRecipe) -> str:
+        title = (recipe.title or "").lower()
+        ingredients = " ".join(recipe.ingredients or []).lower()
+        return f"{title} {ingredients}".strip()
+
+    def _is_breakfast_appropriate(self, recipe: PricedRecipe) -> bool:
+        text = self._recipe_text(recipe)
+        if any(kw in text for kw in DESSERT_KEYWORDS):
+            return False
+        if any(kw in text for kw in MAIN_ONLY_KEYWORDS):
+            return False
+        return True
+
+    def _is_main_appropriate(self, recipe: PricedRecipe) -> bool:
+        text = self._recipe_text(recipe)
+        if any(kw in text for kw in DESSERT_KEYWORDS):
+            return False
+        if any(kw in text for kw in BREAKFAST_KEYWORDS):
+            cal = _safe_float(recipe.calories_per_serving)
+            main_cal_lo = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Almoço"] * 0.55
+            return cal >= main_cal_lo
+        return True
+
     def _slot_context_penalty(self, ind: Individual) -> float:
         """
         Penalises plans where a recipe is clearly wrong for its meal slot.
@@ -657,31 +755,21 @@ class MealPlanGA:
           - Breakfast/lunch/dinner slot with a dessert: 60 pts
           - Main-meal slot with a breakfast-only recipe that is too light: 40 pts
         """
-        _main_only_kw = {
-            "bacalhau", "bife", "costela", "feijoada", "cozido", "arroz de",
-            "frango assado", "frango no forno", "massa com", "esparguete",
-            "risotto", "lasanha", "moussaka", "estufado", "carne de porco",
-            "lombo", "entrecosto", "churrasco",
-        }
-        _breakfast_only_kw = {
-            "aveia", "muesli", "granola", "papas", "cereais", "overnight oats",
-        }
-        _dessert_kw = {
-            "bolo", "tarte", "torta", "pudim", "mousse", "brownie",
-            "cookie", "cupcake", "cheesecake", "gelado", "sobremesa",
-        }
+        _main_only_kw = MAIN_ONLY_KEYWORDS
+        _breakfast_only_kw = BREAKFAST_KEYWORDS
+        _dessert_kw = DESSERT_KEYWORDS
 
         breakfast_cal_hi = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Pequeno-almoço"] * 1.80
         main_cal_lo = self.daily_calorie_target * SLOT_CALORIE_SPLIT["Almoço"] * 0.55
 
         penalty = 0.0
         for ms in ind.slots:
-            title = (ms.recipe.title or "").lower()
+            text = self._recipe_text(ms.recipe)
             cal = _safe_float(ms.recipe.calories_per_serving)
 
-            is_dessert = any(kw in title for kw in _dessert_kw)
-            is_main_only = any(kw in title for kw in _main_only_kw)
-            is_breakfast_only = any(kw in title for kw in _breakfast_only_kw)
+            is_dessert = any(kw in text for kw in _dessert_kw)
+            is_main_only = any(kw in text for kw in _main_only_kw)
+            is_breakfast_only = any(kw in text for kw in _breakfast_only_kw)
 
             if ms.slot == "Pequeno-almoço":
                 if is_dessert:
@@ -694,10 +782,12 @@ class MealPlanGA:
 
             elif ms.slot in ("Almoço", "Jantar"):
                 if is_dessert:
-                    penalty += 60.0
+                    penalty += 100.0
                 elif is_breakfast_only and cal > 0 and cal < main_cal_lo:
                     # Pure breakfast item (e.g. oatmeal) as a main meal
-                    penalty += 40.0
+                    penalty += 80.0
+                elif is_breakfast_only:
+                    penalty += 60.0
 
         return min(800.0, penalty)
 

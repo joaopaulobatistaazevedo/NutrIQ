@@ -10,6 +10,8 @@ Key changes vs original:
     auth_token forwarding, keyword false-positives
 """
 import asyncio
+import re
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
@@ -117,6 +119,10 @@ class OpenAIService:
             merged_context["coach_metrics"] = coach_metrics
 
         pending_edit_request = bool(merged_context.get("pending_edit_request"))
+
+        temporal_hints = self._extract_temporal_plan_hints(user_message)
+        if temporal_hints:
+            merged_context.update(temporal_hints)
 
         # Detect whether this is an explicit plan request OR a life event that
         # should silently trigger a recalculation in the background.
@@ -245,6 +251,8 @@ class OpenAIService:
             "max_weekly_budget, planning_days, favorite_foods, disliked_ingredients, "
             "calories_offset (int - positivo se o utilizador comeu a mais, NEGATIVO se saltou refeições ou comeu menos do que o plano previa), "
             "missing_ingredients (array - itens que o utilizador não tem ou não encontrou na loja), "
+            "week_offset (int - 0 semana atual, 1 próxima semana, 2 duas semanas à frente, etc), "
+            "week_start (string ISO YYYY-MM-DD quando o utilizador indicar uma data específica), "
             "restrictions, allergens, new_liked_ingredients, requested_extra_ingredients, "
             "goal (valores possíveis: 'lose_weight', 'gain_weight', 'maintain', 'gain_muscle'). "
             "IMPORTANTE: calories_offset deve ser negativo quando o utilizador refere que saltou refeições, comeu pouco, ou teve um dia com menos calorias. "
@@ -367,11 +375,24 @@ class OpenAIService:
         # na mensagem atual — nesse caso mantemos o valor já presente no
         # merged_context (proveniente do onboarding ou da memória persistida).
         _planning_days_before = merged.get("planning_days")
+        _week_offset_before = merged.get("week_offset")
+        _week_start_before = merged.get("week_start")
         for k, v in constraints.items():
             if v not in (None, "", []):
                 merged[k] = v
         if merged.get("planning_days") in (None, "") and _planning_days_before not in (None, ""):
             merged["planning_days"] = _planning_days_before
+
+        # Temporal intent deserves explicit precedence: if we already inferred
+        # a future week from the user message, don't let extractor defaults
+        # (typically 0/current week) overwrite it.
+        inferred_week_offset = self._safe_week_offset(_week_offset_before)
+        extracted_week_offset = constraints.get("week_offset")
+        if inferred_week_offset > 0 and extracted_week_offset in (None, "", 0, "0"):
+            merged["week_offset"] = inferred_week_offset
+
+        if _week_start_before and constraints.get("week_start") in (None, ""):
+            merged["week_start"] = _week_start_before
 
         if memory:
             for key in ("goal", "max_weekly_budget", "planning_days"):
@@ -394,6 +415,8 @@ class OpenAIService:
         goal = merged.get("goal", "maintain")
         if goal in (None, ""):
             goal = "maintain"
+        week_offset = self._safe_week_offset(merged.get("week_offset"))
+        week_start = self._normalize_iso_week_start(merged.get("week_start"))
         recent_recipe_ids = sorted(self._to_recipe_ids(merged.get("recent_recipe_ids") or []))
 
         return {
@@ -403,6 +426,8 @@ class OpenAIService:
                 "max_weekly_budget": max_budget,
                 "planning_days": planning_days,
                 "goal": goal,
+                "week_offset": week_offset,
+                "week_start": week_start,
                 "favorite_foods": merged.get("favorite_foods", []),
                 "disliked_ingredients": merged.get("disliked_ingredients", []),
                 "calories_offset": calories_offset,
@@ -655,6 +680,60 @@ class OpenAIService:
             "estimated_tdee": tdee if tdee > 0 else None,
             "estimated_kcal_target": kcal_target if kcal_target > 0 else None,
         }
+
+    def _extract_temporal_plan_hints(self, text: str) -> Dict[str, Any]:
+        if not text or not isinstance(text, str):
+            return {}
+
+        lowered = text.strip().lower()
+        hints: Dict[str, Any] = {}
+
+        date_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", lowered)
+        if date_match:
+            normalized = self._normalize_iso_week_start(date_match.group(1))
+            if normalized:
+                hints["week_start"] = normalized
+                return hints
+
+        if any(token in lowered for token in ("esta semana", "semana atual", "semana corrente")):
+            hints["week_offset"] = 0
+            return hints
+
+        if any(token in lowered for token in ("próxima semana", "proxima semana", "semana que vem", "semana seguinte")):
+            hints["week_offset"] = 1
+
+        offset_match = re.search(r"daqui\s+a\s+(\d+)\s+semanas?", lowered)
+        if offset_match:
+            try:
+                hints["week_offset"] = max(0, min(52, int(offset_match.group(1))))
+            except (TypeError, ValueError):
+                pass
+
+        return hints
+
+    def _safe_week_offset(self, value: Any) -> int:
+        try:
+            parsed = int(value)
+            return max(0, min(52, parsed))
+        except (TypeError, ValueError):
+            return 0
+
+    def _normalize_iso_week_start(self, raw: Any) -> Optional[str]:
+        if not isinstance(raw, str):
+            return None
+        text = raw.strip()
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text).date()
+        except ValueError:
+            try:
+                parsed = date.fromisoformat(text)
+            except ValueError:
+                return None
+
+        monday = parsed - timedelta(days=parsed.weekday())
+        return monday.isoformat()
 
 
 # ──────────────────────────────────────────────────────────────────────────
