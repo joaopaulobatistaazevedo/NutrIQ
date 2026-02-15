@@ -3,7 +3,6 @@ import {
   CalendarDays,
   BookOpen,
   ShoppingCart,
-  BarChart3,
   User,
   Users,
   BriefcaseMedical,
@@ -14,9 +13,8 @@ const USER_NAV_ITEMS = [
   { path: '/meal-plan', icon: CalendarDays, label: 'Plano Alimentar', shortcut: 'Alt+2', shortcutKey: '2' },
   { path: '/recipes', icon: BookOpen, label: 'Receitas', shortcut: 'Alt+3', shortcutKey: '3' },
   { path: '/shopping', icon: ShoppingCart, label: 'Lista de Compras', shortcut: 'Alt+4', shortcutKey: '4' },
-  { path: '/progress', icon: BarChart3, label: 'Progresso', shortcut: 'Alt+5', shortcutKey: '5' },
-  { path: '/profile', icon: User, label: 'Perfil', shortcut: 'Alt+6', shortcutKey: '6' },
-  { path: '/nutrisocial', icon: Users, label: 'NutriSocial', shortcut: 'Alt+7', shortcutKey: '7' },
+  { path: '/profile', icon: User, label: 'Perfil', shortcut: 'Alt+5', shortcutKey: '5' },
+  { path: '/nutrisocial', icon: Users, label: 'NutriSocial', shortcut: 'Alt+6', shortcutKey: '6' },
 ];
 
 const NUTRITIONIST_NAV_ITEMS = [
@@ -31,6 +29,7 @@ export const MAIN_NAV_ITEMS = USER_NAV_ITEMS;
 
 export const PRIVATE_PATHS = [
   ...USER_NAV_ITEMS.map((item) => item.path),
+  '/progress',
   '/nutritionist',
 ];
 

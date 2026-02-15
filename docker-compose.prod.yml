@@ -29,12 +29,18 @@ services:
     restart: unless-stopped
     environment:
       PORT: 7071
+      UPLOADS_DIR: /app/uploads
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DB: ${MYSQL_DB:-bugsbyte}
       MYSQL_USER: ${MYSQL_USER:-bugsbyte}
       MYSQL_PASS: ${MYSQL_PASSWORD:-uma_password_forte}
       MYSQL_PARAMS: useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      PASSWORD_RESET_URL_BASE: ${PASSWORD_RESET_URL_BASE:-http://localhost:5173/reset-password}
+      PASSWORD_RESET_TOKEN_TTL_MINUTES: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:-30}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-NutrIQ}
     depends_on:
       mysql:
         condition: service_healthy
@@ -42,6 +48,7 @@ services:
       - "${BACKEND_HOST_PORT:-7071}:7071"
     volumes:
       - backend_sqlite_data:/app/database
+      - backend_uploads_data:/app/uploads
 
   chatbot:
     build:
@@ -61,6 +68,19 @@ services:
       - "${CHATBOT_HOST_PORT:-8000}:8000"
     volumes:
       - chatbot_data:/app/data
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      chatbot:
+        condition: service_started
+    ports:
+      - "${GATEWAY_HOST_PORT:-7080}:80"
+    volumes:
+      - ./docker/gateway.nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
   frontend:
     image: bugsbyte-frontend
@@ -120,6 +140,8 @@ services:
         condition: service_started
       chatbot:
         condition: service_started
+      gateway:
+        condition: service_started
       frontend:
         condition: service_started
       supermarket-scraper:
@@ -148,4 +170,5 @@ services:
 volumes:
   mysql_data:
   backend_sqlite_data:
+  backend_uploads_data:
   chatbot_data:

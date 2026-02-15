@@ -26,4 +26,9 @@ public class AuthController {
         authService.requestPasswordReset(email);
         return Map.of("message", "Se o email existir, enviámos instruções para recuperar a password.");
     }
+
+    public Map<String, String> resetPassword(String token, String newPassword) {
+        authService.resetPassword(token, newPassword);
+        return Map.of("message", "Password atualizada com sucesso.");
+    }
 }

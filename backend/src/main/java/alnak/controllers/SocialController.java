@@ -158,6 +158,69 @@ public class SocialController {
                 socialService.getPendingSentRequests(authenticatedUserId));
     }
 
+    // ── Communities ─────────────────────────────────────────
+
+    public CommunityResponse createCommunity(long authenticatedUserId, String body) throws Exception {
+        CommunityCreateRequest req = mapper.readValue(body, CommunityCreateRequest.class);
+        var community = socialService.createCommunity(authenticatedUserId, req.name());
+        return new CommunityResponse(
+                community.id(),
+                community.ownerUserId(),
+                community.name(),
+                community.memberIds(),
+                community.pendingInviteUserIds()
+        );
+    }
+
+    public CommunityResponse renameCommunity(long communityId, long authenticatedUserId, String body) throws Exception {
+        CommunityRenameRequest req = mapper.readValue(body, CommunityRenameRequest.class);
+        var community = socialService.renameCommunity(communityId, authenticatedUserId, req.name());
+        return new CommunityResponse(
+                community.id(),
+                community.ownerUserId(),
+                community.name(),
+                community.memberIds(),
+                community.pendingInviteUserIds()
+        );
+    }
+
+    public void inviteFriendToCommunity(long communityId, long authenticatedUserId, String body) throws Exception {
+        CommunityInviteRequest req = mapper.readValue(body, CommunityInviteRequest.class);
+        socialService.inviteFriendToCommunity(communityId, authenticatedUserId, req.friendUserId());
+    }
+
+    public List<CommunityResponse> getMyCommunities(long authenticatedUserId) {
+        return socialService.getMyCommunities(authenticatedUserId).stream()
+                .map(item -> new CommunityResponse(
+                        item.id(),
+                        item.ownerUserId(),
+                        item.name(),
+                        item.memberIds(),
+                        item.pendingInviteUserIds()
+                ))
+                .toList();
+    }
+
+    public List<CommunityInviteResponse> getPendingCommunityInvites(long authenticatedUserId) {
+        return socialService.getPendingCommunityInvites(authenticatedUserId).stream()
+                .map(item -> new CommunityInviteResponse(
+                        item.communityId(),
+                        item.communityName(),
+                        item.inviterId(),
+                        item.inviterName(),
+                        item.createdAt()
+                ))
+                .toList();
+    }
+
+    public void acceptCommunityInvite(long communityId, long authenticatedUserId) {
+        socialService.acceptCommunityInvite(authenticatedUserId, communityId);
+    }
+
+    public void declineCommunityInvite(long communityId, long authenticatedUserId) {
+        socialService.declineCommunityInvite(authenticatedUserId, communityId);
+    }
+
     // ── Private helpers ───────────────────────────────────────────
 
     private RecipeRatingResponse buildRatingResponse(long userId, int recipeId) {

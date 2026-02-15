@@ -1,14 +1,8 @@
-import axios from 'axios';
+import { createJsonClient } from './httpClient';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:7071';
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+const client = createJsonClient(API_BASE_URL, 15000);
 
 function normalizeError(error) {
   const payload = error?.response?.data;
@@ -69,6 +63,20 @@ export async function requestPasswordReset({ email }) {
         typeof data?.message === 'string' && data.message.trim()
           ? data.message.trim()
           : 'Se o email existir, enviámos instruções para recuperar a password.',
+    };
+  } catch (error) {
+    throw new Error(normalizeError(error));
+  }
+}
+
+export async function resetPassword({ token, newPassword }) {
+  try {
+    const { data } = await client.post('/api/auth/reset-password', { token, newPassword });
+    return {
+      message:
+        typeof data?.message === 'string' && data.message.trim()
+          ? data.message.trim()
+          : 'Password atualizada com sucesso.',
     };
   } catch (error) {
     throw new Error(normalizeError(error));

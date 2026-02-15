@@ -1,17 +1,12 @@
-import axios from 'axios';
 import { getAuthSession } from '../utils/authSession';
+import { createJsonClient } from './httpClient';
 
 const API_BASE_URL = import.meta.env.VITE_CHATBOT_API_URL || 'http://localhost:8000';
 const BOT_COOKIE_KEY = 'nutriq_bot_uid';
 const BOT_COOKIE_TTL_DAYS = 365;
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 20000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// Chat responses may take longer when the model generates plans/carts.
+const client = createJsonClient(API_BASE_URL, 120000);
 
 const mapHistory = (messages = []) =>
   messages

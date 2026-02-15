@@ -8,6 +8,7 @@ import alnak.controllers.SocialController;
 import alnak.controllers.ShoppingCartController;
 import alnak.controllers.UserController;
 import alnak.data.global.FriendshipDAO;
+import alnak.data.global.CommunityDAO;
 import alnak.data.global.GlobalDatabase;
 import alnak.data.global.GlobalRecipeDAO;
 import alnak.data.global.GlobalMealPlanDAO;
@@ -16,8 +17,10 @@ import alnak.data.global.UserDAO;
 import alnak.data.local.IngredientMarketPriceDAO;
 import alnak.data.local.RecipeDAO;
 import alnak.data.local.ShoppingCartSnapshotDAO;
+import alnak.dto.ForgotPasswordRequest;
 import alnak.dto.LoginRequest;
 import alnak.dto.RegisterRequest;
+import alnak.dto.ResetPasswordRequest;
 import alnak.dto.UpdateProfileRequest;
 import alnak.services.AuthService;
 import alnak.services.MealPlanService;
@@ -42,6 +45,7 @@ public class Main {
         UserDAO          userDAO          = new UserDAO();
         PostDAO          postDAO          = new PostDAO();
         FriendshipDAO    friendshipDAO    = new FriendshipDAO();
+        CommunityDAO     communityDAO     = new CommunityDAO();
         GlobalRecipeDAO  globalRecipeDAO  = new GlobalRecipeDAO();
         GlobalMealPlanDAO globalMealPlanDAO = new GlobalMealPlanDAO();
 
@@ -58,7 +62,7 @@ public class Main {
         RecipeService    recipeService    = new RecipeService(recipeDAO, globalRecipeDAO);
         MealPlanService  mealPlanService  = new MealPlanService(globalMealPlanDAO, globalRecipeDAO, recipeDAO);
         SocialService    socialService    = new SocialService(
-                postDAO, friendshipDAO, globalRecipeDAO, userDAO, recipeDAO);
+                postDAO, friendshipDAO, globalRecipeDAO, userDAO, recipeDAO, communityDAO);
         ShoppingCartService shoppingCartService = new ShoppingCartService(shoppingCartSnapshotDAO);
 
         // ── Controllers ───────────────────────────────────────────
@@ -71,8 +75,14 @@ public class Main {
         ShoppingCartController shoppingCartController = new ShoppingCartController(shoppingCartService);
 
         // ── App ───────────────────────────────────────────────────
-        Javalin app = Javalin.create(config ->
-                config.plugins.enableCors(cors -> cors.add(it -> it.anyHost())));
+        // Resolve the uploads directory once at startup
+        java.nio.file.Path uploadsDir = java.nio.file.Paths.get(
+                System.getenv().getOrDefault("UPLOADS_DIR", "uploads")).toAbsolutePath();
+        try { java.nio.file.Files.createDirectories(uploadsDir); } catch (Exception ignored) {}
+
+        Javalin app = Javalin.create(config -> {
+            config.plugins.enableCors(cors -> cors.add(it -> it.anyHost()));
+        });
 
         app.exception(IllegalArgumentException.class,
                 (e, ctx) -> ctx.status(400).json(Map.of("error", e.getMessage())));
@@ -99,10 +109,15 @@ public class Main {
 
 
         app.post("/api/auth/forgot-password", ctx -> {
-            Map<String, Object> payload = ctx.bodyAsClass(Map.class);
-            Object emailValue = payload.get("email");
-            String email = emailValue == null ? null : emailValue.toString();
-            ctx.json(authController.forgotPassword(email));
+            ForgotPasswordRequest request = ctx.bodyAsClass(ForgotPasswordRequest.class);
+            ctx.json(authController.forgotPassword(request == null ? null : request.getEmail()));
+        });
+
+        app.post("/api/auth/reset-password", ctx -> {
+            ResetPasswordRequest request = ctx.bodyAsClass(ResetPasswordRequest.class);
+            String token = request == null ? null : request.getToken();
+            String newPassword = request == null ? null : request.getNewPassword();
+            ctx.json(authController.resetPassword(token, newPassword));
         });
 
         // ── User routes ───────────────────────────────────────────
@@ -398,6 +413,122 @@ public class Main {
         app.get("/api/social/friends/requests/sent", ctx -> {
             Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
             ctx.json(socialController.getPendingSentRequests(userId));
+        });
+
+        app.get("/api/social/communities", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(socialController.getMyCommunities(userId));
+        });
+
+        app.post("/api/social/communities", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.status(201).json(socialController.createCommunity(userId, ctx.body()));
+        });
+
+        app.put("/api/social/communities/{communityId}", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            ctx.json(socialController.renameCommunity(communityId, userId, ctx.body()));
+        });
+
+        app.post("/api/social/communities/{communityId}/invite", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            socialController.inviteFriendToCommunity(communityId, userId, ctx.body());
+            ctx.status(204);
+        });
+
+        app.get("/api/social/communities/invites/pending", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            ctx.json(socialController.getPendingCommunityInvites(userId));
+        });
+
+        app.post("/api/social/communities/{communityId}/invites/accept", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            socialController.acceptCommunityInvite(communityId, userId);
+            ctx.status(204);
+        });
+
+        app.post("/api/social/communities/{communityId}/invites/decline", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long communityId = Long.parseLong(ctx.pathParam("communityId"));
+            socialController.declineCommunityInvite(communityId, userId);
+            ctx.status(204);
+        });
+
+        app.post("/api/social/posts/{id}/kudos", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long postId = Long.parseLong(ctx.pathParam("id"));
+            boolean added = socialService.toggleKudo(postId, userId);
+            java.util.Map<Long, String> kudos = socialService.getKudosForPost(postId);
+            ctx.json(new alnak.dto.SocialDTOs.KudoToggleResponse(postId, added, kudos));
+        });
+
+        app.get("/api/social/posts/{id}/interactions", ctx -> {
+            long postId = Long.parseLong(ctx.pathParam("id"));
+            java.util.Map<Long, String> kudos = socialService.getKudosForPost(postId);
+            java.util.List<alnak.dto.SocialDTOs.CommentResponse> comments =
+                    alnak.dto.SocialDTOs.CommentResponse.fromList(
+                            socialService.getCommentsForPost(postId));
+            ctx.json(new alnak.dto.SocialDTOs.PostInteractionsResponse(postId, kudos, comments));
+        });
+
+        app.post("/api/social/posts/{id}/comments", ctx -> {
+            Long userId = extractUserId(ctx.header("Authorization"), jwtUtil);
+            long postId = Long.parseLong(ctx.pathParam("id"));
+            alnak.dto.SocialDTOs.AddCommentRequest body =
+                    ctx.bodyAsClass(alnak.dto.SocialDTOs.AddCommentRequest.class);
+            alnak.business_logic.entities.PostComment comment =
+                    socialService.addComment(postId, userId, body.text());
+            ctx.status(201).json(alnak.dto.SocialDTOs.CommentResponse.from(comment));
+        });
+
+        app.get("/api/social/posts/{id}/comments", ctx -> {
+            long postId = Long.parseLong(ctx.pathParam("id"));
+            ctx.json(alnak.dto.SocialDTOs.CommentResponse.fromList(
+                    socialService.getCommentsForPost(postId)));
+        });
+
+        // ── Image upload ──────────────────────────────────────────
+        // POST /api/social/posts/upload  — multipart or raw bytes
+        // Returns { "picturePath": "/uploads/<filename>" }
+        app.post("/api/social/posts/upload", ctx -> {
+            extractUserId(ctx.header("Authorization"), jwtUtil); // auth check only
+            var uploadedFile = ctx.uploadedFile("file");
+            if (uploadedFile == null) {
+                ctx.status(400).json(Map.of("error", "No file provided (field name: 'file')"));
+                return;
+            }
+            String originalName = uploadedFile.filename();
+            String ext = originalName.contains(".")
+                    ? originalName.substring(originalName.lastIndexOf('.'))
+                    : ".jpg";
+            String filename = java.util.UUID.randomUUID() + ext;
+            java.nio.file.Path dest = uploadsDir.resolve(filename);
+            try (var in = uploadedFile.content()) {
+                java.nio.file.Files.copy(in, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            ctx.status(201).json(Map.of("picturePath", "/uploads/" + filename));
+        });
+
+        // GET /uploads/<filename> — serve uploaded images as static files
+        app.get("/uploads/{filename}", ctx -> {
+            String filename = ctx.pathParam("filename");
+            // Basic path traversal guard
+            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                ctx.status(400);
+                return;
+            }
+            java.nio.file.Path file = uploadsDir.resolve(filename);
+            if (!java.nio.file.Files.exists(file)) {
+                ctx.status(404);
+                return;
+            }
+            String mime = java.net.URLConnection.guessContentTypeFromName(filename);
+            if (mime == null) mime = "application/octet-stream";
+            ctx.contentType(mime);
+            ctx.result(java.nio.file.Files.newInputStream(file));
         });
 
         // ── Start ─────────────────────────────────────────────────

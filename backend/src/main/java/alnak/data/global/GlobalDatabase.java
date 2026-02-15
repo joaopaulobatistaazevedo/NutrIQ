@@ -131,6 +131,18 @@ public class GlobalDatabase
             """);
 
             s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id          INT PRIMARY KEY AUTO_INCREMENT,
+                    user_id     INT          NOT NULL,
+                    token_hash  CHAR(64)     NOT NULL UNIQUE,
+                    expires_at  DATETIME     NOT NULL,
+                    used_at     DATETIME,
+                    created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS user_profiles (
                     user_id               INT PRIMARY KEY,
                     age                   INT,
@@ -257,15 +269,74 @@ public class GlobalDatabase
                 )
             """);
 
+            // ── Post interactions (kudos + comments) ─────────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS post_kudos (
+                    post_id    INT       NOT NULL,
+                    user_id    INT       NOT NULL,
+                    created_at DATETIME  DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (post_id, user_id),
+                    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS post_comments (
+                    id         INT PRIMARY KEY AUTO_INCREMENT,
+                    post_id    INT         NOT NULL,
+                    user_id    INT         NOT NULL,
+                    text       TEXT        NOT NULL,
+                    created_at DATETIME    DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            // ── Communities (social groups + invites) ───────────
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS social_communities (
+                    id            INT PRIMARY KEY AUTO_INCREMENT,
+                    owner_user_id INT          NOT NULL,
+                    name          VARCHAR(150) NOT NULL,
+                    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    updated_at    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
+            s.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS social_community_members (
+                    community_id        INT         NOT NULL,
+                    user_id             INT         NOT NULL,
+                    status              VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                    invited_by_user_id  INT         NOT NULL,
+                    created_at          DATETIME    DEFAULT CURRENT_TIMESTAMP,
+                    updated_at          DATETIME    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (community_id, user_id),
+                    FOREIGN KEY (community_id)       REFERENCES social_communities(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id)            REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            """);
+
             // ── Indexes ───────────────────────────────────────────
             createIndexIfMissing(s, "CREATE INDEX idx_users_email      ON users(email)");
+            createIndexIfMissing(s, "CREATE INDEX idx_prt_user_id      ON password_reset_tokens(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_prt_expires_at   ON password_reset_tokens(expires_at)");
             createIndexIfMissing(s, "CREATE INDEX idx_friendships_addr ON friendships(addressee_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_user       ON posts(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_posts_recipe     ON posts(recipe_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_kudos_user  ON post_kudos(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_comments_post ON post_comments(post_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_post_comments_user ON post_comments(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_ratings_recipe   ON user_recipe_ratings(recipe_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_user  ON meal_plans(user_id)");
             createIndexIfMissing(s, "CREATE INDEX idx_meal_plans_week  ON meal_plans(week_start)");
             createIndexIfMissing(s, "CREATE INDEX idx_mp_meals_plan    ON meal_plan_meals(meal_plan_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_social_communities_owner ON social_communities(owner_user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_social_comm_members_user ON social_community_members(user_id)");
+            createIndexIfMissing(s, "CREATE INDEX idx_social_comm_members_status ON social_community_members(status)");
         }
     }
 

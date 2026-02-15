@@ -31,6 +31,7 @@ public class SocialDTOs {
             long userId,
             int recipeId,
             String recipeName,
+            String recipeImageUrl,
             String picturePath,
             String description,
             int rating,
@@ -38,11 +39,13 @@ public class SocialDTOs {
     ) {
         public static PostResponse from(Post post) {
             String recipeName = post.getRecipe() != null ? post.getRecipe().getName() : null;
+            String recipeImageUrl = post.getRecipe() != null ? post.getRecipe().getImageUrl() : null;
             return new PostResponse(
                     post.getId(),
                     post.getUserId(),
                     post.getRecipeId(),
                     recipeName,
+                    recipeImageUrl,
                     post.getPicturePath(),
                     post.getDescription(),
                     post.getRating(),
@@ -112,6 +115,63 @@ public class SocialDTOs {
             String name,
             String email,
             String relationStatus
+    ) {}
+
+    // ── Community DTOs ───────────────────────────────────────────
+
+    public record CommunityCreateRequest(String name) {}
+
+    public record CommunityRenameRequest(String name) {}
+
+    public record CommunityInviteRequest(long friendUserId) {}
+
+    public record CommunityResponse(
+            long id,
+            long ownerUserId,
+            String name,
+            List<Long> memberIds,
+            List<Long> pendingInviteUserIds
+    ) {}
+
+    public record CommunityInviteResponse(
+            long communityId,
+            String communityName,
+            long inviterId,
+            String inviterName,
+            LocalDateTime createdAt
+    ) {}
+
+    // ── Kudo & Comment DTOs ───────────────────────────────────────
+
+    /** Body for POST /api/social/posts/{id}/comments */
+    public record AddCommentRequest(String text) {}
+
+    public record CommentResponse(
+            long id,
+            long postId,
+            long userId,
+            String text,
+            LocalDateTime createdAt
+    ) {
+        public static CommentResponse from(alnak.business_logic.entities.PostComment c) {
+            return new CommentResponse(c.getId(), c.getPostId(), c.getUserId(),
+                    c.getText(), c.getCreatedAt());
+        }
+
+        public static List<CommentResponse> fromList(
+                List<alnak.business_logic.entities.PostComment> list) {
+            return list.stream().map(CommentResponse::from).toList();
+        }
+    }
+
+    /** Response after toggling a kudo. */
+    public record KudoToggleResponse(long postId, boolean added, Map<Long, String> kudosByUser) {}
+
+    /** Full interactions snapshot for one post — returned by GET /api/social/posts/{id}/interactions */
+    public record PostInteractionsResponse(
+            long postId,
+            Map<Long, String> kudosByUser,
+            List<CommentResponse> comments
     ) {}
 
     // ── Feed ──────────────────────────────────────────────────────
