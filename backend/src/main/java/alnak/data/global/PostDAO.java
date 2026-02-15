@@ -242,6 +242,119 @@ public class PostDAO {
         return post;
     }
 
+    // ── Kudos ─────────────────────────────────────────────────────
+
+    /**
+     * Toggle a kudo for a post: add if absent, remove if present.
+     * Returns true if the kudo was added, false if it was removed.
+     */
+    public boolean toggleKudo(long postId, long userId) {
+        // Check existence first
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM post_kudos WHERE post_id = ? AND user_id = ?")) {
+            check.setLong(1, postId);
+            check.setLong(2, userId);
+            try (ResultSet rs = check.executeQuery()) {
+                if (rs.next()) {
+                    // Remove
+                    try (PreparedStatement del = conn.prepareStatement(
+                            "DELETE FROM post_kudos WHERE post_id = ? AND user_id = ?")) {
+                        del.setLong(1, postId);
+                        del.setLong(2, userId);
+                        del.executeUpdate();
+                    }
+                    return false;
+                } else {
+                    // Add
+                    try (PreparedStatement ins = conn.prepareStatement(
+                            "INSERT INTO post_kudos (post_id, user_id) VALUES (?, ?)")) {
+                        ins.setLong(1, postId);
+                        ins.setLong(2, userId);
+                        ins.executeUpdate();
+                    }
+                    return true;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Returns a map of userId → createdAt for all kudos on a post.
+     */
+    public java.util.Map<Long, String> getKudosForPost(long postId) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT user_id, created_at FROM post_kudos WHERE post_id = ?")) {
+            ps.setLong(1, postId);
+            try (ResultSet rs = ps.executeQuery()) {
+                java.util.Map<Long, String> map = new java.util.LinkedHashMap<>();
+                while (rs.next()) {
+                    Timestamp ts = rs.getTimestamp("created_at");
+                    map.put(rs.getLong("user_id"), ts != null ? ts.toLocalDateTime().toString() : "");
+                }
+                return map;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // ── Comments ──────────────────────────────────────────────────
+
+    /**
+     * Add a comment to a post. Returns the new comment with its generated id.
+     */
+    public alnak.business_logic.entities.PostComment addComment(long postId, long userId, String text) {
+        String clean = text == null ? "" : text.trim();
+        if (clean.isEmpty()) throw new IllegalArgumentException("Comment text cannot be empty.");
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO post_comments (post_id, user_id, text) VALUES (?, ?, ?)",
+                Statement.RETURN_GENERATED_KEYS)) {
+            ps.setLong(1, postId);
+            ps.setLong(2, userId);
+            ps.setString(3, clean);
+            ps.executeUpdate();
+            alnak.business_logic.entities.PostComment c = new alnak.business_logic.entities.PostComment();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) c.setId(keys.getLong(1));
+            }
+            c.setPostId(postId);
+            c.setUserId(userId);
+            c.setText(clean);
+            c.setCreatedAt(java.time.LocalDateTime.now());
+            return c;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Returns all comments for a post, oldest first.
+     */
+    public List<alnak.business_logic.entities.PostComment> getCommentsForPost(long postId) {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT * FROM post_comments WHERE post_id = ? ORDER BY created_at ASC")) {
+            ps.setLong(1, postId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<alnak.business_logic.entities.PostComment> list = new ArrayList<>();
+                while (rs.next()) {
+                    alnak.business_logic.entities.PostComment c = new alnak.business_logic.entities.PostComment();
+                    c.setId(rs.getLong("id"));
+                    c.setPostId(rs.getLong("post_id"));
+                    c.setUserId(rs.getLong("user_id"));
+                    c.setText(rs.getString("text"));
+                    Timestamp ts = rs.getTimestamp("created_at");
+                    if (ts != null) c.setCreatedAt(ts.toLocalDateTime());
+                    list.add(c);
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private void setNullableString(PreparedStatement ps, int index, String value) throws SQLException {
         if (value == null) ps.setNull(index, Types.VARCHAR);
         else ps.setString(index, value);

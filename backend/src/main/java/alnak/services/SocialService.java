@@ -10,6 +10,7 @@ import alnak.data.global.PostDAO;
 import alnak.data.global.UserDAO;
 import alnak.data.local.RecipeDAO;
 import alnak.business_logic.entities.User;
+import alnak.business_logic.entities.PostComment;
 
 import java.util.List;
 import java.util.Map;
@@ -290,6 +291,37 @@ public class SocialService {
      */
     public boolean areFriends(long userA, long userB) {
         return friendshipDAO.areFriends(userA, userB);
+    }
+
+    // ── Kudos & Comments ──────────────────────────────────────────────────────
+
+    /**
+     * Toggle a kudo (like) on a post by userId.
+     * Returns true if the kudo was added, false if it was removed.
+     */
+    public boolean toggleKudo(long postId, long userId) {
+        return postDAO.toggleKudo(postId, userId);
+    }
+
+    /**
+     * Returns all kudos for a post as a map of userId → createdAt string.
+     */
+    public java.util.Map<Long, String> getKudosForPost(long postId) {
+        return postDAO.getKudosForPost(postId);
+    }
+
+    /**
+     * Add a comment to a post.
+     */
+    public alnak.business_logic.entities.PostComment addComment(long postId, long userId, String text) {
+        return postDAO.addComment(postId, userId, text);
+    }
+
+    /**
+     * Get all comments for a post, oldest first.
+     */
+    public List<alnak.business_logic.entities.PostComment> getCommentsForPost(long postId) {
+        return postDAO.getCommentsForPost(postId);
     }
 
     // ── Private helpers ───────────────────────────────────────────
