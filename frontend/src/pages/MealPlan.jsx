@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sunrise, Sun, Moon } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Sun } from 'lucide-react';
 import Layout from '../components/Layout';
 import { fetchActiveMealPlan } from '../services/mealPlanService';
 import { CART_GENERATE_REQUEST_KEY, PROFILE_KEY, WEEKLY_PLAN_KEY } from '../constants/storageKeys';
@@ -62,13 +62,10 @@ function parseStorage(key, fallback) {
 }
 
 function slotMeta(slot) {
-  if (slot === 'Pequeno-almoço') {
-    return { icon: Sunrise, time: '08:00', kcal: 380 };
+  if (slot === 'Snack') {
+    return { icon: Sun, time: '16:30', kcal: 280 };
   }
-  if (slot === 'Almoço') {
-    return { icon: Sun, time: '13:00', kcal: 620 };
-  }
-  return { icon: Moon, time: '20:00', kcal: 540 };
+  return { icon: null, time: '13:00', kcal: 620 };
 }
 
 export default function MealPlan() {
@@ -257,7 +254,7 @@ export default function MealPlan() {
                       <article key={`${selectedIso}-${meal.slot}-${meal.dish}`} className="daily-meal-item">
                         <div className="daily-meal-head">
                           <span className="daily-meal-slot">
-                            <Icon size={16} />
+                            {Icon ? <Icon size={16} /> : null}
                             {meal.slot}
                           </span>
                           <span className="daily-meal-time">

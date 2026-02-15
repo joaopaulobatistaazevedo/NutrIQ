@@ -18,17 +18,16 @@ const DAY_TO_OFFSET = {
 const OFFSET_TO_LABEL = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const MEAL_TYPE_TO_SLOT = {
-  BREAKFAST: 'Pequeno-almoço',
-  LUNCH: 'Almoço',
-  DINNER: 'Jantar',
+  BREAKFAST: 'Refeição',
+  LUNCH: 'Refeição',
+  DINNER: 'Refeição',
+  MEAL: 'Refeição',
   SNACK: 'Snack',
 };
 
 const SLOT_ORDER = {
-  'Pequeno-almoço': 0,
-  Almoço: 1,
-  Jantar: 2,
-  Snack: 3,
+  Refeição: 0,
+  Snack: 1,
 };
 
 function normalizeError(error) {

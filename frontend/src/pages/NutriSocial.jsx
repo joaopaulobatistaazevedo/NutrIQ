@@ -197,29 +197,27 @@ function relationStatusLabel(status) {
 
 function mealTypeLabel(value) {
   const normalized = String(value || '').trim().toUpperCase();
-  if (normalized === 'BREAKFAST') return 'Pequeno-almoço';
-  if (normalized === 'LUNCH') return 'Almoço';
-  if (normalized === 'DINNER') return 'Jantar';
   if (normalized === 'SNACK') return 'Snack';
-  return '';
+  return 'Refeição';
 }
 
 function inferMealTypeFromDate(value) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'SNACK';
+  if (Number.isNaN(parsed.getTime())) return 'MEAL';
   const hour = parsed.getHours();
-  if (hour < 11) return 'BREAKFAST';
-  if (hour < 15) return 'LUNCH';
-  if (hour < 19) return 'SNACK';
-  return 'DINNER';
+  if (hour >= 15 && hour < 19) return 'SNACK';
+  return 'MEAL';
 }
 
 function mealTypeFromPost(post) {
   const candidates = [post?.mealType, post?.meal_type, post?.type, post?.meal];
   for (const candidate of candidates) {
     const normalized = String(candidate || '').trim().toUpperCase();
-    if (['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'].includes(normalized)) {
-      return normalized;
+    if (normalized === 'SNACK') {
+      return 'SNACK';
+    }
+    if (['BREAKFAST', 'LUNCH', 'DINNER', 'MEAL'].includes(normalized)) {
+      return 'MEAL';
     }
   }
   return inferMealTypeFromDate(post?.createdAt);

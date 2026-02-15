@@ -17,9 +17,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Clock3,
-  Sunrise,
   Sun,
-  Moon,
   ChevronRight,
   Target,
 } from 'lucide-react';
@@ -41,27 +39,15 @@ const fade = {
 
 const WEEK_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const SLOT_ORDER = {
-  'Pequeno-almoço': 0,
-  Almoço: 1,
-  Jantar: 2,
-  Snack: 3,
+  Refeição: 0,
+  Snack: 1,
 };
 
 const SLOT_META = {
-  'Pequeno-almoço': {
-    icon: Sunrise,
-    fallbackMinutes: 15,
-    fallbackImage: 'https://picsum.photos/seed/breakfast-nutriq/1200/800',
-  },
-  Almoço: {
-    icon: Sun,
+  Refeição: {
+    icon: null,
     fallbackMinutes: 25,
-    fallbackImage: 'https://picsum.photos/seed/lunch-nutriq/1200/800',
-  },
-  Jantar: {
-    icon: Moon,
-    fallbackMinutes: 20,
-    fallbackImage: 'https://picsum.photos/seed/dinner-nutriq/1200/800',
+    fallbackImage: 'https://picsum.photos/seed/meal-nutriq/1200/800',
   },
   Snack: {
     icon: Sun,
@@ -882,7 +868,7 @@ export default function Dashboard() {
 
   const meals = todayMeals;
   const activeMealData = meals[activeMeal] || null;
-  const MealIcon = activeMealData?.icon || Sunrise;
+  const MealIcon = activeMealData?.icon || null;
   const completedCount = meals.filter((meal) => Boolean(meal.completed)).length;
   const completedPct = meals.length ? (completedCount / meals.length) * 100 : 0;
   const consumedKcal = meals.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0);
@@ -1053,7 +1039,7 @@ export default function Dashboard() {
                     className={`dash-meal-tab ${activeMeal === i ? 'active' : ''}`}
                     onClick={() => setActiveMeal(i)}
                   >
-                    <Icon size={16} />
+                    {Icon ? <Icon size={16} /> : null}
                     <span>{meal.period}</span>
                   </button>
                 );
@@ -1085,9 +1071,11 @@ export default function Dashboard() {
                     loading="lazy"
                     className="dash-meal-image"
                   />
-                  <div className="dash-meal-icon">
-                    <MealIcon size={24} />
-                  </div>
+                  {MealIcon ? (
+                    <div className="dash-meal-icon">
+                      <MealIcon size={24} />
+                    </div>
+                  ) : null}
                   <h3>{activeMealData.name}</h3>
                   <div className="dash-meal-meta">
                     <span>
