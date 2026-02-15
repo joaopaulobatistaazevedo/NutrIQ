@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, Flame, MessageCircle, Pencil, Search, Send, ThumbsUp, Trash2, UserMinus, UserPlus, Users, XCircle } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
   acceptFriendRequest,
@@ -241,6 +241,7 @@ function encodeFriendshipId(requesterId, addresseeId) {
 
 export default function NutriSocial() {
   const location = useLocation();
+  const navigate = useNavigate();
   const authSession = getAuthSession();
   const token = String(authSession?.token || '').trim();
   const currentUserId = Number(authSession?.userId || 0);
@@ -446,6 +447,12 @@ export default function NutriSocial() {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (activeTab === 'meal') {
+      navigate('/progress');
+    }
+  }, [activeTab, navigate]);
 
   useEffect(() => {
     if (!token) {
@@ -1125,17 +1132,6 @@ export default function NutriSocial() {
                 aria-label="Amigos"
               >
                   Amigos
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'meal'}
-                  className={`nutri-social-tab ${activeTab === 'meal' ? 'is-active' : ''}`}
-                  onClick={() => setActiveTab('meal')}
-                title="Registar Refeição"
-                aria-label="Registar Refeição"
-              >
-                  Registar Refeição
                 </button>
                 <button
                   type="button"
@@ -1856,18 +1852,6 @@ export default function NutriSocial() {
                 </div>
               </div>
             </div>
-          ) : null}
-
-          {activeTab === 'meal' ? (
-            <section className="card">
-              <div className="card-header">
-                <h3 className="card-title m-0">Registar Refeição</h3>
-              </div>
-              <div className="card-body">
-                <p className="text-secondary mb-3">Usa esta aba para abrir o registo de refeição.</p>
-                <Link to="/progress" className="btn btn-primary">Ir para Registar Refeição</Link>
-              </div>
-            </section>
           ) : null}
         </div>
       </div>

@@ -383,37 +383,6 @@ export default function Progress() {
       <div className="page">
         <div className="container-xl">
           <div className="progress-page">
-            <header className="progress-header page-header d-print-none">
-              <div>
-                <h1 className="page-title">Progresso Semanal</h1>
-                <p>Resumo simples da tua evolução em calorias, consistência e custo diário.</p>
-              </div>
-              <div className="progress-tag badge bg-primary-lt text-primary">
-                <BarChart3 size={16} />
-                {isLoading ? 'A sincronizar...' : 'Últimos 7 dias'}
-              </div>
-            </header>
-
-            <section className="progress-summary-grid">
-              <article className="progress-summary-card card">
-                <span className="progress-summary-icon"><Flame size={16} /></span>
-                <strong>{summary.avgCalories} kcal</strong>
-                <p>Média diária</p>
-              </article>
-
-              <article className="progress-summary-card card">
-                <span className="progress-summary-icon"><Wallet size={16} /></span>
-                <strong>€{summary.avgBudget}</strong>
-                <p>Custo médio/dia</p>
-              </article>
-
-              <article className="progress-summary-card card">
-                <span className="progress-summary-icon"><TrendingUp size={16} /></span>
-                <strong>{summary.adherence > 0 ? '+' : ''}{summary.adherence}%</strong>
-                <p>Consistência</p>
-              </article>
-            </section>
-
             <section className="progress-photo-card card">
               <div className="progress-photo-header">
                 <h2><Camera size={18} /> Check-in da refeição para streak</h2>
@@ -509,36 +478,7 @@ export default function Progress() {
               </form>
             </section>
 
-            <section className="progress-combined-card card">
-              <div className="progress-combined-block">
-                <h2>Calorias por dia</h2>
-                <div className="progress-merged-chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 28, right: 14, left: 4, bottom: 0 }}>
-                      <CartesianGrid vertical={false} stroke="#dce5f0" />
-                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        width={44}
-                        tick={{ fill: '#90a0b6', fontSize: 12 }}
-                        tickFormatter={(value) => `${value}`}
-                      />
-                      <Tooltip
-                        cursor={{ fill: 'rgba(34, 204, 154, 0.08)' }}
-                        contentStyle={{ borderRadius: 12, border: '1px solid #d4deeb', background: '#f9fbfd' }}
-                        labelStyle={{ color: '#1e293b' }}
-                        formatter={(value) => [`${value} kcal`, 'Calorias']}
-                      />
-                      <Bar dataKey="calories" fill="#22cc9a" radius={[8, 8, 0, 0]} maxBarSize={52}>
-                        <LabelList dataKey="priceLabel" position="top" fill="#334155" fontSize={12} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                {loadError ? <p className="progress-load-note">{loadError}</p> : null}
-              </div>
-            </section>
+            
           </div>
         </div>
       </div>
