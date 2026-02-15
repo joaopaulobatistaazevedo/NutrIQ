@@ -226,6 +226,7 @@ class OpenAIService:
         extraction_prompt = (
             "Extrai APENAS preferências para JSON válido com as chaves: "
             "favorite_foods (array), disliked_ingredients (array), "
+            "goal (string: 'lose_weight' | 'gain_weight' | 'maintain' | 'gain_muscle'), "
             "max_weekly_budget (number), planning_days (number). "
             "Se faltar algo usa null. Responde APENAS JSON."
         )
@@ -360,10 +361,18 @@ class OpenAIService:
         # Prefer merged_context (already enriched with memory) over raw user_context
         merged = dict(merged_context or user_context or {})
         
-        # Atualiza o contexto com o que o utilizador acabou de dizer no chat
+        # Atualiza o contexto com o que o utilizador acabou de dizer no chat.
+        # planning_days merece tratamento especial: o LLM de extração devolve
+        # frequentemente null quando o utilizador não repete o número de dias
+        # na mensagem atual — nesse caso mantemos o valor já presente no
+        # merged_context (proveniente do onboarding ou da memória persistida).
+        _planning_days_before = merged.get("planning_days")
         for k, v in constraints.items():
             if v not in (None, "", []):
                 merged[k] = v
+        if merged.get("planning_days") in (None, "") and _planning_days_before not in (None, ""):
+            merged["planning_days"] = _planning_days_before
+
         if memory:
             for key in ("goal", "max_weekly_budget", "planning_days"):
                 if merged.get(key) in (None, "") and memory.get(key) not in (None, ""):

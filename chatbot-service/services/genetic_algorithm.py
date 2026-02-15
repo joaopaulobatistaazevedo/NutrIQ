@@ -893,9 +893,12 @@ class MealPlanGA:
 
             slot_map = {ms.slot: ms for ms in day_slots if ms.slot in SLOTS}
             for slot in SLOTS:
+                # Determine the correct pool for this slot to avoid e.g. lunch
+                # recipes appearing in the breakfast slot during repair.
+                slot_pool = self._breakfast_pool if slot == "Pequeno-almoço" else self._main_pool
                 ms = slot_map.get(slot)
                 if ms is None:
-                    candidate = self._pick_low_repetition_recipe(day_used, usage)
+                    candidate = self._pick_low_repetition_recipe(day_used, usage, slot_pool)
                     repaired_slots.append(MealSlot(day=day, slot=slot, recipe=candidate))
                     rid = str(candidate.id or candidate.url or "")
                     day_used.add(rid)
@@ -903,7 +906,7 @@ class MealPlanGA:
                 else:
                     rid = str(ms.recipe.id or ms.recipe.url or "")
                     if rid in day_used:
-                        candidate = self._pick_low_repetition_recipe(day_used, usage)
+                        candidate = self._pick_low_repetition_recipe(day_used, usage, slot_pool)
                         repaired_slots.append(MealSlot(day=day, slot=slot, recipe=candidate))
                         rid = str(candidate.id or candidate.url or "")
                         usage[rid] = usage.get(rid, 0) + 1
@@ -914,14 +917,22 @@ class MealPlanGA:
         ind.slots = repaired_slots
         return ind
 
-    def _pick_low_repetition_recipe(self, day_used: set[str], usage: dict[str, int]) -> PricedRecipe:
+    def _pick_low_repetition_recipe(
+        self,
+        day_used: set[str],
+        usage: dict[str, int],
+        pool: list[PricedRecipe] | None = None,
+    ) -> PricedRecipe:
+        # Use the provided slot-specific pool; fall back to the full recipe list
+        # only if the pool is empty (should not happen in practice).
+        source = pool if pool else self.recipes
         candidates = [
             recipe
-            for recipe in self.recipes
+            for recipe in source
             if str(recipe.id or recipe.url or "") not in day_used
         ]
         if not candidates:
-            candidates = list(self.recipes)
+            candidates = list(source) or list(self.recipes)
 
         return min(
             candidates,
