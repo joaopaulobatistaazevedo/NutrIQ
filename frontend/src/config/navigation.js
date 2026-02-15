@@ -19,6 +19,7 @@ const USER_NAV_ITEMS = [
 
 const NUTRITIONIST_NAV_ITEMS = [
   { path: '/nutritionist', icon: BriefcaseMedical, label: 'Painel Nutri', shortcut: 'Alt+1', shortcutKey: '1' },
+  { path: '/nutrisocial', icon: Users, label: 'NutriSocial', shortcut: 'Alt+2', shortcutKey: '2' },
 ];
 
 export function getMainNavItems(role = 'user') {

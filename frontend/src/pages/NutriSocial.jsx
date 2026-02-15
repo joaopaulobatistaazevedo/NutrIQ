@@ -31,7 +31,7 @@ import {
 } from '../services/nutriSocialService';
 import { fetchRecipes } from '../services/recipeService';
 import { fetchMyProfile } from '../services/userService';
-import { getAuthSession } from '../utils/authSession';
+import { getAuthSession, getStoredRoleForEmail } from '../utils/authSession';
 import '../styles/nutrisocial.css';
 
 const FALLBACK_POST_IMAGE = 'https://placehold.co/860x520/e2e8f0/475569?text=NutriSocial';
@@ -187,6 +187,23 @@ function avatarForUser(userId, userDirectory) {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=E2E8F0&color=0F172A&rounded=true&size=96`;
 }
 
+function normalizeAccountRole(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'nutritionist') return 'nutritionist';
+  if (normalized === 'user') return 'user';
+  return '';
+}
+
+function isNutritionistUser(userId, userDirectory) {
+  const numericUserId = Number(userId || 0);
+  if (!Number.isInteger(numericUserId) || numericUserId <= 0) {
+    return false;
+  }
+
+  const user = userDirectory.get(numericUserId);
+  return normalizeAccountRole(user?.role) === 'nutritionist';
+}
+
 function relationStatusLabel(status) {
   const normalized = String(status || '').trim().toUpperCase();
   if (normalized === 'FRIEND') return 'Já amigo';
@@ -247,6 +264,7 @@ export default function NutriSocial() {
   const token = String(authSession?.token || '').trim();
   const currentUserId = Number(authSession?.userId || 0);
   const sessionName = String(authSession?.name || '').trim();
+  const currentUserRole = normalizeAccountRole(authSession?.role || getStoredRoleForEmail(authSession?.email || ''));
 
   const [streakCount, setStreakCount] = useState(0);
   const [currentUserName, setCurrentUserName] = useState('');
@@ -390,6 +408,7 @@ export default function NutriSocial() {
           id: Number(friend?.id),
           name: String(friend?.name || '').trim(),
           email: String(friend?.email || '').trim(),
+          role: normalizeAccountRole(friend?.role || getStoredRoleForEmail(friend?.email || '')),
         }))
         .filter((friend) => Number.isInteger(friend.id) && friend.id > 0);
 
@@ -608,6 +627,7 @@ export default function NutriSocial() {
         id: currentUserId,
         name: currentUserName || sessionName || 'Tu',
         email: '',
+        role: currentUserRole,
       });
     }
 
@@ -620,11 +640,12 @@ export default function NutriSocial() {
         id,
         name: String(friend?.name || '').trim() || `Chef #${id}`,
         email: String(friend?.email || '').trim(),
+        role: normalizeAccountRole(friend?.role || getStoredRoleForEmail(friend?.email || '')),
       });
     });
 
     return map;
-  }, [currentUserId, currentUserName, friendUsers, sessionName]);
+  }, [currentUserId, currentUserName, currentUserRole, friendUsers, sessionName]);
 
   const storyUsers = useMemo(() => {
     const list = [];
@@ -1744,6 +1765,9 @@ export default function NutriSocial() {
                   const mealType = mealTypeFromPost(post);
                   const mealTypeDisplay = mealTypeLabel(mealType) || 'Refeição';
                   const createdLabel = dayHourLabel(post?.currentTime || post?.createdAt);
+                  const authorName = usernameFromId(post.userId, currentUserId, userDirectory);
+                  const authorRole = normalizeAccountRole(post?.userRole || post?.authorRole || post?.role);
+                  const isVerifiedAuthor = authorRole === 'nutritionist' || isNutritionistUser(post.userId, userDirectory);
                   const isEditingPost = editingPostId === draftKey;
 
                   return (
@@ -1752,7 +1776,14 @@ export default function NutriSocial() {
                         <div className="d-flex align-items-center gap-2">
                           <span className="avatar avatar-sm">{String(post.userId || '').slice(-2)}</span>
                           <div className="d-flex flex-column">
-                            <span className="fw-semibold">{usernameFromId(post.userId, currentUserId, userDirectory)}</span>
+                            <span className="nutri-social-verified-inline">
+                              <span className="fw-semibold">{authorName}</span>
+                              {isVerifiedAuthor ? (
+                                <span className="nutri-social-verified-icon text-primary" title="Nutricionista verificado" aria-label="Nutricionista verificado">
+                                  <CheckCircle2 size={14} />
+                                </span>
+                              ) : null}
+                            </span>
                             <small className="text-secondary d-inline-flex align-items-center gap-1">
                               <Clock3 size={12} /> {createdLabel}
                             </small>
@@ -1937,13 +1968,26 @@ export default function NutriSocial() {
 
                         {sortedComments.length > 0 ? (
                           <div className="nutri-social-comment-list mt-2">
-                            {sortedComments.slice(0, 4).map((comment) => (
-                              <div className="nutri-social-comment-item" key={comment.id}>
-                                <strong>{usernameFromId(comment.userId, currentUserId, userDirectory)}</strong>
-                                <span>{comment.text}</span>
-                                <small>{prettyDate(comment.createdAt)}</small>
-                              </div>
-                            ))}
+                            {sortedComments.slice(0, 4).map((comment) => {
+                              const commentAuthorName = usernameFromId(comment.userId, currentUserId, userDirectory);
+                              const commentAuthorRole = normalizeAccountRole(comment?.userRole || comment?.authorRole || comment?.role);
+                              const isVerifiedCommentAuthor = commentAuthorRole === 'nutritionist' || isNutritionistUser(comment.userId, userDirectory);
+
+                              return (
+                                <div className="nutri-social-comment-item" key={comment.id}>
+                                  <div className="nutri-social-verified-inline">
+                                    <strong>{commentAuthorName}</strong>
+                                    {isVerifiedCommentAuthor ? (
+                                      <span className="nutri-social-verified-icon text-primary" title="Nutricionista verificado" aria-label="Nutricionista verificado">
+                                        <CheckCircle2 size={12} />
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <span>{comment.text}</span>
+                                  <small>{prettyDate(comment.createdAt)}</small>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : null}
                       </div>

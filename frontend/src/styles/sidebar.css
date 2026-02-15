@@ -303,6 +303,24 @@
   }
 
   .sidebar-footer {
-    display: none;
+    display: flex;
+    padding: 0;
+    border-top: none;
+    margin-left: 6px;
+  }
+
+  .sidebar-logout {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+    color: rgba(226, 232, 240, 0.7);
+  }
+
+  .sidebar-logout:hover {
+    transform: translateY(-1px);
   }
 }

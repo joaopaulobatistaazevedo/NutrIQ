@@ -14,7 +14,7 @@ export default function ProtectedRoute({ children, requiredRole }) {
     if (role !== requiredRole) {
       return <Navigate to={role === 'nutritionist' ? '/nutritionist' : '/dashboard'} replace />;
     }
-  } else if (role === 'nutritionist') {
+  } else if (role === 'nutritionist' && location.pathname !== '/nutrisocial') {
     return <Navigate to="/nutritionist" replace />;
   }
 

@@ -111,26 +111,6 @@ function extractSourceUrl(recipe) {
   return match[0].replace(/[.,;!?]+$/, '');
 }
 
-function estimateWeeklySpend(prices) {
-  const cheapestByIngredient = new Map();
-
-  prices.forEach((entry) => {
-    const ingredient = String(entry?.ingredientNormalized || '').trim();
-    const price = Number(entry?.price);
-
-    if (!ingredient || !Number.isFinite(price)) {
-      return;
-    }
-
-    const previous = cheapestByIngredient.get(ingredient);
-    if (previous === undefined || price < previous) {
-      cheapestByIngredient.set(ingredient, price);
-    }
-  });
-
-  return Array.from(cheapestByIngredient.values()).reduce((total, value) => total + value, 0);
-}
-
 function parseStorage(key, fallback = null) {
   try {
     const raw = localStorage.getItem(key);
@@ -751,7 +731,6 @@ export default function Dashboard() {
 
         const profile = apiUser?.profile || {};
         const dailyGoal = Math.max(1200, Math.round(toNumberOr(2150, profile?.dailyCalories)));
-        const estimatedSpendByPrices = estimateWeeklySpend(prices);
         const storedWeeklyPlan = loadStoredWeeklyPlan();
         const storedMealLookup = buildStoredMealLookup(storedWeeklyPlan);
         const priceIndex = buildPriceIndex(prices);
@@ -787,6 +766,9 @@ export default function Dashboard() {
         const weeklyCalories = WEEK_DAYS.map((dayLabel) => {
           const dayMeals = flatMeals.filter((meal) => meal?.dayLabel === dayLabel);
           const real = Math.round(dayMeals.reduce((sum, meal) => {
+            if (!meal?.completed) {
+              return sum;
+            }
             const recipe = recipeById.get(Number(meal?.recipe_id));
             const metrics = estimateMealMetrics(meal, recipe, priceIndex);
             return sum + toNumberOr(0, metrics.kcal);
@@ -813,6 +795,7 @@ export default function Dashboard() {
               name: String(meal?.title || 'Refeição').trim() || 'Refeição',
               time: formatMinutes(totalTime),
               kcal,
+              costValue: cost,
               cost: formatEuro(cost),
               image: String(recipe?.imageUrl || '').trim() || meta.fallbackImage,
               sourceUrl: extractSourceUrl(recipe),
@@ -825,15 +808,13 @@ export default function Dashboard() {
         const weeklyAdherencePct =
           weeklyTotalMeals > 0 ? Math.round((weeklyCompletedMeals / weeklyTotalMeals) * 100) : 0;
 
-        const computedPlanCost = flatMeals.reduce((sum, meal) => {
+        const completedMeals = flatMeals.filter((meal) => Boolean(meal?.completed));
+        const completedMealsCost = completedMeals.reduce((sum, meal) => {
           const recipe = recipeById.get(Number(meal?.recipe_id));
           const metrics = estimateMealMetrics(meal, recipe, priceIndex);
           return sum + toNumberOr(0, metrics.cost);
         }, 0);
-        const weeklyPlanCost = toNumberOr(0, activePlan?.total_cost);
-        const estimatedWeeklySpend = computedPlanCost > 0
-          ? computedPlanCost
-          : (weeklyPlanCost > 0 ? weeklyPlanCost : estimatedSpendByPrices);
+        const estimatedWeeklySpend = completedMealsCost;
 
         if (!isMounted) {
           return;
@@ -842,7 +823,11 @@ export default function Dashboard() {
         setDashboardData({
           userName: toName(apiUser?.name),
           dailyGoal,
-          consumedCalories: Math.round(mealsForToday.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0)),
+          consumedCalories: Math.round(
+            mealsForToday.reduce((sum, meal) => (
+              meal?.completed ? sum + toNumberOr(0, meal.kcal) : sum
+            ), 0),
+          ),
           weeklyBudget: Math.max(0, toNumberOr(0, profile?.budgetWeekly)),
           estimatedWeeklySpend,
           weeklyCalories,
@@ -871,7 +856,9 @@ export default function Dashboard() {
   const MealIcon = activeMealData?.icon || null;
   const completedCount = meals.filter((meal) => Boolean(meal.completed)).length;
   const completedPct = meals.length ? (completedCount / meals.length) * 100 : 0;
-  const consumedKcal = meals.reduce((sum, meal) => sum + toNumberOr(0, meal.kcal), 0);
+  const consumedKcal = meals.reduce((sum, meal) => (
+    meal?.completed ? sum + toNumberOr(0, meal.kcal) : sum
+  ), 0);
   const isActiveMealCompleted = Boolean(activeMealData?.completed);
 
   useEffect(() => {
@@ -884,30 +871,6 @@ export default function Dashboard() {
       setActiveMeal(0);
     }
   }, [activeMeal, meals.length]);
-
-  const macros = useMemo(() => {
-    if (dashboardData.goal === 'BULK') {
-      return [
-        { label: 'Proteína', value: 140, max: 170, color: '#60a5fa' },
-        { label: 'Hidratos', value: 280, max: 340, color: '#fbbf24' },
-        { label: 'Gordura', value: 75, max: 90, color: '#f472b6' },
-      ];
-    }
-
-    if (dashboardData.goal === 'LOSE_WEIGHT') {
-      return [
-        { label: 'Proteína', value: 130, max: 160, color: '#60a5fa' },
-        { label: 'Hidratos', value: 180, max: 240, color: '#fbbf24' },
-        { label: 'Gordura', value: 55, max: 75, color: '#f472b6' },
-      ];
-    }
-
-    return [
-      { label: 'Proteína', value: 120, max: 150, color: '#60a5fa' },
-      { label: 'Hidratos', value: 230, max: 280, color: '#fbbf24' },
-      { label: 'Gordura', value: 65, max: 80, color: '#f472b6' },
-    ];
-  }, [dashboardData.goal]);
 
   const budgetPercent = useMemo(() => {
     if (dashboardData.weeklyBudget <= 0 || dashboardData.estimatedWeeklySpend <= 0) {
@@ -966,6 +929,47 @@ export default function Dashboard() {
     );
   };
 
+  const handleCompleteActiveMeal = () => {
+    if (!activeMealData) {
+      return;
+    }
+
+    const willComplete = !isActiveMealCompleted;
+    const kcalDelta = Math.round(toNumberOr(0, activeMealData.kcal)) * (willComplete ? 1 : -1);
+    const costDelta = toNumberOr(0, activeMealData.costValue) * (willComplete ? 1 : -1);
+    const todayDayLabel = WEEK_DAYS[(new Date().getDay() + 6) % 7];
+
+    setTodayMeals((previous) => previous.map((meal, index) => (
+      index === activeMeal
+        ? { ...meal, completed: willComplete }
+        : meal
+    )));
+
+    setDashboardData((previous) => {
+      const totalMeals = Math.max(0, toNumberOr(0, previous.weeklyTotalMeals));
+      const currentCompleted = Math.max(0, toNumberOr(0, previous.weeklyCompletedMeals));
+      const nextCompletedMeals = Math.min(totalMeals, Math.max(0, currentCompleted + (willComplete ? 1 : -1)));
+      const nextAdherence = totalMeals > 0 ? Math.round((nextCompletedMeals / totalMeals) * 100) : 0;
+
+      const nextWeeklyCalories = Array.isArray(previous.weeklyCalories)
+        ? previous.weeklyCalories.map((entry) => (
+          entry?.day === todayDayLabel
+            ? { ...entry, real: Math.max(0, Math.round(toNumberOr(0, entry.real) + kcalDelta)) }
+            : entry
+        ))
+        : previous.weeklyCalories;
+
+      return {
+        ...previous,
+        consumedCalories: Math.max(0, Math.round(toNumberOr(0, previous.consumedCalories) + kcalDelta)),
+        estimatedWeeklySpend: Math.max(0, toNumberOr(0, previous.estimatedWeeklySpend) + costDelta),
+        weeklyCompletedMeals: nextCompletedMeals,
+        weeklyAdherencePct: nextAdherence,
+        weeklyCalories: nextWeeklyCalories,
+      };
+    });
+  };
+
   return (
     <Layout>
       <div className="page dash">
@@ -998,27 +1002,6 @@ export default function Dashboard() {
               <div className="dash-hero-right">
                 <div className="dash-hero-meters">
                   <CalorieRing consumed={dashboardData.consumedCalories} goal={dashboardData.dailyGoal} />
-                </div>
-
-                <div className="dash-hero-macros">
-                  {macros.map((m) => (
-                    <div className="macro-bar" key={m.label}>
-                      <div className="macro-bar-head">
-                        <span>{m.label}</span>
-                        <span>{m.value}g</span>
-                      </div>
-                      <div className="macro-bar-track">
-                        <motion.div
-                          className="macro-bar-fill"
-                          style={{ background: m.color }}
-                          initial={{ width: 0 }}
-                          whileInView={{ width: `${(m.value / m.max) * 100}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
-                          viewport={{ once: true }}
-                        />
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
@@ -1090,9 +1073,13 @@ export default function Dashboard() {
                     <button type="button" className="dash-meal-view" onClick={openActiveMealRecipe}>
                       Ver receita completa <ChevronRight size={15} />
                     </button>
-                    <button type="button" className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`} disabled>
+                    <button
+                      type="button"
+                      className={`dash-meal-complete ${isActiveMealCompleted ? 'done' : ''}`}
+                      onClick={handleCompleteActiveMeal}
+                    >
                       <CheckCircle2 size={14} />
-                      <span>{isActiveMealCompleted ? 'Marcada como comida' : 'Por concluir'}</span>
+                      <span>{isActiveMealCompleted ? 'Desmarcar refeição' : 'Marcar como comida'}</span>
                     </button>
                   </div>
                 </motion.div>

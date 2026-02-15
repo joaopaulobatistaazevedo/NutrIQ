@@ -533,6 +533,19 @@
   color: var(--app-text-muted);
 }
 
+.nutri-social-verified-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nutri-social-verified-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 /* Mobile fix: header/actions stacking and card controls */
 @media (max-width: 768px) {
   .nutri-social-page .page-header {

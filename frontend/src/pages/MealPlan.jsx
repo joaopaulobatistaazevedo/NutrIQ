@@ -126,7 +126,10 @@ function slotMeta(slot) {
   if (slot === 'Snack') {
     return { icon: Sun, time: '16:30', kcal: 280 };
   }
-  return { icon: null, time: '13:00', kcal: 620 };
+  if (slot === 'Almoço') {
+    return { icon: Sun, time: '13:00', kcal: 620 };
+  }
+  return { icon: Moon, time: '20:00', kcal: 540 };
 }
 
 export default function MealPlan() {
